@@ -1,0 +1,93 @@
+{
+  "expo": {
+    "name": "FootNation",
+    "slug": "flex",
+    "scheme": [
+      "com.footnation.app",
+      "footnation"
+    ],
+    "version": "1.0.1",
+    "orientation": "default",
+    "icon": "./assets/brand/app-icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F7F9FC",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.footnation.app",
+      "usesAppleSignIn": true,
+      "bitcode": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.footnation.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-asset",
+      "expo-image",
+      "expo-video",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "FootNation utilise le microphone pour vos vidéos, vos messages vocaux et les appels que vous lancez ou acceptez.",
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FootNation accède aux photos que vous choisissez pour vos publications.",
+          "cameraPermission": "FootNation utilise la caméra pour vos publications et les appels vidéo que vous lancez ou acceptez.",
+          "microphonePermission": "FootNation utilise le microphone pour vos vidéos, vos messages vocaux et les appels que vous lancez ou acceptez."
+        }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "FootNation utilise la caméra pour vos publications et les appels vidéo que vous lancez ou acceptez.",
+          "microphonePermission": "FootNation utilise le microphone pour vos vidéos, vos messages vocaux et les appels que vous lancez ou acceptez."
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "color": "#087CFF",
+          "defaultChannel": "footnation"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "FootNation utilise votre position pour vous montrer les clubs proches de vous.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0624e449-c8c6-43fb-bf1c-27540ce68521"
+      }
+    },
+    "owner": "fleximmos-team"
+  }
+}

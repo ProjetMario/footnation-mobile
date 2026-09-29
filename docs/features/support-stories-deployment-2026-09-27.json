@@ -1,0 +1,20 @@
+{
+  "project": "FOOTNATION",
+  "project_id": "zkvwqywtlkkkxmapehwe",
+  "applied_on": "2026-09-27",
+  "authorized_by": "Explicit user approval in task",
+  "migrations": [
+    {
+      "version": "20260927110924",
+      "name": "support_conversations",
+      "file": "supabase/migrations/20260927110924_support_conversations.sql",
+      "sha256": "766c589ab61c222d2216aa116d28ac49425a35f0b1d4e7cbed4411ff1b4599e4"
+    },
+    {
+      "version": "20260927110938",
+      "name": "profile_story_collections_presence",
+      "file": "supabase/migrations/20260927110938_profile_story_collections_presence.sql",
+      "sha256": "da7438a8077f9cd34133284c449537282e89cdcd57c20763845c00d6d6c25cad"
+    }
+  ]
+}

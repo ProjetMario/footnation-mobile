@@ -1,0 +1,1 @@
+CREATE POLICY native_club_follow_owner ON public.club_followers AS RESTRICTIVE FOR INSERT TO anon,authenticated WITH CHECK(auth.uid() IS NOT NULL AND (profile_id=auth.uid() OR public.is_site_admin()));

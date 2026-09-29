@@ -1,0 +1,100 @@
+{
+  "verified_at": "2026-09-24",
+  "mode": "read_only",
+  "observations": [
+    {
+      "project": "zkvwqywtlkkkxmapehwe",
+      "database_metadata": {
+        "functions": [
+          {
+            "name": "public.account_deletion_check(uuid)",
+            "present": true
+          },
+          {
+            "name": "public.account_deletion_shared_spaces_check(uuid)",
+            "present": false
+          },
+          {
+            "name": "public.get_member_access_status()",
+            "present": false
+          },
+          {
+            "name": "public.get_social_signup_status()",
+            "present": false
+          },
+          {
+            "name": "public.can_review_content()",
+            "present": false
+          },
+          {
+            "name": "public.is_site_admin()",
+            "present": true
+          },
+          {
+            "name": "public.prune_native_growth_activity()",
+            "present": true
+          },
+          {
+            "name": "public.review_content_report(uuid,text,text,integer)",
+            "present": false
+          },
+          {
+            "name": "public.apple_deletion_receipt(uuid)",
+            "present": false
+          }
+        ],
+        "ownership_fks": [
+          {
+            "table": "pro_pages",
+            "column": "owner_id",
+            "nullable": false,
+            "delete_action": "c"
+          },
+          {
+            "table": "groups",
+            "column": "created_by",
+            "nullable": false,
+            "delete_action": "c"
+          }
+        ],
+        "rls": [
+          {
+            "table": "posts",
+            "enabled": true
+          },
+          {
+            "table": "stories",
+            "enabled": true
+          },
+          {
+            "table": "shorts",
+            "enabled": true
+          },
+          {
+            "table": "user_reports",
+            "enabled": true
+          }
+        ],
+        "report_columns": [
+          "id",
+          "reporter_id",
+          "reported_id",
+          "reason",
+          "details",
+          "status",
+          "created_at"
+        ],
+        "report_constraints": null,
+        "deletion_shared_guard_present": true,
+        "migrations": null
+      }
+    },
+    {
+      "auth_providers": {
+        "apple": false,
+        "google": true,
+        "email": true
+      }
+    }
+  ]
+}

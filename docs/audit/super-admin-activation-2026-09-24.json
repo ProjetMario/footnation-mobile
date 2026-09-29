@@ -1,0 +1,268 @@
+{
+  "project": "FOOTNATION",
+  "project_ref": "zkvwqywtlkkkxmapehwe",
+  "verified_on": "2026-09-24",
+  "migrations": [
+    {
+      "version": "20260924123723",
+      "name": "admin_console"
+    },
+    {
+      "version": "20260924124200",
+      "name": "admin_console_avatar_bucket"
+    }
+  ],
+  "functions": [
+    {
+      "name": "ga4-analytics",
+      "version": 7,
+      "status": "ACTIVE",
+      "verify_jwt": true,
+      "sha256": "c123d3294d31c2e0180e60af740b6b8f8ca23535fafb72db570295c88378533b"
+    },
+    {
+      "name": "get-mobile-stats",
+      "version": 7,
+      "status": "ACTIVE",
+      "verify_jwt": true,
+      "sha256": "2c4cd0d244c8093cacd6e9f78738f96720ab1bf9041b9a9bec0df834ec6bb298"
+    },
+    {
+      "name": "admin-console-account",
+      "version": 2,
+      "status": "ACTIVE",
+      "verify_jwt": true,
+      "sha256": "9e25897b6ef9c89ddd779d89bad96dfba7d678a3dc1d765d45b439568eb653da"
+    }
+  ],
+  "source_verification": [
+    {
+      "name": "admin-console-account",
+      "version": 2,
+      "verify_jwt": true,
+      "files_match": true,
+      "files_checked": 8
+    },
+    {
+      "name": "ga4-analytics",
+      "version": 7,
+      "verify_jwt": true,
+      "files_match": true,
+      "files_checked": 3
+    },
+    {
+      "name": "get-mobile-stats",
+      "version": 7,
+      "verify_jwt": true,
+      "files_match": true,
+      "files_checked": 2
+    }
+  ],
+  "database_verification": {
+    "read_only": true,
+    "paged_resources": 34,
+    "overview_periods": 3,
+    "admin_pagination": "passed",
+    "member_page_overview_mutation": "denied",
+    "missing_identity": "denied",
+    "anonymous": "denied",
+    "rls_tables": 4,
+    "direct_client_table_access": 0
+  },
+  "local_verification": {
+    "targeted_vitest_files": 5,
+    "targeted_vitest_tests": 68,
+    "sql_contract": "passed",
+    "typecheck": "passed",
+    "native_device": "not_run"
+  },
+  "security_advisor_additions": [
+    {
+      "name": "rls_enabled_no_policy",
+      "level": "INFO",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy",
+      "detail": "Table \\`public.admin_console_audit\\` has RLS enabled, but no policies exist",
+      "metadata": {
+        "name": "admin_console_audit",
+        "type": "table",
+        "schema": "public"
+      }
+    },
+    {
+      "name": "rls_enabled_no_policy",
+      "level": "INFO",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy",
+      "detail": "Table \\`public.admin_console_media\\` has RLS enabled, but no policies exist",
+      "metadata": {
+        "name": "admin_console_media",
+        "type": "table",
+        "schema": "public"
+      }
+    },
+    {
+      "name": "rls_enabled_no_policy",
+      "level": "INFO",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy",
+      "detail": "Table \\`public.admin_console_operations\\` has RLS enabled, but no policies exist",
+      "metadata": {
+        "name": "admin_console_operations",
+        "type": "table",
+        "schema": "public"
+      }
+    },
+    {
+      "name": "rls_enabled_no_policy",
+      "level": "INFO",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy",
+      "detail": "Table \\`public.admin_profile_overrides\\` has RLS enabled, but no policies exist",
+      "metadata": {
+        "name": "admin_profile_overrides",
+        "type": "table",
+        "schema": "public"
+      }
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+      "detail": "Function `public.admin_console_mutate(p_action text, p_id uuid, p_expected text, p_values jsonb, p_reason text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/admin_console_mutate`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+      "metadata": {
+        "name": "admin_console_mutate",
+        "schema": "public",
+        "language": "plpgsql",
+        "arguments": "p_action text, p_id uuid, p_expected text, p_values jsonb, p_reason text",
+        "security_definer": true
+      }
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+      "detail": "Function `public.admin_console_overview(p_period text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/admin_console_overview`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+      "metadata": {
+        "name": "admin_console_overview",
+        "schema": "public",
+        "language": "plpgsql",
+        "arguments": "p_period text",
+        "security_definer": true
+      }
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+      "detail": "Function `public.admin_console_page(p_resource text, p_filters jsonb, p_offset integer, p_limit integer)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/admin_console_page`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+      "metadata": {
+        "name": "admin_console_page",
+        "schema": "public",
+        "language": "plpgsql",
+        "arguments": "p_resource text, p_filters jsonb, p_offset integer, p_limit integer",
+        "security_definer": true
+      }
+    }
+  ],
+  "performance_advisor_owned": [
+    {
+      "name": "unused_index",
+      "level": "INFO",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index",
+      "detail": "Index \\`admin_console_operations_actor_created_idx\\` on table \\`public.admin_console_operations\\` has not been used",
+      "metadata": {
+        "name": "admin_console_operations",
+        "type": "table",
+        "schema": "public"
+      }
+    },
+    {
+      "name": "unused_index",
+      "level": "INFO",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index",
+      "detail": "Index \\`admin_console_operations_target_action_created_idx\\` on table \\`public.admin_console_operations\\` has not been used",
+      "metadata": {
+        "name": "admin_console_operations",
+        "type": "table",
+        "schema": "public"
+      }
+    },
+    {
+      "name": "unused_index",
+      "level": "INFO",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index",
+      "detail": "Index \\`admin_console_media_target_idx\\` on table \\`public.admin_console_media\\` has not been used",
+      "metadata": {
+        "name": "admin_console_media",
+        "type": "table",
+        "schema": "public"
+      }
+    }
+  ],
+  "pending": [
+    "Real Auth email/password, reminder, upload and account deletion end-to-end tests on disposable accounts",
+    "Account deletion disabled: missing billing/Stripe and Apple revocation prerequisites",
+    "Real iOS and Android device validation",
+    "Unrelated pending age-gate migrations deliberately excluded"
+  ],
+  "backup_directory": "/tmp/footnation-super-admin-activation",
+  "http_verification": [
+    {
+      "function": "admin-console-account",
+      "case": "preflight",
+      "status": 204,
+      "headers_accepted": true,
+      "origin_accepted": true,
+      "passed": true
+    },
+    {
+      "function": "admin-console-account",
+      "case": "missing_token",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "function": "admin-console-account",
+      "case": "invalid_token",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "function": "ga4-analytics",
+      "case": "preflight",
+      "status": 200,
+      "headers_accepted": true,
+      "origin_accepted": true,
+      "passed": true
+    },
+    {
+      "function": "ga4-analytics",
+      "case": "missing_token",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "function": "ga4-analytics",
+      "case": "invalid_token",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "function": "get-mobile-stats",
+      "case": "preflight",
+      "status": 204,
+      "headers_accepted": true,
+      "origin_accepted": true,
+      "passed": true
+    },
+    {
+      "function": "get-mobile-stats",
+      "case": "missing_token",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "function": "get-mobile-stats",
+      "case": "invalid_token",
+      "status": 401,
+      "passed": true
+    }
+  ]
+}

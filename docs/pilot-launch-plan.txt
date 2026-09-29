@@ -1,0 +1,19 @@
+Plan de lancement pilote FootNation
+1) Vérifier la recette locale
+✅ Variables locales chargées dans l’environnement
+2) Build preview
+   - npx eas build --platform ios --profile preview
+   - npx eas build --platform android --profile preview
+❗ extra.eas.projectId présent dans la config Expo (identifiant EAS connu)
+❗ EXPO_PUBLIC_SUPABASE_URL présent
+❗ EXPO_PUBLIC_SUPABASE_ANON_KEY présent
+3) Préparer les serveurs
+   - déployer native-push, account-deletion et message-attachment-cleanup sur Supabase
+   - valider NATIVE_PUSH_PROJECT_ID avec l'UUID EAS <à renseigner>
+   - vérification active du worker push : EXPO_NATIVE_PUSH_ENABLED=false
+4) Exécuter le worker push
+   - appeler l’endpoint natif push depuis votre planificateur sécurisé (Bearer secret dédié)
+❗ SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY disponibles pour les fonctions serveurs
+5) Tests appareils réels
+   - installer les builds preview sur Android et iPhone
+   - tester inscription, connexion, notification, clic, convocation, message et déconnexion

@@ -1,0 +1,643 @@
+{
+  "scope": "Route shape comparison only. Matching routes do not prove functional parity. Geo and wildcard routes require separate review.",
+  "source": "docs/source-routes.json",
+  "routes": [
+    {
+      "sourcePath": "/",
+      "nativeFiles": [
+        "app/(tabs)/index.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/clubs-departement/*",
+      "nativeFiles": [
+        "app/clubs-departement/[combined].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/clubs-ville-:combined",
+      "nativeFiles": [
+        "app/[legacy].tsx",
+        "app/clubs-ville/[combined].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/:slug",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/blog",
+      "nativeFiles": [
+        "app/blog/index.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/blog/:slug",
+      "nativeFiles": [
+        "app/blog/[slug].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/centres-foot-5",
+      "nativeFiles": [
+        "app/centres-foot-5.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/clubs",
+      "nativeFiles": [
+        "app/(tabs)/clubs.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/club/:id",
+      "nativeFiles": [
+        "app/club/[id].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/club/:id/admin",
+      "nativeFiles": [
+        "app/club/[id]/admin.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/club/:id/member",
+      "nativeFiles": [
+        "app/club/[id]/member.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/city-football/:slug",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/world-football/:slug",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/countries",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/country/:slug",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/cities",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/city/:slug",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/championships",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/championship/:slug",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/famous-club/:slug",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/club-football/:slug",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/football-city/:slug",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/club-dashboard",
+      "nativeFiles": [
+        "app/club-dashboard.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/my-profile",
+      "nativeFiles": [
+        "app/my-profile.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/profile",
+      "nativeFiles": [
+        "app/profile.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/profile/:id",
+      "nativeFiles": [
+        "app/profile/[id].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/talent/:slug",
+      "nativeFiles": [
+        "app/talent/[slug].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/profile-setup",
+      "nativeFiles": [
+        "app/profile-setup.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/my-convocations",
+      "nativeFiles": [
+        "app/my-convocations.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/my-invitations",
+      "nativeFiles": [
+        "app/my-invitations.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/career",
+      "nativeFiles": [
+        "app/career.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/organizations",
+      "nativeFiles": [
+        "app/organizations.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/connections",
+      "nativeFiles": [
+        "app/connections.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/search-users",
+      "nativeFiles": [
+        "app/search-users.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/search",
+      "nativeFiles": [
+        "app/search.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/settings",
+      "nativeFiles": [
+        "app/settings.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/parrainage",
+      "nativeFiles": [
+        "app/parrainage.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/cv-football",
+      "nativeFiles": [
+        "app/cv-football.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/messages",
+      "nativeFiles": [
+        "app/messages.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/stories/create",
+      "nativeFiles": [
+        "app/stories/create.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/help",
+      "nativeFiles": [
+        "app/help.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/legal",
+      "nativeFiles": [
+        "app/legal.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/mentions-legales",
+      "nativeFiles": [
+        "app/mentions-legales.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/suppression-compte",
+      "nativeFiles": [
+        "app/suppression-compte.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/conditions-generales-vente",
+      "nativeFiles": [
+        "app/conditions-generales-vente.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/politique-confidentialite",
+      "nativeFiles": [
+        "app/politique-confidentialite.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/securite-des-mineurs",
+      "nativeFiles": [
+        "app/securite-des-mineurs.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/auth/callback",
+      "nativeFiles": [
+        "app/auth/callback.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/followers",
+      "nativeFiles": [
+        "app/followers.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/login",
+      "nativeFiles": [
+        "app/login.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/pro-pages",
+      "nativeFiles": [
+        "app/pro-pages/index.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/pro-pages/new",
+      "nativeFiles": [
+        "app/pro-pages/new.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/pro-pages/:id",
+      "nativeFiles": [
+        "app/pro-pages/[id]/index.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/pro-pages/:id/edit",
+      "nativeFiles": [
+        "app/pro-pages/[id]/edit.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/pages/:slug",
+      "nativeFiles": [
+        "app/pages/[slug].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/matches",
+      "nativeFiles": [
+        "app/matches.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/match/:matchId",
+      "nativeFiles": [
+        "app/match/[id].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/actualites",
+      "nativeFiles": [
+        "app/actualites.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/actu/:id",
+      "nativeFiles": [
+        "app/actu/[id].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/ligue1",
+      "nativeFiles": [
+        "app/ligue1.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/classements/ligue-1",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/classements/premier-league",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/classements/liga",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/classements/bundesliga",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/ligue-des-champions",
+      "nativeFiles": [
+        "app/ligue-des-champions.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/events",
+      "nativeFiles": [
+        "app/events/index.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/events/dashboard",
+      "nativeFiles": [
+        "app/events/dashboard.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/events/new",
+      "nativeFiles": [
+        "app/events/new.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/events/:eventId",
+      "nativeFiles": [
+        "app/events/[id].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/events/:eventId/edit",
+      "nativeFiles": [
+        "app/events/[id]/edit.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/pricing",
+      "nativeFiles": [
+        "app/pricing.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/stories",
+      "nativeFiles": [
+        "app/stories/index.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/my-content",
+      "nativeFiles": [
+        "app/my-content.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/opportunities",
+      "nativeFiles": [
+        "app/(tabs)/opportunities.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/shorts",
+      "nativeFiles": [
+        "app/shorts/index.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/shorts/explore",
+      "nativeFiles": [
+        "app/shorts/explore.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/shorts/create",
+      "nativeFiles": [
+        "app/shorts/create.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/posts/:id",
+      "nativeFiles": [
+        "app/posts/[id].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/qr/:profileId",
+      "nativeFiles": [
+        "app/qr/[profileId].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/club-claim",
+      "nativeFiles": [
+        "app/club-claim.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/notifications",
+      "nativeFiles": [
+        "app/notifications.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/clubs-discovery",
+      "nativeFiles": [
+        "app/clubs-discovery.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/fff-clubs",
+      "nativeFiles": [
+        "app/fff-clubs.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/fff-clubs/:id",
+      "nativeFiles": [
+        "app/fff-clubs/[id].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/fff-teams/:teamId",
+      "nativeFiles": [
+        "app/fff-teams/[teamId].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/matching",
+      "nativeFiles": [
+        "app/matching.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/profile-views",
+      "nativeFiles": [
+        "app/profile-views.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/predictions",
+      "nativeFiles": [
+        "app/predictions.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/admin",
+      "nativeFiles": [
+        "app/admin.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/admin/user/:userId",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/admin/club/:clubId",
+      "nativeFiles": [
+        "app/admin/club/[id].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/admin/verifications",
+      "nativeFiles": [
+        "app/admin/verifications.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/groups",
+      "nativeFiles": [
+        "app/groups/index.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/groups/new",
+      "nativeFiles": [
+        "app/groups/new.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/groups/:id",
+      "nativeFiles": [
+        "app/groups/[id].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/groups/:id/edit",
+      "nativeFiles": [
+        "app/groups/[id]/edit.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/live/broadcast/:clubId",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/live/watch/:clubId",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "/live/replay/:streamId",
+      "nativeFiles": [
+        "app/live/replay/[streamId].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/matchs",
+      "nativeFiles": [
+        "app/matchs.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/parametres",
+      "nativeFiles": [
+        "app/parametres.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/story/create",
+      "nativeFiles": [
+        "app/story/create.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/cgu",
+      "nativeFiles": [
+        "app/cgu.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/conditions-generales",
+      "nativeFiles": [
+        "app/conditions-generales.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/conditions-vente",
+      "nativeFiles": [
+        "app/conditions-vente.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/securite-mineurs",
+      "nativeFiles": [
+        "app/securite-mineurs.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/jobs",
+      "nativeFiles": [
+        "app/jobs.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/jobs/create",
+      "nativeFiles": [
+        "app/jobs/create.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/jobs/my-offers",
+      "nativeFiles": [
+        "app/jobs/my-offers.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/jobs/:id",
+      "nativeFiles": [
+        "app/jobs/[id].tsx"
+      ]
+    },
+    {
+      "sourcePath": "/contact",
+      "nativeFiles": [
+        "app/contact.tsx"
+      ]
+    },
+    {
+      "sourcePath": "/marketing",
+      "nativeFiles": []
+    },
+    {
+      "sourcePath": "*",
+      "nativeFiles": []
+    }
+  ]
+}

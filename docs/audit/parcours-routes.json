@@ -1,0 +1,3416 @@
+{
+  "generated": "2026-09-23T21:35:05.404Z",
+  "note": "Inventaire de couverture ; une route présente n’est pas une preuve de recette visuelle.",
+  "routes": [
+    {
+      "route": "/",
+      "source": "app/(tabs)/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/[legacy]",
+      "source": "app/[legacy].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/[locale]/[geo]",
+      "source": "app/[locale]/[geo].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/+not-found",
+      "source": "app/+not-found.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/account-activity",
+      "source": "app/account-activity.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/account-settings",
+      "source": "app/account-settings.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/actu/[id]",
+      "source": "app/actu/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/actualites",
+      "source": "app/actualites.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/admin",
+      "source": "app/admin.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/admin-club-claims",
+      "source": "app/admin-club-claims.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/admin-club-reports",
+      "source": "app/admin-club-reports.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/admin-pro-validation",
+      "source": "app/admin-pro-validation.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/admin/club/[id]",
+      "source": "app/admin/club/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/admin/feedback",
+      "source": "app/admin/feedback.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/admin/growth",
+      "source": "app/admin/growth.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/admin/verifications",
+      "source": "app/admin/verifications.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/auth/callback",
+      "source": "app/auth/callback.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/blog",
+      "source": "app/blog/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/blog/[slug]",
+      "source": "app/blog/[slug].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/career",
+      "source": "app/career.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/career-preferences",
+      "source": "app/career-preferences.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/centres-foot-5",
+      "source": "app/centres-foot-5.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/cgu",
+      "source": "app/cgu.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/classement-ligue1",
+      "source": "app/classement-ligue1.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/classements/[competition]",
+      "source": "app/classements/[competition].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club-admin/[id]",
+      "source": "app/club-admin/[id]/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club-admin/[id]/[section]",
+      "source": "app/club-admin/[id]/[section].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club-admin/[id]/convocation/[convocation]",
+      "source": "app/club-admin/[id]/convocation/[convocation].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club-admin/[id]/match/[matchId]",
+      "source": "app/club-admin/[id]/match/[matchId].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club-chat",
+      "source": "app/club-chat/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club-chat/[id]",
+      "source": "app/club-chat/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club-claim",
+      "source": "app/club-claim.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club-claims",
+      "source": "app/club-claims.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club-dashboard",
+      "source": "app/club-dashboard.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club-followers",
+      "source": "app/club-followers.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club/[id]",
+      "source": "app/club/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club/[id]/admin",
+      "source": "app/club/[id]/admin.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur sans droits",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/club/[id]/member",
+      "source": "app/club/[id]/member.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/clubs",
+      "source": "app/(tabs)/clubs.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/clubs-departement",
+      "source": "app/clubs-departement/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/clubs-departement/[combined]",
+      "source": "app/clubs-departement/[combined].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/clubs-discovery",
+      "source": "app/clubs-discovery.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/clubs-ville/[combined]",
+      "source": "app/clubs-ville/[combined].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/compose",
+      "source": "app/compose.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/conditions-generales",
+      "source": "app/conditions-generales.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/conditions-generales-vente",
+      "source": "app/conditions-generales-vente.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/conditions-vente",
+      "source": "app/conditions-vente.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/connections",
+      "source": "app/connections.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/contact",
+      "source": "app/contact.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/conversation/[id]",
+      "source": "app/conversation/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/countries",
+      "source": "app/countries.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/country/[slug]",
+      "source": "app/country/[slug].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/cv-football",
+      "source": "app/cv-football.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/documents/[slug]",
+      "source": "app/documents/[slug].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/education",
+      "source": "app/education.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/events",
+      "source": "app/events/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/events-dashboard",
+      "source": "app/events-dashboard.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/events/[id]",
+      "source": "app/events/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/events/[id]/edit",
+      "source": "app/events/[id]/edit.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/events/[id]/manage",
+      "source": "app/events/[id]/manage.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/events/dashboard",
+      "source": "app/events/dashboard.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/events/new",
+      "source": "app/events/new.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/experience",
+      "source": "app/experience.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/feedback",
+      "source": "app/feedback.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/fff-clubs",
+      "source": "app/fff-clubs.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/fff-clubs/[id]",
+      "source": "app/fff-clubs/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/fff-team/[teamId]",
+      "source": "app/fff-team/[teamId].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/fff-teams/[teamId]",
+      "source": "app/fff-teams/[teamId].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/followers",
+      "source": "app/followers.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/geography",
+      "source": "app/geography/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/geography/[slug]",
+      "source": "app/geography/[slug].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/geography/country/[code]",
+      "source": "app/geography/country/[code].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/groups",
+      "source": "app/groups/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/groups/[id]",
+      "source": "app/groups/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/groups/[id]/edit",
+      "source": "app/groups/[id]/edit.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/groups/new",
+      "source": "app/groups/new.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/help",
+      "source": "app/help.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/invite",
+      "source": "app/invite.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/jobs",
+      "source": "app/jobs.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/jobs/[id]",
+      "source": "app/jobs/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/jobs/create",
+      "source": "app/jobs/create.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/jobs/my-offers",
+      "source": "app/jobs/my-offers.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/legal",
+      "source": "app/legal.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/ligue-des-champions",
+      "source": "app/ligue-des-champions.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/ligue1",
+      "source": "app/ligue1.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/link-unavailable",
+      "source": "app/link-unavailable.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/live",
+      "source": "app/live/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/live/replay/[streamId]",
+      "source": "app/live/replay/[streamId].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/login",
+      "source": "app/login.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/match/[id]",
+      "source": "app/match/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/matches",
+      "source": "app/matches.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/matching",
+      "source": "app/matching.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/matchs",
+      "source": "app/matchs.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/member/[section]",
+      "source": "app/member/[section].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/mentions-legales",
+      "source": "app/mentions-legales.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/message-outbox",
+      "source": "app/message-outbox.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/messages",
+      "source": "app/(tabs)/messages.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/more",
+      "source": "app/(tabs)/more.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/my-club-reports",
+      "source": "app/my-club-reports.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/my-content",
+      "source": "app/my-content.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/my-convocations",
+      "source": "app/my-convocations.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/my-followed-clubs",
+      "source": "app/my-followed-clubs.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/my-invitations",
+      "source": "app/my-invitations.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/my-profile",
+      "source": "app/(tabs)/my-profile.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/my-teams",
+      "source": "app/my-teams.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/network",
+      "source": "app/(tabs)/network.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/notifications",
+      "source": "app/notifications.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/opportunities",
+      "source": "app/(tabs)/opportunities.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/opportunity/[id]",
+      "source": "app/opportunity/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/opportunity/[id]/applications",
+      "source": "app/opportunity/[id]/applications.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/opportunity/[id]/edit",
+      "source": "app/opportunity/[id]/edit.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/opportunity/new",
+      "source": "app/opportunity/new.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/organizations",
+      "source": "app/organizations.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/pages/[slug]",
+      "source": "app/pages/[slug].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/parametres",
+      "source": "app/parametres.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/parental-consent",
+      "source": "app/parental-consent.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/parrainage",
+      "source": "app/parrainage.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/politique-confidentialite",
+      "source": "app/politique-confidentialite.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/post/[id]/edit",
+      "source": "app/post/[id]/edit.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/posts/[id]",
+      "source": "app/posts/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/predictions",
+      "source": "app/predictions.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/pricing",
+      "source": "app/pricing.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/pro-pages",
+      "source": "app/pro-pages/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/pro-pages/[id]",
+      "source": "app/pro-pages/[id]/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/pro-pages/[id]/content/[section]",
+      "source": "app/pro-pages/[id]/content/[section].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/pro-pages/[id]/edit",
+      "source": "app/pro-pages/[id]/edit.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/pro-pages/[id]/team/[teamId]",
+      "source": "app/pro-pages/[id]/team/[teamId].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/pro-pages/new",
+      "source": "app/pro-pages/new.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/profile",
+      "source": "app/profile.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/profile-qr",
+      "source": "app/profile-qr.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/profile-setup",
+      "source": "app/profile-setup.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/profile-views",
+      "source": "app/profile-views.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/profile/[id]",
+      "source": "app/profile/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/qr/[profileId]",
+      "source": "app/qr/[profileId].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/referral",
+      "source": "app/referral.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/report/[id]",
+      "source": "app/report/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/reset-password",
+      "source": "app/reset-password.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/saved-posts",
+      "source": "app/saved-posts.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/search",
+      "source": "app/(tabs)/search.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/search-users",
+      "source": "app/search-users.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/securite-des-mineurs",
+      "source": "app/securite-des-mineurs.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/securite-mineurs",
+      "source": "app/securite-mineurs.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/settings",
+      "source": "app/settings.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/shorts",
+      "source": "app/(tabs)/shorts.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/shorts/[id]",
+      "source": "app/shorts/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/shorts/create",
+      "source": "app/shorts/create.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/shorts/explore",
+      "source": "app/shorts/explore.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/signup",
+      "source": "app/signup.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/stories",
+      "source": "app/stories/index.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/stories/[id]",
+      "source": "app/stories/[id].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/stories/create",
+      "source": "app/stories/create.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/story/create",
+      "source": "app/story/create.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/suppression-compte",
+      "source": "app/suppression-compte.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/talent/[slug]",
+      "source": "app/talent/[slug].tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    },
+    {
+      "route": "/verification",
+      "source": "app/verification.tsx",
+      "navigation": "inventoriée — destinations statiques contrôlées par navigationRoutes.test.ts",
+      "roles_a_recetter": [
+        "visiteur",
+        "joueur",
+        "responsable du club",
+        "administrateur"
+      ],
+      "scenarios": [
+        "ouverture directe",
+        "navigation",
+        "retour",
+        "chargement",
+        "vide",
+        "erreur",
+        "session expirée"
+      ],
+      "visuel": "BLOQUÉ — navigateur contrôlable indisponible",
+      "mobile": "NON EXÉCUTÉ — appareil requis"
+    }
+  ]
+}

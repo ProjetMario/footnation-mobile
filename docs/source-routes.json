@@ -1,0 +1,454 @@
+[
+  {
+    "path": "/",
+    "element": "{<Index />}"
+  },
+  {
+    "path": "/clubs-departement/*",
+    "element": "{<DepartmentClubsPage />}"
+  },
+  {
+    "path": "/clubs-ville-:combined",
+    "element": "{<CityClubsPage />}"
+  },
+  {
+    "path": "/:slug",
+    "element": "{<GeoPage />}"
+  },
+  {
+    "path": "/blog",
+    "element": "{<BlogList />}"
+  },
+  {
+    "path": "/blog/:slug",
+    "element": "{<BlogPost />}"
+  },
+  {
+    "path": "/centres-foot-5",
+    "element": "{<FiveSideCentersPage />}"
+  },
+  {
+    "path": "/clubs",
+    "element": "{<Clubs />}"
+  },
+  {
+    "path": "/club/:id",
+    "element": "{<FffClubDetail />}"
+  },
+  {
+    "path": "/club/:id/admin",
+    "element": "{<ClubAdminSpace />}"
+  },
+  {
+    "path": "/club/:id/member",
+    "element": "{<ClubMemberSpace />}"
+  },
+  {
+    "path": "/city-football/:slug",
+    "element": "{<CityFootballPage />}"
+  },
+  {
+    "path": "/world-football/:slug",
+    "element": "{<WorldCityFootballPage />}"
+  },
+  {
+    "path": "/countries",
+    "element": "{<CountriesListPage />}"
+  },
+  {
+    "path": "/country/:slug",
+    "element": "{<CountryPage />}"
+  },
+  {
+    "path": "/cities",
+    "element": "{<CityPage />}"
+  },
+  {
+    "path": "/city/:slug",
+    "element": "{<CityPage />}"
+  },
+  {
+    "path": "/championships",
+    "element": "{<ChampionshipsListPage />}"
+  },
+  {
+    "path": "/championship/:slug",
+    "element": "{<ChampionshipPage />}"
+  },
+  {
+    "path": "/famous-club/:slug",
+    "element": "{<IntlHubPage />}"
+  },
+  {
+    "path": "/club-football/:slug",
+    "element": "{<CityFootballPage />}"
+  },
+  {
+    "path": "/football-city/:slug",
+    "element": "{<WorldCityFootballPage />}"
+  },
+  {
+    "path": "/club-dashboard",
+    "element": "{<ClubDashboard />}"
+  },
+  {
+    "path": "/my-profile",
+    "element": "{<MyProfile />}"
+  },
+  {
+    "path": "/profile",
+    "element": "{<MyProfile />}"
+  },
+  {
+    "path": "/profile/:id",
+    "element": "{<Profile />}"
+  },
+  {
+    "path": "/talent/:slug",
+    "element": "{<PublicPlayerProfile />}"
+  },
+  {
+    "path": "/profile-setup",
+    "element": "{<ProfileSetup />}"
+  },
+  {
+    "path": "/my-convocations",
+    "element": "{<MyConvocations />}"
+  },
+  {
+    "path": "/my-invitations",
+    "element": "{<MyInvitations />}"
+  },
+  {
+    "path": "/career",
+    "element": "{<Career />}"
+  },
+  {
+    "path": "/organizations",
+    "element": "{<Organizations />}"
+  },
+  {
+    "path": "/connections",
+    "element": "{<Connections />}"
+  },
+  {
+    "path": "/search-users",
+    "element": "{<SearchUsers />}"
+  },
+  {
+    "path": "/search",
+    "element": "{<GlobalSearch />}"
+  },
+  {
+    "path": "/settings",
+    "element": "{<Settings />}"
+  },
+  {
+    "path": "/parrainage",
+    "element": "{<Referral />}"
+  },
+  {
+    "path": "/cv-football",
+    "element": "{<CVFootball />}"
+  },
+  {
+    "path": "/messages",
+    "element": "{<Messages />}"
+  },
+  {
+    "path": "/stories/create",
+    "element": "{<StoryCreate />}"
+  },
+  {
+    "path": "/help",
+    "element": "{<Help />}"
+  },
+  {
+    "path": "/legal",
+    "element": "{<Legal />}"
+  },
+  {
+    "path": "/mentions-legales",
+    "element": "{<MentionsLegales />}"
+  },
+  {
+    "path": "/suppression-compte",
+    "element": "{<AccountDeletion />}"
+  },
+  {
+    "path": "/conditions-generales-vente",
+    "element": "{<ConditionsVente />}"
+  },
+  {
+    "path": "/politique-confidentialite",
+    "element": "{<PolitiqueConfidentialite />}"
+  },
+  {
+    "path": "/securite-des-mineurs",
+    "element": "{<SecuriteMineurs />}"
+  },
+  {
+    "path": "/auth/callback",
+    "element": "{<AuthCallback />}"
+  },
+  {
+    "path": "/followers",
+    "element": "{<Followers />}"
+  },
+  {
+    "path": "/login",
+    "element": "{<Login />}"
+  },
+  {
+    "path": "/pro-pages",
+    "element": "{<ProPagesDashboard />}"
+  },
+  {
+    "path": "/pro-pages/new",
+    "element": "{<ProPageEditor />}"
+  },
+  {
+    "path": "/pro-pages/:id",
+    "element": "{<ProPageDetail />}"
+  },
+  {
+    "path": "/pro-pages/:id/edit",
+    "element": "{<ProPageEditor />}"
+  },
+  {
+    "path": "/pages/:slug",
+    "element": "{<PublicProPage />}"
+  },
+  {
+    "path": "/matches",
+    "element": "{<MatchesToday />}"
+  },
+  {
+    "path": "/match/:matchId",
+    "element": "{<MatchDetail />}"
+  },
+  {
+    "path": "/actualites",
+    "element": "{<Actualites />}"
+  },
+  {
+    "path": "/actu/:id",
+    "element": "{<ActuDetail />}"
+  },
+  {
+    "path": "/ligue1",
+    "element": "{<CompetitionStandingsPage initialSlug=\"ligue-1\" />}"
+  },
+  {
+    "path": "/classements/ligue-1",
+    "element": "{<CompetitionStandingsPage initialSlug=\"ligue-1\" />}"
+  },
+  {
+    "path": "/classements/premier-league",
+    "element": "{<CompetitionStandingsPage initialSlug=\"premier-league\" />}"
+  },
+  {
+    "path": "/classements/liga",
+    "element": "{<CompetitionStandingsPage initialSlug=\"liga\" />}"
+  },
+  {
+    "path": "/classements/bundesliga",
+    "element": "{<CompetitionStandingsPage initialSlug=\"bundesliga\" />}"
+  },
+  {
+    "path": "/ligue-des-champions",
+    "element": "{<CompetitionStandingsPage initialSlug=\"ligue-des-champions\" />}"
+  },
+  {
+    "path": "/events",
+    "element": "{<EventsList />}"
+  },
+  {
+    "path": "/events/dashboard",
+    "element": "{<EventsDashboard />}"
+  },
+  {
+    "path": "/events/new",
+    "element": "{<EventEditor />}"
+  },
+  {
+    "path": "/events/:eventId",
+    "element": "{<EventDetail />}"
+  },
+  {
+    "path": "/events/:eventId/edit",
+    "element": "{<EventEditor />}"
+  },
+  {
+    "path": "/pricing",
+    "element": "{<JobOpportunities />}"
+  },
+  {
+    "path": "/stories",
+    "element": "{<StoriesFeed />}"
+  },
+  {
+    "path": "/my-content",
+    "element": "{<Navigate to=\"/my-profile\" replace />}"
+  },
+  {
+    "path": "/opportunities",
+    "element": "{<JobOpportunities />}"
+  },
+  {
+    "path": "/shorts",
+    "element": "{<ShortsExplore />}"
+  },
+  {
+    "path": "/shorts/explore",
+    "element": "{<ShortsExplore />}"
+  },
+  {
+    "path": "/shorts/create",
+    "element": "{<ShortCreate />}"
+  },
+  {
+    "path": "/posts/:id",
+    "element": "{<PostDetail />}"
+  },
+  {
+    "path": "/qr/:profileId",
+    "element": "{<QRCodeAction />}"
+  },
+  {
+    "path": "/club-claim",
+    "element": "{<ClubClaim />}"
+  },
+  {
+    "path": "/notifications",
+    "element": "{<Notifications />}"
+  },
+  {
+    "path": "/clubs-discovery",
+    "element": "{<ClubsDiscovery />}"
+  },
+  {
+    "path": "/fff-clubs",
+    "element": "{<ClubsDiscovery />}"
+  },
+  {
+    "path": "/fff-clubs/:id",
+    "element": "{<FffClubDetail />}"
+  },
+  {
+    "path": "/fff-teams/:teamId",
+    "element": "{<FffTeamDetail />}"
+  },
+  {
+    "path": "/matching",
+    "element": "{<Matching />}"
+  },
+  {
+    "path": "/profile-views",
+    "element": "{<ProfileViews />}"
+  },
+  {
+    "path": "/predictions",
+    "element": "{<Predictions />}"
+  },
+  {
+    "path": "/admin",
+    "element": "{<Admin />}"
+  },
+  {
+    "path": "/admin/user/:userId",
+    "element": "{<AdminUserEdit />}"
+  },
+  {
+    "path": "/admin/club/:clubId",
+    "element": "{<AdminClubRedirect />}"
+  },
+  {
+    "path": "/admin/verifications",
+    "element": "{<AdminVerifications />}"
+  },
+  {
+    "path": "/groups",
+    "element": "{<GroupsList />}"
+  },
+  {
+    "path": "/groups/new",
+    "element": "{<GroupEditor />}"
+  },
+  {
+    "path": "/groups/:id",
+    "element": "{<GroupDetail />}"
+  },
+  {
+    "path": "/groups/:id/edit",
+    "element": "{<GroupEditor />}"
+  },
+  {
+    "path": "/live/broadcast/:clubId",
+    "element": "{<LiveBroadcast />}"
+  },
+  {
+    "path": "/live/watch/:clubId",
+    "element": "{<LiveWatch />}"
+  },
+  {
+    "path": "/live/replay/:streamId",
+    "element": "{<LiveReplay />}"
+  },
+  {
+    "path": "/matchs",
+    "element": "{<Navigate to=\"/matches\" replace />}"
+  },
+  {
+    "path": "/parametres",
+    "element": "{<Navigate to=\"/settings\" replace />}"
+  },
+  {
+    "path": "/story/create",
+    "element": "{<Navigate to=\"/stories/create\" replace />}"
+  },
+  {
+    "path": "/cgu",
+    "element": "{<Navigate to=\"/conditions-generales-vente\" replace />}"
+  },
+  {
+    "path": "/conditions-generales",
+    "element": "{<Navigate to=\"/conditions-generales-vente\" replace />}"
+  },
+  {
+    "path": "/conditions-vente",
+    "element": "{<Navigate to=\"/conditions-generales-vente\" replace />}"
+  },
+  {
+    "path": "/securite-mineurs",
+    "element": "{<Navigate to=\"/securite-des-mineurs\" replace />}"
+  },
+  {
+    "path": "/jobs",
+    "element": "{<Jobs />}"
+  },
+  {
+    "path": "/jobs/create",
+    "element": "{<Navigate to=\"/opportunities\" replace />}"
+  },
+  {
+    "path": "/jobs/my-offers",
+    "element": "{<Navigate to=\"/opportunities\" replace />}"
+  },
+  {
+    "path": "/jobs/:id",
+    "element": "{<Navigate to=\"/opportunities\" replace />}"
+  },
+  {
+    "path": "/contact",
+    "element": "{<Contact />}"
+  },
+  {
+    "path": "/marketing",
+    "element": "{<Marketing />}"
+  },
+  {
+    "path": "*",
+    "element": "{<NotFound />}"
+  }
+]

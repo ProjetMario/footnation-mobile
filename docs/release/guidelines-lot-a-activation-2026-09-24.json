@@ -1,0 +1,234 @@
+{
+  "authorization": "User explicitly approved the three listed migrations in this task.",
+  "application": {
+    "project": "zkvwqywtlkkkxmapehwe",
+    "started_at": "2026-09-24T10:22:32.544309+00:00",
+    "finished_at": "2026-09-24T10:22:34.671610+00:00",
+    "files": [
+      {
+        "name": "20260924120000_account_deletion_shared_spaces.sql",
+        "sha256": "327d62fe5d9c902d9081a0f0d9de96b1fdeb308444eec86bde3e75e0386c6b1a"
+      },
+      {
+        "name": "20260924130000_content_moderation_workflow.sql",
+        "sha256": "298c4f4a5acabd3d4c71c1f57887933b0f7def4f7fd7fe5a1763b18db90fc21e"
+      },
+      {
+        "name": "20260924131000_community_text_filter.sql",
+        "sha256": "c7127a35fd7b38ed3f0173b4a9a9edb8af0b21f6a3d32a761c7cf9d4f1cd7261"
+      }
+    ],
+    "atomic": true,
+    "status": "committed",
+    "server": {
+      "transaction_committed": true,
+      "database_time": "2026-09-24T10:22:34.732306+00:00"
+    }
+  },
+  "verification": {
+    "project": "zkvwqywtlkkkxmapehwe",
+    "verified_at": "2026-09-24T10:24:49.002252+00:00",
+    "mode": "read_only_catalogs_and_api_permission_checks",
+    "database": {
+      "checked_at": "2026-09-24T10:24:47.829808+00:00",
+      "journal": [
+        {
+          "version": "20260924120000",
+          "name": "account_deletion_shared_spaces",
+          "source_sha256": "327d62fe5d9c902d9081a0f0d9de96b1fdeb308444eec86bde3e75e0386c6b1a"
+        },
+        {
+          "version": "20260924130000",
+          "name": "content_moderation_workflow",
+          "source_sha256": "298c4f4a5acabd3d4c71c1f57887933b0f7def4f7fd7fe5a1763b18db90fc21e"
+        },
+        {
+          "version": "20260924131000",
+          "name": "community_text_filter",
+          "source_sha256": "c7127a35fd7b38ed3f0173b4a9a9edb8af0b21f6a3d32a761c7cf9d4f1cd7261"
+        }
+      ],
+      "reviewer_auth_can_execute": true,
+      "reviewer_anon_denied": true,
+      "deletion_check_service_only": true,
+      "policies": [
+        {
+          "table": "club_news",
+          "name": "moderation_source_visible",
+          "permissive": "RESTRICTIVE",
+          "command": "SELECT"
+        },
+        {
+          "table": "posts",
+          "name": "moderation_visible",
+          "permissive": "RESTRICTIVE",
+          "command": "SELECT"
+        },
+        {
+          "table": "stories",
+          "name": "moderation_visible",
+          "permissive": "RESTRICTIVE",
+          "command": "SELECT"
+        },
+        {
+          "table": "shorts",
+          "name": "moderation_visible",
+          "permissive": "RESTRICTIVE",
+          "command": "SELECT"
+        },
+        {
+          "table": "user_reports",
+          "name": "report_delete_via_service",
+          "permissive": "RESTRICTIVE",
+          "command": "DELETE"
+        },
+        {
+          "table": "user_reports",
+          "name": "report_private_read_v2",
+          "permissive": "RESTRICTIVE",
+          "command": "SELECT"
+        },
+        {
+          "table": "user_reports",
+          "name": "report_update_via_service",
+          "permissive": "RESTRICTIVE",
+          "command": "UPDATE"
+        }
+      ],
+      "triggers": [
+        {
+          "table": "groups",
+          "name": "account_deletion_group_owner",
+          "enabled": "O"
+        },
+        {
+          "table": "pro_pages",
+          "name": "account_deletion_page_owner",
+          "enabled": "O"
+        },
+        {
+          "table": "user_reports",
+          "name": "guard_content_report",
+          "enabled": "O"
+        },
+        {
+          "table": "posts",
+          "name": "guard_content_visibility",
+          "enabled": "O"
+        },
+        {
+          "table": "shorts",
+          "name": "guard_content_visibility",
+          "enabled": "O"
+        },
+        {
+          "table": "stories",
+          "name": "guard_content_visibility",
+          "enabled": "O"
+        },
+        {
+          "table": "posts",
+          "name": "guard_community_text",
+          "enabled": "O"
+        },
+        {
+          "table": "shorts",
+          "name": "guard_community_text",
+          "enabled": "O"
+        },
+        {
+          "table": "stories",
+          "name": "guard_community_text",
+          "enabled": "O"
+        },
+        {
+          "table": "post_comments",
+          "name": "guard_community_text",
+          "enabled": "O"
+        },
+        {
+          "table": "short_comments",
+          "name": "guard_community_text",
+          "enabled": "O"
+        },
+        {
+          "table": "story_comments",
+          "name": "guard_community_text",
+          "enabled": "O"
+        },
+        {
+          "table": "club_news_comments",
+          "name": "guard_community_text",
+          "enabled": "O"
+        },
+        {
+          "table": "club_publications",
+          "name": "guard_community_text",
+          "enabled": "O"
+        },
+        {
+          "table": "club_shorts",
+          "name": "guard_community_text",
+          "enabled": "O"
+        },
+        {
+          "table": "pro_page_posts",
+          "name": "guard_community_text",
+          "enabled": "O"
+        }
+      ],
+      "owner_guard_null_safe": true,
+      "threat_rejected": true,
+      "normal_football_text_allowed": true,
+      "unauthenticated_moderation_denied": true
+    },
+    "api": [
+      {
+        "operation": "empty_select_posts",
+        "http_status": 200,
+        "passed": true
+      },
+      {
+        "operation": "empty_select_shorts",
+        "http_status": 200,
+        "passed": true
+      },
+      {
+        "operation": "empty_select_stories",
+        "http_status": 200,
+        "passed": true
+      },
+      {
+        "operation": "empty_select_user_reports",
+        "http_status": 200,
+        "passed": true
+      },
+      {
+        "operation": "empty_select_club_news",
+        "http_status": 200,
+        "passed": true
+      },
+      {
+        "operation": "anonymous_moderator_false",
+        "http_status": 200,
+        "passed": true
+      },
+      {
+        "operation": "anonymous_review_denied_before_any_mutation",
+        "http_status": 401,
+        "passed": true
+      }
+    ]
+  },
+  "schema_snapshot": {
+    "kind": "schema_only_no_user_rows",
+    "bytes": 894893,
+    "sha256": "540e28e93474a3e026ba3ad9523e2258ca551e25510359f01ee28177871fa93a",
+    "path": "/tmp/footnation-approved-lot-a/before-public-schema.sql"
+  },
+  "limits": [
+    "No real account deletion or report decision was executed.",
+    "No frontend, Edge Function or store submission was deployed.",
+    "Apple and social-admission configuration were outside this approved lot."
+  ]
+}

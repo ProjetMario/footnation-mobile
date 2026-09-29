@@ -1,0 +1,474 @@
+{
+  "header": {
+    "id": "401876449",
+    "competitions": [
+      {
+        "id": "401876449",
+        "competitors": [
+          {
+            "homeAway": "home",
+            "team": {
+              "id": "176"
+            }
+          },
+          {
+            "homeAway": "away",
+            "team": {
+              "id": "160"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "boxscore": {
+    "teams": [
+      {
+        "team": {
+          "id": "176"
+        },
+        "statistics": [
+          {
+            "name": "foulsCommitted",
+            "displayValue": "9",
+            "label": "Fouls"
+          },
+          {
+            "name": "yellowCards",
+            "displayValue": "2",
+            "label": "Yellow Cards"
+          },
+          {
+            "name": "redCards",
+            "displayValue": "1",
+            "label": "Red Cards"
+          },
+          {
+            "name": "offsides",
+            "displayValue": "1",
+            "label": "Offsides"
+          },
+          {
+            "name": "wonCorners",
+            "displayValue": "3",
+            "label": "Corner Kicks"
+          },
+          {
+            "name": "saves",
+            "displayValue": "8",
+            "label": "Saves"
+          },
+          {
+            "name": "possessionPct",
+            "displayValue": "39.4",
+            "label": "Possession"
+          },
+          {
+            "name": "totalShots",
+            "displayValue": "12",
+            "label": "SHOTS"
+          },
+          {
+            "name": "shotsOnTarget",
+            "displayValue": "4",
+            "label": "ON GOAL"
+          },
+          {
+            "name": "shotPct",
+            "displayValue": "0.3",
+            "label": "On Target %"
+          },
+          {
+            "name": "penaltyKickGoals",
+            "displayValue": "0",
+            "label": "Penalty Goals"
+          },
+          {
+            "name": "penaltyKickShots",
+            "displayValue": "0",
+            "label": "Penalty Kicks Taken"
+          },
+          {
+            "name": "accuratePasses",
+            "displayValue": "328",
+            "label": "Accurate Passes"
+          },
+          {
+            "name": "totalPasses",
+            "displayValue": "404",
+            "label": "Passes"
+          },
+          {
+            "name": "passPct",
+            "displayValue": "0.8",
+            "label": "Pass Completion %"
+          },
+          {
+            "name": "accurateCrosses",
+            "displayValue": "2",
+            "label": "Accurate Crosses"
+          },
+          {
+            "name": "totalCrosses",
+            "displayValue": "13",
+            "label": "Crosses"
+          },
+          {
+            "name": "crossPct",
+            "displayValue": "0.2",
+            "label": "Cross %"
+          },
+          {
+            "name": "totalLongBalls",
+            "displayValue": "60",
+            "label": "Long Balls"
+          },
+          {
+            "name": "accurateLongBalls",
+            "displayValue": "29",
+            "label": "Accurate Long Balls"
+          },
+          {
+            "name": "longballPct",
+            "displayValue": "0.5",
+            "label": "Long Balls %"
+          },
+          {
+            "name": "blockedShots",
+            "displayValue": "5",
+            "label": "Blocked Shots"
+          },
+          {
+            "name": "effectiveTackles",
+            "displayValue": "7",
+            "label": "Effective Tackles"
+          },
+          {
+            "name": "totalTackles",
+            "displayValue": "10",
+            "label": "Tackles"
+          },
+          {
+            "name": "tacklePct",
+            "displayValue": "0.7",
+            "label": "Tackle %"
+          },
+          {
+            "name": "interceptions",
+            "displayValue": "10",
+            "label": "Interceptions"
+          },
+          {
+            "name": "effectiveClearance",
+            "displayValue": "19",
+            "label": "Effective Clearances"
+          },
+          {
+            "name": "totalClearance",
+            "displayValue": "19",
+            "label": "Clearances"
+          }
+        ]
+      },
+      {
+        "team": {
+          "id": "160"
+        },
+        "statistics": [
+          {
+            "name": "foulsCommitted",
+            "displayValue": "3",
+            "label": "Fouls"
+          },
+          {
+            "name": "yellowCards",
+            "displayValue": "1",
+            "label": "Yellow Cards"
+          },
+          {
+            "name": "redCards",
+            "displayValue": "0",
+            "label": "Red Cards"
+          },
+          {
+            "name": "offsides",
+            "displayValue": "2",
+            "label": "Offsides"
+          },
+          {
+            "name": "wonCorners",
+            "displayValue": "7",
+            "label": "Corner Kicks"
+          },
+          {
+            "name": "saves",
+            "displayValue": "3",
+            "label": "Saves"
+          },
+          {
+            "name": "possessionPct",
+            "displayValue": "60.6",
+            "label": "Possession"
+          },
+          {
+            "name": "totalShots",
+            "displayValue": "31",
+            "label": "SHOTS"
+          },
+          {
+            "name": "shotsOnTarget",
+            "displayValue": "10",
+            "label": "ON GOAL"
+          },
+          {
+            "name": "shotPct",
+            "displayValue": "0.3",
+            "label": "On Target %"
+          },
+          {
+            "name": "penaltyKickGoals",
+            "displayValue": "0",
+            "label": "Penalty Goals"
+          },
+          {
+            "name": "penaltyKickShots",
+            "displayValue": "0",
+            "label": "Penalty Kicks Taken"
+          },
+          {
+            "name": "accuratePasses",
+            "displayValue": "560",
+            "label": "Accurate Passes"
+          },
+          {
+            "name": "totalPasses",
+            "displayValue": "628",
+            "label": "Passes"
+          },
+          {
+            "name": "passPct",
+            "displayValue": "0.9",
+            "label": "Pass Completion %"
+          },
+          {
+            "name": "accurateCrosses",
+            "displayValue": "7",
+            "label": "Accurate Crosses"
+          },
+          {
+            "name": "totalCrosses",
+            "displayValue": "18",
+            "label": "Crosses"
+          },
+          {
+            "name": "crossPct",
+            "displayValue": "0.4",
+            "label": "Cross %"
+          },
+          {
+            "name": "totalLongBalls",
+            "displayValue": "62",
+            "label": "Long Balls"
+          },
+          {
+            "name": "accurateLongBalls",
+            "displayValue": "37",
+            "label": "Accurate Long Balls"
+          },
+          {
+            "name": "longballPct",
+            "displayValue": "0.6",
+            "label": "Long Balls %"
+          },
+          {
+            "name": "blockedShots",
+            "displayValue": "9",
+            "label": "Blocked Shots"
+          },
+          {
+            "name": "effectiveTackles",
+            "displayValue": "7",
+            "label": "Effective Tackles"
+          },
+          {
+            "name": "totalTackles",
+            "displayValue": "13",
+            "label": "Tackles"
+          },
+          {
+            "name": "tacklePct",
+            "displayValue": "0.5",
+            "label": "Tackle %"
+          },
+          {
+            "name": "interceptions",
+            "displayValue": "3",
+            "label": "Interceptions"
+          },
+          {
+            "name": "effectiveClearance",
+            "displayValue": "20",
+            "label": "Effective Clearances"
+          },
+          {
+            "name": "totalClearance",
+            "displayValue": "20",
+            "label": "Clearances"
+          }
+        ]
+      }
+    ]
+  },
+  "keyEvents": [
+    {
+      "id": "52756709",
+      "type": {
+        "id": "137",
+        "text": "Goal - Header",
+        "type": "goal---header"
+      },
+      "text": "Goal! Marseille 0, Paris Saint Germain 1. Ferran Torres (Paris Saint Germain) header from the centre of the box to the top left corner. Assisted by Désiré Doué with a cross.",
+      "shortText": "Ferran Torres Goal - Header",
+      "period": {
+        "number": 2
+      },
+      "clock": {
+        "value": 3912.0,
+        "displayValue": "66'"
+      },
+      "scoringPlay": true,
+      "team": {
+        "id": "160",
+        "displayName": "Paris Saint-Germain"
+      },
+      "participants": [
+        {
+          "athlete": {
+            "id": "265869",
+            "displayName": "Ferran Torres"
+          }
+        },
+        {
+          "athlete": {
+            "id": "336388",
+            "displayName": "Désiré Doué"
+          }
+        }
+      ],
+      "source": {
+        "id": "38",
+        "description": "SA.ENVOY"
+      },
+      "wallclock": "2026-09-20T20:11:57Z",
+      "shootout": false,
+      "goalPositionY": 52.9,
+      "fieldPositionX": 92.7,
+      "fieldPositionY": 51.9,
+      "fieldPosition2X": 100.0,
+      "fieldPosition2Y": 52.9
+    },
+    {
+      "id": "52757714",
+      "type": {
+        "id": "70",
+        "text": "Goal",
+        "type": "goal"
+      },
+      "text": "Goal! Marseille 1, Paris Saint Germain 1. Angel Gomes (Marseille) right footed shot from the centre of the box to the bottom right corner. Assisted by Amine Gouiri.",
+      "shortText": "Angel Gomes Goal",
+      "period": {
+        "number": 2
+      },
+      "clock": {
+        "value": 4262.0,
+        "displayValue": "72'"
+      },
+      "scoringPlay": true,
+      "team": {
+        "id": "176",
+        "displayName": "Marseille"
+      },
+      "participants": [
+        {
+          "athlete": {
+            "id": "256773",
+            "displayName": "Angel Gomes"
+          }
+        },
+        {
+          "athlete": {
+            "id": "259743",
+            "displayName": "Amine Gouiri"
+          }
+        }
+      ],
+      "source": {
+        "id": "38",
+        "description": "SA.ENVOY"
+      },
+      "wallclock": "2026-09-20T20:17:47Z",
+      "shootout": false,
+      "goalPositionY": 46.5,
+      "fieldPositionX": 90.7,
+      "fieldPositionY": 44.1,
+      "fieldPosition2X": 100.0,
+      "fieldPosition2Y": 46.5
+    },
+    {
+      "id": "52757897",
+      "type": {
+        "id": "70",
+        "text": "Goal",
+        "type": "goal"
+      },
+      "text": "Goal! Marseille 1, Paris Saint Germain 2. Marquinhos (Paris Saint Germain) right footed shot from very close range to the centre of the goal.",
+      "shortText": "Marquinhos Goal",
+      "period": {
+        "number": 2
+      },
+      "clock": {
+        "value": 4431.0,
+        "displayValue": "74'"
+      },
+      "scoringPlay": true,
+      "team": {
+        "id": "160",
+        "displayName": "Paris Saint-Germain"
+      },
+      "participants": [
+        {
+          "athlete": {
+            "id": "159047",
+            "displayName": "Marquinhos"
+          }
+        }
+      ],
+      "source": {
+        "id": "38",
+        "description": "SA.ENVOY"
+      },
+      "wallclock": "2026-09-20T20:20:36Z",
+      "shootout": false,
+      "goalPositionY": 50.0,
+      "fieldPositionX": 97.0,
+      "fieldPositionY": 47.9,
+      "fieldPosition2X": 100.0,
+      "fieldPosition2Y": 50.0
+    }
+  ],
+  "gameInfo": {
+    "attendance": 0,
+    "officials": [
+      {
+        "fullName": "Francois Letexier",
+        "displayName": "Francois Letexier",
+        "position": {
+          "name": "Referee",
+          "displayName": "Referee",
+          "id": "1"
+        },
+        "order": 1
+      }
+    ]
+  }
+}

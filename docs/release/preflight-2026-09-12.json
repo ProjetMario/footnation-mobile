@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "scope": "local-only",
+  "profile": "preview",
+  "localConfiguration": "BLOCKED",
+  "releaseDecision": "MANUAL_VALIDATION_REQUIRED",
+  "environmentPresence": {
+    "EXPO_PUBLIC_SUPABASE_URL": "PRESENT",
+    "EXPO_PUBLIC_SUPABASE_ANON_KEY": "PRESENT",
+    "EXPO_PUBLIC_ERROR_REPORTING_ENABLED": "ABSENT",
+    "EXPO_PUBLIC_SENTRY_DSN": "ABSENT",
+    "EXPO_PUBLIC_APP_ENV": "ABSENT",
+    "SENTRY_ORG": "ABSENT",
+    "SENTRY_PROJECT": "ABSENT",
+    "SENTRY_AUTH_TOKEN": "ABSENT",
+    "EXPO_PUBLIC_NATIVE_PUSH_ENABLED": "ABSENT"
+  },
+  "checks": [
+    {
+      "id": "node",
+      "status": "PASS",
+      "detail": "Expo 57 : Node 22.13 minimum."
+    },
+    {
+      "id": "public-build-config",
+      "status": "PASS",
+      "detail": "Configuration Supabase publique et configuration Sentry si activée ; format local uniquement, sans authentification distante."
+    },
+    {
+      "id": "public-secrets",
+      "status": "PASS",
+      "detail": "Aucun nom ou format connu de secret serveur dans les variables EXPO_PUBLIC_. Contrôle local partiel, pas un audit du bundle."
+    },
+    {
+      "id": "eas-project",
+      "status": "FAIL",
+      "detail": "extra.eas.projectId doit contenir l’UUID du projet EAS existant ; liaison et droits distants non vérifiés."
+    },
+    {
+      "id": "app-identifiers",
+      "status": "PASS",
+      "detail": "Identifiants iOS/Android conservés : com.footnation.app."
+    },
+    {
+      "id": "eas-profile",
+      "status": "PASS",
+      "detail": "Le profil EAS choisi doit déclarer son environnement homonyme."
+    },
+    {
+      "id": "native-plugins",
+      "status": "PASS",
+      "detail": "Plugins caméra, micro, notifications, WebRTC et stockage sécurisé déclarés ; compilation et permissions sur appareil à valider."
+    },
+    {
+      "id": "error-monitoring",
+      "status": "FAIL",
+      "detail": "La bêta exige EXPO_PUBLIC_ERROR_REPORTING_ENABLED=true, EXPO_PUBLIC_SENTRY_DSN, EXPO_PUBLIC_APP_ENV et SENTRY_ORG / SENTRY_PROJECT / SENTRY_AUTH_TOKEN côté build. Réception non vérifiée."
+    },
+    {
+      "id": "push-client",
+      "status": "FAIL",
+      "detail": "Notifications natives requises pour la bêta club. Activer EXPO_PUBLIC_NATIVE_PUSH_ENABLED uniquement après validation du worker, APNs/FCM et de la livraison réelle."
+    },
+    {
+      "id": "android-fcm-file",
+      "status": "MANUAL",
+      "detail": "google-services.json : vérifier le fichier Android utilisé par EAS et les credentials FCM v1. Le fichier ne prouve pas la validité des credentials."
+    },
+    {
+      "id": "backend-services",
+      "status": "MANUAL",
+      "detail": "Vérifier les déploiements account-deletion, native-push et message-attachment-cleanup, leurs guards, secrets et planificateurs. Ne pas activer un flag pour masquer une absence de service."
+    },
+    {
+      "id": "schema-access",
+      "status": "MANUAL",
+      "detail": "Confirmer migrations, RLS et accès croisés sur un environnement de recette autorisé. Aucun appel Supabase n’est effectué ici."
+    },
+    {
+      "id": "turn",
+      "status": "MANUAL",
+      "detail": "Vérifier call-ice-config et le relais TURN sur deux réseaux ; une fonction déployée ne prouve pas un relais opérationnel."
+    },
+    {
+      "id": "monitoring-received",
+      "status": "MANUAL",
+      "detail": "Vérifier erreur synthétique reçue, source symboliquée et alerte. Crashs natifs/ANR non couverts par le transport JavaScript actuel."
+    },
+    {
+      "id": "device-acceptance",
+      "status": "MANUAL",
+      "detail": "Installation et recette iPhone/Android : NON EXÉCUTÉES par ce contrôle. Compléter device-acceptance.csv séparément pour chaque plateforme."
+    },
+    {
+      "id": "beta-operations",
+      "status": "MANUAL",
+      "detail": "Confirmer modération, support, sauvegarde/restauration et coûts/limites médias avant d’élargir les clubs pilotes."
+    }
+  ],
+  "checkedAt": "2026-09-12T09:54:45.085Z"
+}

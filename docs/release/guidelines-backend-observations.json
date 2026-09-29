@@ -1,0 +1,122 @@
+{
+  "verified_at": "2026-09-24T10:24:49.002252+00:00",
+  "mode": "read_only_after_approved_lot_a",
+  "observations": [
+    {
+      "project": "zkvwqywtlkkkxmapehwe",
+      "database_metadata": {
+        "functions": [
+          {
+            "name": "public.account_deletion_check(uuid)",
+            "present": true
+          },
+          {
+            "name": "public.account_deletion_shared_spaces_check(uuid)",
+            "present": true
+          },
+          {
+            "name": "public.get_member_access_status()",
+            "present": false
+          },
+          {
+            "name": "public.get_social_signup_status()",
+            "present": false
+          },
+          {
+            "name": "public.can_review_content()",
+            "present": true
+          },
+          {
+            "name": "public.is_site_admin()",
+            "present": true
+          },
+          {
+            "name": "public.prune_native_growth_activity()",
+            "present": true
+          },
+          {
+            "name": "public.review_content_report(uuid,text,text,integer)",
+            "present": true
+          },
+          {
+            "name": "public.community_text_rejected(text)",
+            "present": true
+          },
+          {
+            "name": "public.guard_community_text()",
+            "present": true
+          },
+          {
+            "name": "public.apple_deletion_receipt(uuid)",
+            "present": false
+          }
+        ],
+        "ownership_fks": [
+          {
+            "table": "groups",
+            "column": "created_by",
+            "nullable": true,
+            "delete_action": "n"
+          },
+          {
+            "table": "pro_pages",
+            "column": "owner_id",
+            "nullable": true,
+            "delete_action": "n"
+          }
+        ],
+        "rls": [
+          {
+            "table": "posts",
+            "enabled": true
+          },
+          {
+            "table": "stories",
+            "enabled": true
+          },
+          {
+            "table": "shorts",
+            "enabled": true
+          },
+          {
+            "table": "user_reports",
+            "enabled": true
+          }
+        ],
+        "report_columns": [
+          "id",
+          "reporter_id",
+          "reported_id",
+          "reason",
+          "details",
+          "status",
+          "created_at",
+          "admin_notes",
+          "reviewed_at",
+          "content_kind",
+          "content_id",
+          "reviewed_by",
+          "revision",
+          "report_priority"
+        ],
+        "report_constraints": [
+          "CHECK (((content_id IS NULL) = (content_kind IS NULL)))",
+          "CHECK ((content_kind = ANY (ARRAY['post'::text, 'short'::text, 'story'::text])))"
+        ],
+        "deletion_shared_guard_present": false,
+        "migrations": [
+          "20260924120000",
+          "20260924130000",
+          "20260924131000"
+        ]
+      }
+    },
+    {
+      "auth_providers": {
+        "apple": false,
+        "google": true,
+        "email": true
+      }
+    }
+  ]
+}

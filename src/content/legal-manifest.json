@@ -1,0 +1,27 @@
+{
+  "mentions-legales": {
+    "source": "src/pages/MentionsLegales.tsx",
+    "sha256": "4337e5226c11d823e7fcf7362a74b76271a9bbfe76431195f3796fd797c39bd8",
+    "paragraphs": 19
+  },
+  "conditions-generales-vente": {
+    "source": "src/pages/ConditionsVente.tsx",
+    "sha256": "9343813c5b33cecc8b4d2d6722153a24ad7e7da33f7ad675ae8f5adecc81fc78",
+    "paragraphs": 24
+  },
+  "politique-confidentialite": {
+    "source": "src/pages/PolitiqueConfidentialite.tsx",
+    "sha256": "0e8aebad4839c21a71dd94d9233334a44e0648bb99cff7e0192614956bed707c",
+    "paragraphs": 35
+  },
+  "securite-des-mineurs": {
+    "source": "src/pages/SecuriteMineurs.tsx",
+    "sha256": "6792921da58bacedbd37da5603d16e26a1360c825aeab5a6579fadd47d39895d",
+    "paragraphs": 26
+  },
+  "legal": {
+    "source": "src/pages/Legal.tsx",
+    "sha256": "0ecbcbfb35a367b1d4cc42d26971d4fe84d117615bc2919b187d4b9fa4b2c844",
+    "paragraphs": 60
+  }
+}

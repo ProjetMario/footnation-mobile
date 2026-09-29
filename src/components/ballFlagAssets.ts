@@ -1,0 +1,22 @@
+// Static requires allow Expo to bundle every texture on iOS, Android and web.
+export const BALL_FLAG_ASSETS = [
+  require("../../assets/brand/flags/fr.png"),
+  require("../../assets/brand/flags/ba.png"),
+  require("../../assets/brand/flags/dz.png"),
+  require("../../assets/brand/flags/eu.png"),
+  require("../../assets/brand/flags/us.png"),
+  require("../../assets/brand/flags/cn.png"),
+  require("../../assets/brand/flags/au.png"),
+  require("../../assets/brand/flags/br.png"),
+  require("../../assets/brand/flags/ar.png"),
+  require("../../assets/brand/flags/gb.png"),
+  require("../../assets/brand/flags/jp.png"),
+  require("../../assets/brand/flags/de.png"),
+  require("../../assets/brand/flags/tr.png"),
+  require("../../assets/brand/flags/pt.png"),
+  require("../../assets/brand/flags/ma.png"),
+  require("../../assets/brand/flags/qa.png"),
+  require("../../assets/brand/flags/it.png"),
+  require("../../assets/brand/flags/sa.png"),
+  require("../../assets/brand/flags/hr.png"),
+];
