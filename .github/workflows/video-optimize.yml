@@ -1,0 +1,26 @@
+name: Optimize public videos
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: video-mobile-optimization
+  cancel-in-progress: false
+jobs:
+  optimize:
+    if: github.repository == 'ProjetMario/footnation-mobile' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install FFmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+      - name: Verify encoder and safety checks
+        run: python3 -m unittest discover -s scripts/media-video/tests -v
+      - name: Process at most three videos
+        env:
+          SUPABASE_URL: ${{ secrets.MEDIA_VIDEO_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.MEDIA_VIDEO_SERVICE_ROLE_KEY }}
+        run: python3 scripts/media-video/worker.py --max-jobs 3 --max-seconds 420
