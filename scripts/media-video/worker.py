@@ -115,8 +115,8 @@ def optimize(source: Path, directory: Path, needs_thumbnail=True) -> dict:
     result = directory / "mobile.mp4"
     command(["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-protocol_whitelist", "file,pipe",
              "-i", str(source), "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-map_metadata", "-1",
-             "-vf", f"scale={width}:{height}:flags=lanczos,setsar=1,fps=30", "-c:v", "libx264", "-preset", "fast",
-             "-crf", "26", "-maxrate", "1800k", "-bufsize", "3600k", "-pix_fmt", "yuv420p", "-profile:v", "high",
+             "-vf", f"scale={width}:{height}:flags=lanczos:out_range=tv,setsar=1,fps=30", "-c:v", "libx264", "-preset", "fast",
+             "-crf", "26", "-maxrate", "1800k", "-bufsize", "3600k", "-pix_fmt", "yuv420p", "-color_range", "tv", "-profile:v", "high",
              "-level:v", "3.1", "-g", "60", "-keyint_min", "30", "-c:a", "aac", "-b:a", "96k", "-ac", "2",
              "-movflags", "+faststart", "-threads", "2", str(result)])
     output = probe(result)

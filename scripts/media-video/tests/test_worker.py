@@ -79,6 +79,26 @@ class WorkerTests(unittest.TestCase):
             self.assertEqual(source.read_bytes(), original)
 
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg required")
+    def test_full_range_rotated_iphone_video_becomes_limited_range_yuv420p(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            raw = directory / "raw.mp4"
+            source = directory / "rotated.mp4"
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=360x640:rate=30",
+                            "-t", "1", "-vf", "scale=out_range=pc", "-c:v", "libx264", "-crf", "12",
+                            "-color_range", "pc", "-threads", "2", str(raw)], check=True)
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-display_rotation:v:0", "90", "-i", str(raw),
+                            "-c", "copy", str(source)], check=True)
+            self.assertEqual(worker.probe(source)["video"]["pix_fmt"], "yuvj420p")
+            result = worker.optimize(source, directory)
+            self.assertIsNotNone(result["video"])
+            output = worker.probe(result["video"])
+            self.assertEqual(output["video"]["pix_fmt"], "yuv420p")
+            # Some FFmpeg versions omit the default limited-range VUI field.
+            self.assertIn(output["video"].get("color_range"), (None, "tv"))
+            self.assertEqual((output["width"], output["height"]), (640, 360))
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg required")
     def test_small_silent_clip_keeps_original_when_transcoding_is_larger(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

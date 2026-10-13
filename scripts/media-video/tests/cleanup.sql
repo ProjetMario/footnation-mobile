@@ -20,11 +20,12 @@ create table storage.objects(bucket_id text,name text,owner_id text,primary key(
 grant usage on schema storage,public to service_role,authenticated,anon;
 grant all on storage.objects to service_role;
 create table public.posts(id uuid primary key,user_id uuid,video_url text,image_url text,created_at timestamptz default now());
-create table public.shorts(id uuid primary key,user_id uuid,video_url text,thumbnail_url text,created_at timestamptz default now());
+create table public.shorts(id uuid primary key,user_id uuid,source_id text,video_url text,thumbnail_url text,created_at timestamptz default now());
 create table public.admin_console_media(target_id uuid,bucket text,path text);
 grant select,insert,update,delete on public.posts,public.shorts to service_role,authenticated;
 \ir ../../../supabase/migrations/20261013060248_video_mobile_optimization.sql
 \ir ../../../supabase/migrations/20261013061119_video_derivative_cleanup.sql
+\ir ../../../supabase/migrations/20261013062145_video_derivative_upload_guard_qualified.sql
 insert into public.posts(id,user_id,video_url) values('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','11111111-1111-4111-8111-111111111111','https://example/a.mp4');
 insert into public.shorts(id,user_id,video_url) values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','22222222-2222-4222-8222-222222222222','https://example/b.mp4');
 insert into storage.objects values
