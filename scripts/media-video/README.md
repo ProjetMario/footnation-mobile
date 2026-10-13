@@ -9,14 +9,14 @@ The worker accepts only HTTPS public Storage URLs on the configured Supabase hos
 Run after applying both reviewed optimization and derivative-cleanup migrations to the correct project:
 
 ```sh
-python3 scripts/media-video/worker.py --env-file .env --max-jobs 3
+python3 scripts/media-video/worker.py --env-file .env --max-jobs 8
 ```
 
 Only `SUPABASE_URL` and **server-only** `SUPABASE_SERVICE_ROLE_KEY` are read from this file. Never put that key in Expo/Vite or commit it. Uploads go to immutable source/content/lease-addressed `optimized/mobile-720-v1/...` paths in the same source bucket, with long cache lifetime. Completion verifies that public byte-range playback returns HTTP 206. Existing author thumbnails take precedence; the worker's generated poster fills a missing one only.
 
 Frontend contract on each source row: `optimized_video_url`, `optimized_video_source_url`, `optimized_thumbnail_url` are nullable. Select the optimized URL or poster only if `optimized_video_source_url === video_url`; otherwise retain `video_url` and the existing poster. Deploying this migration before the clients is safe. A failed/unavailable worker never blocks playback of an original.
 
-The checked-in GitHub workflow is a free-hosted-runner option for a **public repository**. It runs hourly and on manual dispatch, no pull-request trigger, with a ten-minute timeout and at most three jobs. It is restricted to `ProjetMario/footnation-mobile` on `main`. Configure repository secrets `MEDIA_VIDEO_SUPABASE_URL` and `MEDIA_VIDEO_SERVICE_ROLE_KEY` only after reviewing that target. Schedule activation/deployment is separate from committing this file. No active permanent worker is assumed merely because this file exists. The queue's `state`, `attempts`, `error_code`, `updated_at` and `result` provide operator monitoring; `result` includes byte counts and local conversion/download times, not a claim about client time-to-first-frame. Conversion frequency may be increased after measuring arrivals and storage usage.
+The checked-in GitHub workflow is a free-hosted-runner option for a **public repository**. It runs every ten minutes and on manual dispatch, no pull-request trigger, with a ten-minute timeout and at most eight jobs per run. It is restricted to `ProjetMario/footnation-mobile` on `main`. Configure repository secrets `MEDIA_VIDEO_SUPABASE_URL` and `MEDIA_VIDEO_SERVICE_ROLE_KEY` only after reviewing that target. GitHub may start scheduled jobs a few minutes late, and a busy queue can still span several runs. No active permanent worker is assumed merely because this file exists. The queue's `state`, `attempts`, `error_code`, `updated_at` and `result` provide operator monitoring; `result` includes byte counts and local conversion/download times, not a claim about client time-to-first-frame.
 
 Verification:
 

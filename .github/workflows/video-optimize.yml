@@ -1,7 +1,9 @@
 name: Optimize public videos
 on:
   schedule:
-    - cron: '17 * * * *'
+    # Run every ten minutes so newly uploaded videos do not wait for an
+    # hourly batch. GitHub Actions schedules may start a few minutes late.
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,8 +21,8 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
       - name: Verify encoder and safety checks
         run: python3 -m unittest discover -s scripts/media-video/tests -v
-      - name: Process at most three videos
+      - name: Process at most eight videos
         env:
           SUPABASE_URL: ${{ secrets.MEDIA_VIDEO_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.MEDIA_VIDEO_SERVICE_ROLE_KEY }}
-        run: python3 scripts/media-video/worker.py --max-jobs 3 --max-seconds 420
+        run: python3 scripts/media-video/worker.py --max-jobs 8 --max-seconds 420
