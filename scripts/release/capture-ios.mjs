@@ -47,10 +47,14 @@ try {
  const selectedDevice=process.env.FN_CAPTURE_DEVICE||'all';if(!['all','iphone','ipad'].includes(selectedDevice))throw Error('Invalid capture device');
  for(const spec of preferred.filter(d=>selectedDevice==='all'||d.kind===selectedDevice)){const type=spec.names.map(n=>types.find(t=>t.name===n)).find(Boolean);if(!type)throw Error('Required screenshot device unavailable');const udid=run('xcrun',['simctl','create','FootNation '+spec.kind,type.identifier,runtime.identifier],{capture:true}).trim();devices.push({...spec,udid,name:type.name,runtime:runtime.name});}
  const iphone=devices[0];run('xcrun',['simctl','boot',iphone.udid]);run('xcrun',['simctl','bootstatus',iphone.udid,'-b']);
- let nativeApp,products,appName;
+ let nativeApp,products,appName,compiledSourceSha256=expected,compiledGithubCommit=process.env.GITHUB_SHA,nativeArchiveSha256;
  if(reuse){
   stage('restore authenticated native simulator build');
   const encrypted=readFileSync(path.join(process.env.RUNNER_TEMP,'footnation-reuse-simulator/simulator-app.tar.gz.enc'));
+  nativeArchiveSha256=createHash('sha256').update(encrypted).digest('hex');
+  const previousCaptures=path.join(process.env.RUNNER_TEMP,'footnation-reuse-simulator/captures.tar.gz.enc');
+  if(existsSync(previousCaptures)){const archive=path.join(work,'previous-captures.tar.gz');writeFileSync(archive,decrypt(readFileSync(previousCaptures),key));const previous=JSON.parse(run('tar',['-xOf',archive,'./manifest.json'],{capture:true}));if(previous.app!=='com.footnation.app'||previous.version!=='1.0.4'||previous.buildNumber!=='16')throw Error('Native source provenance mismatch');compiledSourceSha256=previous.compiledSourceSha256||previous.sourceSha256;compiledGithubCommit=previous.compiledGithubCommit||previous.githubCommit;rmSync(archive);}
+  else throw Error('Missing original native build provenance');
   const archive=path.join(work,'reuse-app.tar.gz');writeFileSync(archive,decrypt(encrypted,key));products=path.join(work,'restored-native-app');
   run('python3',[path.join(scripts,'safe-extract-screenshots.py'),archive,products]);
   appName=readdirSync(products).find(n=>n.endsWith('.app'));if(!appName)throw Error('Missing reused app');nativeApp=path.join(products,appName);
@@ -62,8 +66,13 @@ try {
   products=path.join(work,'DerivedData/Build/Products/Release-iphonesimulator');appName=readdirSync(products).find(n=>n.endsWith('.app'));if(!appName)throw Error('Native app product missing');nativeApp=path.join(products,appName);
   run('tar',['-czf',path.join(work,'simulator-app.tar.gz'),'-C',products,appName]);writeFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'),encrypt(readFileSync(path.join(work,'simulator-app.tar.gz')),key));
  }
+ nativeArchiveSha256 ||= createHash('sha256').update(readFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'))).digest('hex');
+ const nativeIdentity=JSON.parse(run('python3',['-c',`import plistlib,json,sys
+p=plistlib.load(open(sys.argv[1],'rb'))
+assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.4' and p['CFBundleVersion']=='16'
+print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
  stage('install native UI automation');run('curl',['-fsSL','https://get.maestro.mobile.dev','-o',path.join(work,'install-maestro.sh')]);run('bash',[path.join(work,'install-maestro.sh')]);
- const manifest={app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:expected,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,method:'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
+ const manifest={app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,method:'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
  const routes=[['01-accueil','home'],['02-recherche','search'],['03-clubs','clubs'],['04-matchs','matches'],['05-opportunites','opportunities'],['06-profil','my-profile'],['07-matching','matching']];
  for(const device of devices){
   stage('capture '+device.kind+' native interface');if(device!==iphone){run('xcrun',['simctl','boot',device.udid]);run('xcrun',['simctl','bootstatus',device.udid,'-b']);}
@@ -75,6 +84,9 @@ try {
   const loginFlow=`appId: com.footnation.app\n---\n- scrollUntilVisible:\n    element: "Adresse e-mail"\n    direction: DOWN\n    timeout: 20000\n- tapOn: "joueur@example.com"\n- inputText: ${JSON.stringify(demo.email)}\n- pressKey: Enter\n- inputText: ${JSON.stringify(demo.password)}\n- pressKey: Enter\n- extendedWaitUntil:\n    notVisible: "Connexion rapide"\n    timeout: 60000\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n`;
   maestro(device.udid,loginFlow,device.kind+'-login',true);await wait(12000);
   screenshot(device.udid,device.kind+'-00-login-result.png');
+  run('xcrun',['simctl','openurl',device.udid,'footnation://my-profile']);await wait(10000);
+  maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- extendedWaitUntil:\n    visible: ".*Démo FootNation.*"\n    timeout: 60000\n`,device.kind+'-authenticated-profile');
+  screenshot(device.udid,device.kind+'-00-authenticated-profile.png');
   for(const locale of ['fr-FR','en-US']) {
    if(locale==='en-US') {
     run('xcrun',['simctl','terminate',device.udid,'com.footnation.app'],{allowFailure:true});
