@@ -37,16 +37,18 @@ try {
  Object.assign(env,{CI:'1',EXPO_NO_TELEMETRY:'1',EXPO_NO_DOTENV:'1',EXPO_PUBLIC_SUPPORTERS_ENABLED:'false',EAS_BUILD_PLATFORM:'ios',NODE_ENV:'production',MAESTRO_CLI_NO_ANALYTICS:'1'});
  const app=JSON.parse(readFileSync(path.join(source,'app.json')));if(app.expo.ios.bundleIdentifier!=='com.footnation.app')throw Error('Unexpected app');app.expo.version='1.0.4';app.expo.ios.buildNumber='16';writeFileSync(path.join(source,'app.json'),JSON.stringify(app,null,2));
  const demo=JSON.parse(readFileSync(path.join(source,'release-private/demo.json')));if(typeof demo.email!=='string'||typeof demo.password!=='string'||!demo.email||!demo.password)throw Error('Missing private demo credentials');
+ const buildOnly=process.env.FN_BUILD_ONLY==='1';
  const reuse=process.env.FN_REUSE_RUN_ID||'';if(reuse&&!/^\d+$/.test(reuse))throw Error('Invalid reuse run id');
  if(!reuse){stage('install dependencies');run('npm',['ci','--include=dev','--legacy-peer-deps','--no-audit','--no-fund']);
  stage('generate native iOS project');run('npx',['--no-install','expo','prebuild','--platform','ios','--no-install']);run('pod',['install'],{cwd:path.join(source,'ios')});}
+ if(!buildOnly){
  stage('prepare simulator devices');
  const runtimes=JSON.parse(run('xcrun',['simctl','list','runtimes','-j'],{capture:true})).runtimes.filter(r=>r.isAvailable&&r.name.startsWith('iOS ')).sort((a,b)=>b.version.localeCompare(a.version,undefined,{numeric:true}));if(!runtimes.length)throw Error('No iOS simulator runtime');
  const runtime=runtimes[0];const types=JSON.parse(run('xcrun',['simctl','list','devicetypes','-j'],{capture:true})).devicetypes;
  const preferred=[{kind:'iphone',names:['iPhone 16 Pro Max','iPhone 17 Pro Max','iPhone 15 Pro Max']},{kind:'ipad',names:['iPad Pro 13-inch (M4)','iPad Pro 13-inch (M5)','iPad Pro (12.9-inch) (6th generation)']}];
  const selectedDevice=process.env.FN_CAPTURE_DEVICE||'all';if(!['all','iphone','ipad'].includes(selectedDevice))throw Error('Invalid capture device');
  for(const spec of preferred.filter(d=>selectedDevice==='all'||d.kind===selectedDevice)){const type=spec.names.map(n=>types.find(t=>t.name===n)).find(Boolean);if(!type)throw Error('Required screenshot device unavailable');const udid=run('xcrun',['simctl','create','FootNation '+spec.kind,type.identifier,runtime.identifier],{capture:true}).trim();devices.push({...spec,udid,name:type.name,runtime:runtime.name});}
- const iphone=devices[0];run('xcrun',['simctl','boot',iphone.udid]);run('xcrun',['simctl','bootstatus',iphone.udid,'-b']);
+ } // Compile-only jobs never start or enumerate CoreSimulator.
  let nativeApp,products,appName,compiledSourceSha256=expected,compiledGithubCommit=process.env.GITHUB_SHA,nativeArchiveSha256;
  if(reuse){
   stage('restore authenticated native simulator build');
@@ -62,7 +64,7 @@ try {
  }else{
   const project=readdirSync(path.join(source,'ios')).find(n=>n.endsWith('.xcworkspace'));if(!project)throw Error('Missing generated workspace');
   const workspace=path.join(source,'ios',project);const scheme=project.replace('.xcworkspace','');
-  stage('compile authentic Release app for iOS Simulator');run('xcodebuild',['-workspace',workspace,'-scheme',scheme,'-configuration','Release','-sdk','iphonesimulator','-destination','id='+iphone.udid,'-derivedDataPath',path.join(work,'DerivedData'),'CODE_SIGNING_ALLOWED=NO','ONLY_ACTIVE_ARCH=YES','build']);
+  stage('compile authentic Release app for iOS Simulator');run('xcodebuild',['-workspace',workspace,'-scheme',scheme,'-configuration','Release','-sdk','iphonesimulator','-destination','generic/platform=iOS Simulator','-derivedDataPath',path.join(work,'DerivedData'),'CODE_SIGNING_ALLOWED=NO','ONLY_ACTIVE_ARCH=YES','ARCHS=arm64','build']);
   products=path.join(work,'DerivedData/Build/Products/Release-iphonesimulator');appName=readdirSync(products).find(n=>n.endsWith('.app'));if(!appName)throw Error('Native app product missing');nativeApp=path.join(products,appName);
   run('tar',['-czf',path.join(work,'simulator-app.tar.gz'),'-C',products,appName]);writeFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'),encrypt(readFileSync(path.join(work,'simulator-app.tar.gz')),key));
  }
@@ -71,13 +73,12 @@ try {
 p=plistlib.load(open(sys.argv[1],'rb'))
 assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.4' and p['CFBundleVersion']=='16'
 print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
- const buildOnly=process.env.FN_BUILD_ONLY==='1';
  const manifest={app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
  const routes=[['01-accueil','home'],['02-recherche','search'],['03-clubs','clubs'],['04-matchs','matches'],['05-opportunites','opportunities'],['06-profil','my-profile'],['07-matching','matching']];
  if(!buildOnly){
  stage('install native UI automation');run('curl',['-fsSL','https://get.maestro.mobile.dev','-o',path.join(work,'install-maestro.sh')]);run('bash',[path.join(work,'install-maestro.sh')]);
  for(const device of devices){
-  stage('capture '+device.kind+' native interface');if(device!==iphone){run('xcrun',['simctl','boot',device.udid]);run('xcrun',['simctl','bootstatus',device.udid,'-b']);}
+  stage('capture '+device.kind+' native interface');run('xcrun',['simctl','boot',device.udid]);run('xcrun',['simctl','bootstatus',device.udid,'-b']);
   run('xcrun',['simctl','ui',device.udid,'appearance','light']);run('xcrun',['simctl','status_bar',device.udid,'override','--time','9:41','--dataNetwork','wifi','--wifiMode','active','--wifiBars','3','--batteryState','charged','--batteryLevel','100']);
   run('xcrun',['simctl','install',device.udid,nativeApp]);
   const container=run('xcrun',['simctl','get_app_container',device.udid,'com.footnation.app','data'],{capture:true}).trim();const storage=path.join(container,'Library/Application Support/com.footnation.app/RCTAsyncLocalStorage_V1');mkdirSync(storage,{recursive:true});const preferences={'footnation:language:v1':'fr','footnation:appearance:v1':'light'};if(/^[0-9a-f-]{36}$/.test(demo.userId||'')){preferences['footnation:first-login-onboarding:v1:'+demo.userId]='seen';preferences['footnation:invitation-prompt-until:v1:'+demo.userId]=String(Date.now()+7*86400000);}writeFileSync(path.join(storage,'manifest.json'),JSON.stringify(preferences));

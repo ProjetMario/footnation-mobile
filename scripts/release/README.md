@@ -53,6 +53,8 @@ Official references: [GitHub standard runners](https://docs.github.com/en/action
 
 Its separately encrypted payload permits only `release-private/build-env.json` and `release-private/demo.json` (`email`, `password`). It rejects signing assets. Use a new `FN_IOS_SCREENSHOT_KEY` and the same authenticated envelope format. Credentials, native screenshots, simulator app and diagnostics remain encrypted in the public one-day artifacts. The simulator binary can be reused with `reuse_run_id` for a later capture pass without recompilation, using the same artifact encryption key. Human visual review and dimension checks are required before uploading any capture to App Store Connect. Remove the temporary GitHub secret, ciphertext and artifacts after verified local retrieval.
 
+`ios-native-screenshots-rescue.yml` separates compilation from UI capture: its first job uses `ONLY_ACTIVE_ARCH=YES`, archives the native app and provenance before any Maestro action, then two dependent jobs capture iPhone and iPad screens using that preserved binary. `FN_BUILD_ONLY=1` is the helper's compile-only mode. Keep the same encryption key across all jobs and retries. An optional `userId` in the private demo payload permits setting that account's ordinary onboarding preferences. A positive assertion of the demonstration profile is required before accepting authenticated captures.
+
 Local checks:
 
 ```sh
