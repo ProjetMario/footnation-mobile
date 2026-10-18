@@ -62,7 +62,7 @@ try {
  }else{
   const project=readdirSync(path.join(source,'ios')).find(n=>n.endsWith('.xcworkspace'));if(!project)throw Error('Missing generated workspace');
   const workspace=path.join(source,'ios',project);const scheme=project.replace('.xcworkspace','');
-  stage('compile authentic Release app for iOS Simulator');run('xcodebuild',['-workspace',workspace,'-scheme',scheme,'-configuration','Release','-sdk','iphonesimulator','-destination','id='+iphone.udid,'-derivedDataPath',path.join(work,'DerivedData'),'CODE_SIGNING_ALLOWED=NO','build']);
+  stage('compile authentic Release app for iOS Simulator');run('xcodebuild',['-workspace',workspace,'-scheme',scheme,'-configuration','Release','-sdk','iphonesimulator','-destination','id='+iphone.udid,'-derivedDataPath',path.join(work,'DerivedData'),'CODE_SIGNING_ALLOWED=NO','ONLY_ACTIVE_ARCH=YES','build']);
   products=path.join(work,'DerivedData/Build/Products/Release-iphonesimulator');appName=readdirSync(products).find(n=>n.endsWith('.app'));if(!appName)throw Error('Native app product missing');nativeApp=path.join(products,appName);
   run('tar',['-czf',path.join(work,'simulator-app.tar.gz'),'-C',products,appName]);writeFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'),encrypt(readFileSync(path.join(work,'simulator-app.tar.gz')),key));
  }
@@ -71,9 +71,11 @@ try {
 p=plistlib.load(open(sys.argv[1],'rb'))
 assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.4' and p['CFBundleVersion']=='16'
 print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
- stage('install native UI automation');run('curl',['-fsSL','https://get.maestro.mobile.dev','-o',path.join(work,'install-maestro.sh')]);run('bash',[path.join(work,'install-maestro.sh')]);
- const manifest={app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,method:'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
+ const buildOnly=process.env.FN_BUILD_ONLY==='1';
+ const manifest={app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
  const routes=[['01-accueil','home'],['02-recherche','search'],['03-clubs','clubs'],['04-matchs','matches'],['05-opportunites','opportunities'],['06-profil','my-profile'],['07-matching','matching']];
+ if(!buildOnly){
+ stage('install native UI automation');run('curl',['-fsSL','https://get.maestro.mobile.dev','-o',path.join(work,'install-maestro.sh')]);run('bash',[path.join(work,'install-maestro.sh')]);
  for(const device of devices){
   stage('capture '+device.kind+' native interface');if(device!==iphone){run('xcrun',['simctl','boot',device.udid]);run('xcrun',['simctl','bootstatus',device.udid,'-b']);}
   run('xcrun',['simctl','ui',device.udid,'appearance','light']);run('xcrun',['simctl','status_bar',device.udid,'override','--time','9:41','--dataNetwork','wifi','--wifiMode','active','--wifiBars','3','--batteryState','charged','--batteryLevel','100']);
@@ -101,10 +103,11 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
   }
   manifest.devices.push({kind:device.kind,name:device.name,runtime:device.runtime});run('xcrun',['simctl','terminate',device.udid,'com.footnation.app'],{allowFailure:true});run('xcrun',['simctl','shutdown',device.udid]);
  }
+ }
  writeFileSync(path.join(output,'manifest.json'),JSON.stringify(manifest,null,2));
  stage('encrypt native capture archive');run('tar',['-czf',path.join(work,'captures.tar.gz'),'-C',output,'.']);writeFileSync(path.join(deliverables,'captures.tar.gz.enc'),encrypt(readFileSync(path.join(work,'captures.tar.gz')),key));
  // The encrypted simulator binary was preserved immediately after compilation.
- console.log('Genuine native screenshots encrypted; human review is required before App Store upload.');
+ console.log(buildOnly?'Native simulator build encrypted and preserved for separate capture jobs.':'Genuine native screenshots encrypted; human review is required before App Store upload.');
 } catch { console.error('Native screenshots failed during: '+phase+'. Diagnostics encrypted.'); process.exitCode=1; }
 finally {
  try{if(log!==undefined)closeSync(log);if(key&&existsSync(path.join(work,'capture.log'))){const entries=['capture.log'];if(existsSync(path.join(work,'maestro-output')))entries.push('maestro-output');if(existsSync(output))entries.push('captures');const archive=path.join(work,'diagnostics.tar.gz');const r=spawnSync('tar',['-czf',archive,'-C',work,...entries],{stdio:'ignore'});if(r.status===0)writeFileSync(path.join(deliverables,'diagnostics.tar.gz.enc'),encrypt(readFileSync(archive),key));}}catch{console.error('Encrypted diagnostics unavailable');}
