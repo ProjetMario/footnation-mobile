@@ -12,8 +12,11 @@ const deliverables=path.join(process.env.RUNNER_TEMP||'','footnation-screenshot-
 const env={...process.env}; delete env.FN_IOS_SCREENSHOT_KEY; delete env.GITHUB_TOKEN; delete env.GH_TOKEN;
 let log,key,phase='configuration',created=false;
 const devices=[];
-function run(command,args,{cwd=source,capture=false,allowFailure=false,commandEnv=env}={}) {
- const r=spawnSync(command,args,{cwd,env:commandEnv,encoding:'utf8',maxBuffer:32*1024*1024,stdio:capture?['ignore','pipe','pipe']:['ignore',log,log]});
+const useXCTest=process.env.FN_CAPTURE_DRIVER==='xctest';
+const xctestScript=path.join(scripts,'xctest','xctest.mjs');
+const xctestWork=path.join(work,'native-ui-driver');
+function run(command,args,{cwd=source,capture=false,allowFailure=false,commandEnv=env,timeoutMs=8*60*1000}={}) {
+ const r=spawnSync(command,args,{cwd,env:commandEnv,encoding:'utf8',maxBuffer:32*1024*1024,timeout:timeoutMs,killSignal:'SIGKILL',stdio:capture?['ignore','pipe','pipe']:['ignore',log,log]});
  if((r.error||r.status!==0)&&!allowFailure){if(capture&&log!==undefined)writeFileSync(log,r.stderr||'Command failed');throw Error('Native capture command failed');}return r.stdout||'';
 }
 function stage(name){phase=name;console.log('Native screenshots: '+name);}
@@ -64,7 +67,7 @@ try {
  }else{
   const project=readdirSync(path.join(source,'ios')).find(n=>n.endsWith('.xcworkspace'));if(!project)throw Error('Missing generated workspace');
   const workspace=path.join(source,'ios',project);const scheme=project.replace('.xcworkspace','');
-  stage('compile authentic Release app for iOS Simulator');run('xcodebuild',['-workspace',workspace,'-scheme',scheme,'-configuration','Release','-sdk','iphonesimulator','-destination','generic/platform=iOS Simulator','-derivedDataPath',path.join(work,'DerivedData'),'CODE_SIGNING_ALLOWED=NO','ONLY_ACTIVE_ARCH=YES','ARCHS=arm64','build']);
+  stage('compile authentic Release app for iOS Simulator');run('xcodebuild',['-workspace',workspace,'-scheme',scheme,'-configuration','Release','-sdk','iphonesimulator','-destination','generic/platform=iOS Simulator','-derivedDataPath',path.join(work,'DerivedData'),'CODE_SIGNING_ALLOWED=NO','ONLY_ACTIVE_ARCH=YES','ARCHS=arm64','build'],{timeoutMs:40*60*1000});
   products=path.join(work,'DerivedData/Build/Products/Release-iphonesimulator');appName=readdirSync(products).find(n=>n.endsWith('.app'));if(!appName)throw Error('Native app product missing');nativeApp=path.join(products,appName);
   run('tar',['-czf',path.join(work,'simulator-app.tar.gz'),'-C',products,appName]);writeFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'),encrypt(readFileSync(path.join(work,'simulator-app.tar.gz')),key));
  }
@@ -73,10 +76,11 @@ try {
 p=plistlib.load(open(sys.argv[1],'rb'))
 assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.4' and p['CFBundleVersion']=='16'
 print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
- const manifest={app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
+ const manifest={captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
  const routes=[['01-accueil','home'],['02-recherche','search'],['03-clubs','clubs'],['04-matchs','matches'],['05-opportunites','opportunities'],['06-profil','my-profile'],['07-matching','matching']];
  if(!buildOnly){
- stage('install native UI automation');run('curl',['-fsSL','https://get.maestro.mobile.dev','-o',path.join(work,'install-maestro.sh')]);run('bash',[path.join(work,'install-maestro.sh')]);
+ if(useXCTest){stage('prepare standalone XCTest UI runner');run(process.execPath,[xctestScript,'prepare','--work',xctestWork,'--demo',path.join(source,'release-private/demo.json')],{timeoutMs:10*60*1000});}
+ else {stage('install native UI automation');run('curl',['--connect-timeout','20','--max-time','120','-fsSL','https://get.maestro.mobile.dev','-o',path.join(work,'install-maestro.sh')]);run('bash',[path.join(work,'install-maestro.sh')]);}
  for(const device of devices){
   stage('capture '+device.kind+' native interface');run('xcrun',['simctl','boot',device.udid]);run('xcrun',['simctl','bootstatus',device.udid,'-b']);
   run('xcrun',['simctl','ui',device.udid,'appearance','light']);run('xcrun',['simctl','status_bar',device.udid,'override','--time','9:41','--dataNetwork','wifi','--wifiMode','active','--wifiBars','3','--batteryState','charged','--batteryLevel','100']);
@@ -84,11 +88,14 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
   const container=run('xcrun',['simctl','get_app_container',device.udid,'com.footnation.app','data'],{capture:true}).trim();const storage=path.join(container,'Library/Application Support/com.footnation.app/RCTAsyncLocalStorage_V1');mkdirSync(storage,{recursive:true});const preferences={'footnation:language:v1':'fr','footnation:appearance:v1':'light'};if(/^[0-9a-f-]{36}$/.test(demo.userId||'')){preferences['footnation:first-login-onboarding:v1:'+demo.userId]='seen';preferences['footnation:invitation-prompt-until:v1:'+demo.userId]=String(Date.now()+7*86400000);}writeFileSync(path.join(storage,'manifest.json'),JSON.stringify(preferences));
   run('xcrun',['simctl','launch',device.udid,'com.footnation.app','-AppleLanguages','(fr)','-AppleLocale','fr_FR']);await wait(15000);
   run('xcrun',['simctl','openurl',device.udid,'footnation://login?next=%2Fsearch']);await wait(8000);
+  if(useXCTest){stage('authenticate '+device.kind+' through native XCTest fields');run(process.execPath,[xctestScript,'run','--work',xctestWork,'--udid',device.udid,'--mode','login','--locale','fr-FR','--device',device.kind,'--output',output],{timeoutMs:10*60*1000});}
+  else {
   const loginFlow=`appId: com.footnation.app\n---\n- scrollUntilVisible:\n    element: "joueur@example.com"\n    direction: DOWN\n    timeout: 20000\n- tapOn: "joueur@example.com"\n- inputText: ${JSON.stringify(demo.email)}\n- pressKey: Enter\n- inputText: ${JSON.stringify(demo.password)}\n- pressKey: Enter\n- extendedWaitUntil:\n    notVisible: "Connexion rapide"\n    timeout: 60000\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n`;
   maestro(device.udid,loginFlow,device.kind+'-login',true);await wait(12000);
   screenshot(device.udid,device.kind+'-00-login-result.png');
   run('xcrun',['simctl','openurl',device.udid,'footnation://my-profile']);await wait(10000);
   maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- extendedWaitUntil:\n    visible: ".*Démo FootNation.*"\n    timeout: 60000\n`,device.kind+'-authenticated-profile');
+  }
   screenshot(device.udid,device.kind+'-00-authenticated-profile.png');
   for(const locale of ['fr-FR','en-US']) {
    if(locale==='en-US') {
@@ -96,10 +103,12 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
     const settings=JSON.parse(readFileSync(path.join(storage,'manifest.json'),'utf8'));settings['footnation:language:v1']='en';writeFileSync(path.join(storage,'manifest.json'),JSON.stringify(settings));
     run('xcrun',['simctl','launch',device.udid,'com.footnation.app','-AppleLanguages','(en)','-AppleLocale','en_US']);await wait(10000);
    }
+   if(useXCTest){stage('capture '+locale+' '+device.kind+' with native XCTest');run(process.execPath,[xctestScript,'run','--work',xctestWork,'--udid',device.udid,'--mode','capture','--locale',locale,'--device',device.kind,'--output',output],{timeoutMs:12*60*1000});}
    for(const [name,route] of routes){
-    run('xcrun',['simctl','openurl',device.udid,'footnation://'+route]);await wait(18000);
+    if(!useXCTest){run('xcrun',['simctl','openurl',device.udid,'footnation://'+route]);await wait(18000);
     if(route==='home')maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- tapOn:\n    text: "Close invitation"\n    optional: true\n- tapOn:\n    text: "Later"\n    optional: true\n`,device.kind+'-dismiss',true);await wait(3000);
-    const filename=locale+'-'+device.kind+'-'+name+'.png';screenshot(device.udid,filename);manifest.screens.push({filename,route,device:device.name,runtime:device.runtime,locale,sha256:createHash('sha256').update(readFileSync(path.join(output,filename))).digest('hex'),visuallyReviewed:false});
+    }
+    const filename=locale+'-'+device.kind+'-'+name+'.png';if(!useXCTest)screenshot(device.udid,filename);manifest.screens.push({filename,route,device:device.name,runtime:device.runtime,locale,captureMethod:useXCTest?'XCUIScreen.main.screenshot native capture':'xcrun simctl io screenshot',sha256:createHash('sha256').update(readFileSync(path.join(output,filename))).digest('hex'),visuallyReviewed:false});
    }
   }
   manifest.devices.push({kind:device.kind,name:device.name,runtime:device.runtime});run('xcrun',['simctl','terminate',device.udid,'com.footnation.app'],{allowFailure:true});run('xcrun',['simctl','shutdown',device.udid]);
@@ -109,9 +118,9 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
  stage('encrypt native capture archive');run('tar',['-czf',path.join(work,'captures.tar.gz'),'-C',output,'.']);writeFileSync(path.join(deliverables,'captures.tar.gz.enc'),encrypt(readFileSync(path.join(work,'captures.tar.gz')),key));
  // The encrypted simulator binary was preserved immediately after compilation.
  console.log(buildOnly?'Native simulator build encrypted and preserved for separate capture jobs.':'Genuine native screenshots encrypted; human review is required before App Store upload.');
-} catch { console.error('Native screenshots failed during: '+phase+'. Diagnostics encrypted.'); process.exitCode=1; }
+} catch { console.error('Native screenshots failed during: '+phase+'. Diagnostics encrypted.'); for(const device of devices){try{run('xcrun',['simctl','io',device.udid,'screenshot',path.join(output,device.kind+'-00-failure.png')],{allowFailure:true,timeoutMs:30000});}catch{}} process.exitCode=1; }
 finally {
- try{if(log!==undefined)closeSync(log);if(key&&existsSync(path.join(work,'capture.log'))){const entries=['capture.log'];if(existsSync(path.join(work,'maestro-output')))entries.push('maestro-output');if(existsSync(output))entries.push('captures');const archive=path.join(work,'diagnostics.tar.gz');const r=spawnSync('tar',['-czf',archive,'-C',work,...entries],{stdio:'ignore'});if(r.status===0)writeFileSync(path.join(deliverables,'diagnostics.tar.gz.enc'),encrypt(readFileSync(archive),key));}}catch{console.error('Encrypted diagnostics unavailable');}
+ try{if(log!==undefined)closeSync(log);if(key&&existsSync(path.join(work,'capture.log'))){const entries=['capture.log'];if(existsSync(path.join(work,'maestro-output')))entries.push('maestro-output');if(existsSync(output))entries.push('captures');if(existsSync(xctestWork))for(const name of readdirSync(xctestWork))if(name.endsWith('.log'))entries.push('native-ui-driver/'+name);const archive=path.join(work,'diagnostics.tar.gz');const r=spawnSync('tar',['-czf',archive,'-C',work,...entries],{stdio:'ignore'});if(r.status===0)writeFileSync(path.join(deliverables,'diagnostics.tar.gz.enc'),encrypt(readFileSync(archive),key));}}catch{console.error('Encrypted diagnostics unavailable');}
  for(const device of devices)spawnSync('xcrun',['simctl','delete',device.udid],{stdio:'ignore'});
  if(created&&process.env.RUNNER_TEMP&&work.startsWith(process.env.RUNNER_TEMP+path.sep))rmSync(work,{recursive:true,force:true});key?.fill(0);
 }

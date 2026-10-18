@@ -1,0 +1,74 @@
+name: Genuine native iOS screenshots with XCTest
+on:
+  workflow_dispatch:
+    inputs:
+      payload_path:
+        required: true
+        default: release/ios-screenshots.enc
+        type: string
+      payload_sha256:
+        required: true
+        type: string
+      reuse_run_id:
+        description: Prior encrypted simulator build to reuse without recompiling
+        required: true
+        default: ""
+        type: string
+      reuse_artifact_name:
+        description: Artifact name from the prior simulator build
+        required: true
+        default: ""
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: footnation-native-screenshots-xctest
+  cancel-in-progress: false
+jobs:
+  screenshots:
+    if: github.event.repository.private == false && inputs.reuse_run_id != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ${{ fromJSON(inputs.reuse_run_id != '' && '["iphone","ipad"]' || '["all"]') }}
+    runs-on: macos-26
+    timeout-minutes: 35
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Download previously encrypted simulator build
+        if: inputs.reuse_run_id != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ inputs.reuse_artifact_name || format('footnation-native-screenshots-{0}', inputs.reuse_run_id) }}
+          run-id: ${{ inputs.reuse_run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/footnation-reuse-simulator
+      - name: Capture existing native app through XCTest
+        env:
+          FN_IOS_SCREENSHOT_KEY: ${{ secrets.FN_IOS_SCREENSHOT_KEY }}
+          FN_PAYLOAD_PATH: ${{ inputs.payload_path }}
+          FN_PAYLOAD_SHA256: ${{ inputs.payload_sha256 }}
+          FN_REUSE_RUN_ID: ${{ inputs.reuse_run_id }}
+          FN_CAPTURE_DEVICE: ${{ matrix.device }}
+          FN_CAPTURE_DRIVER: xctest
+        run: node scripts/release/capture-ios.mjs
+      - name: Preserve encrypted native captures and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: footnation-native-screenshots-${{ github.run_id }}-${{ matrix.device }}
+          path: ${{ runner.temp }}/footnation-screenshot-artifacts/*
+          if-no-files-found: warn
+          retention-days: 1
+          compression-level: 0
+      - name: Cleanup temporary app data
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/footnation-native-screenshots"
