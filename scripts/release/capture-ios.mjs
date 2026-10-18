@@ -31,7 +31,7 @@ try {
  if(!payload||path.isAbsolute(payload)||payload.split(/[\\/]/).includes('..')||!/^[a-zA-Z0-9_./-]+$/.test(payload)||!/^[a-f0-9]{64}$/.test(expected||''))throw Error('Invalid encrypted snapshot');
  const ciphertext=readFileSync(path.join(process.env.GITHUB_WORKSPACE,payload));if(createHash('sha256').update(ciphertext).digest('hex')!==expected)throw Error('Snapshot integrity mismatch');
  writeFileSync(path.join(work,'source.tar.gz'),decrypt(ciphertext,key),{mode:0o600});
- run('python3',[path.join(scripts,'safe-extract.py'),path.join(work,'source.tar.gz'),source],{cwd:work});rmSync(path.join(work,'source.tar.gz'));
+ run('python3',[path.join(scripts,'safe-extract-screenshots.py'),path.join(work,'source.tar.gz'),source],{cwd:work});rmSync(path.join(work,'source.tar.gz'));
  const buildEnv=JSON.parse(readFileSync(path.join(source,'release-private/build-env.json')));
  for(const [name,value] of Object.entries(buildEnv)){if(!/^EXPO_PUBLIC_[A-Z0-9_]+$/.test(name)||typeof value!=='string')throw Error('Unexpected build setting');env[name]=value;}
  Object.assign(env,{CI:'1',EXPO_NO_TELEMETRY:'1',EXPO_NO_DOTENV:'1',EXPO_PUBLIC_SUPPORTERS_ENABLED:'false',EAS_BUILD_PLATFORM:'ios',NODE_ENV:'production',MAESTRO_CLI_NO_ANALYTICS:'1'});
