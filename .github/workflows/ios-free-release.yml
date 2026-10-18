@@ -1,0 +1,57 @@
+name: Free iOS release build
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload_path:
+        description: Repository path to the encrypted source/signing snapshot
+        required: true
+        default: release/ios-source.enc
+        type: string
+      payload_sha256:
+        description: SHA256 of the encrypted snapshot
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: footnation-ios-store-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Standard public-repository runner: never replace with a larger/paid runner.
+    if: github.event.repository.private == false
+    runs-on: macos-26
+    timeout-minutes: 100
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Build from authenticated encrypted snapshot
+        env:
+          FN_IOS_RELEASE_KEY: ${{ secrets.FN_IOS_RELEASE_KEY }}
+          FN_PAYLOAD_PATH: ${{ inputs.payload_path }}
+          FN_PAYLOAD_SHA256: ${{ inputs.payload_sha256 }}
+        run: node scripts/release/build-ios.mjs
+      - name: Preserve encrypted IPA or encrypted diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: footnation-ios-${{ github.run_id }}
+          path: ${{ runner.temp }}/footnation-ios-artifacts/*
+          if-no-files-found: warn
+          retention-days: 1
+          compression-level: 0
+      - name: Remove temporary signing files after interruption
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/footnation-ios-release/signing.keychain-db" 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/footnation-ios-release"

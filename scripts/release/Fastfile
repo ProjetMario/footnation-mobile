@@ -1,0 +1,54 @@
+require 'json'
+require 'xcodeproj'
+
+default_platform(:ios)
+platform :ios do
+  desc 'Build an App Store IPA from existing, locally imported signing assets'
+  lane :release do
+    source = ENV.fetch('FN_SOURCE_ROOT')
+    metadata = JSON.parse(File.read(File.join(source, 'release-private', 'signing-runtime.json')))
+    project_paths = Dir[File.join(source, 'ios', '*.xcodeproj')]
+    UI.user_error!('Expected one generated app project') unless project_paths.length == 1
+    project_path = project_paths.first
+    project = Xcodeproj::Project.open(project_path)
+    targets = project.targets.select { |target| target.product_type == 'com.apple.product-type.application' }
+    UI.user_error!('Expected one app target') unless targets.length == 1
+    target = targets.first
+    update_code_signing_settings(
+      path: project_path,
+      use_automatic_signing: false,
+      targets: [target.name],
+      team_id: metadata.fetch('teamId'),
+      bundle_identifier: metadata.fetch('bundleIdentifier'),
+      code_sign_identity: metadata.fetch('identity'),
+      profile_uuid: metadata.fetch('profileUuid'),
+      profile_name: metadata.fetch('profileName')
+    )
+    workspace = project_path.sub(/\.xcodeproj$/, '.xcworkspace')
+    UI.user_error!('Generated workspace missing') unless File.directory?(workspace)
+    build_app(
+      workspace: workspace,
+      scheme: target.name,
+      configuration: 'Release',
+      clean: true,
+      silent: true,
+      disable_xcpretty: true,
+      suppress_xcode_output: true,
+      archive_path: File.join(ENV.fetch('FN_WORK_ROOT'), 'FootNation.xcarchive'),
+      derived_data_path: File.join(ENV.fetch('FN_WORK_ROOT'), 'DerivedData'),
+      buildlog_path: File.join(ENV.fetch('FN_WORK_ROOT'), 'build-logs'),
+      output_directory: File.join(ENV.fetch('FN_WORK_ROOT'), 'output'),
+      output_name: 'FootNation.ipa',
+      export_method: 'app-store',
+      export_options: {
+        method: 'app-store-connect',
+        signingStyle: 'manual',
+        teamID: metadata.fetch('teamId'),
+        signingCertificate: metadata.fetch('identity'),
+        provisioningProfiles: { metadata.fetch('bundleIdentifier') => metadata.fetch('profileUuid') },
+        manageAppVersionAndBuildNumber: false,
+        uploadSymbols: true
+      }
+    )
+  end
+end
