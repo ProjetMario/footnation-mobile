@@ -44,7 +44,8 @@ try {
  const runtimes=JSON.parse(run('xcrun',['simctl','list','runtimes','-j'],{capture:true})).runtimes.filter(r=>r.isAvailable&&r.name.startsWith('iOS ')).sort((a,b)=>b.version.localeCompare(a.version,undefined,{numeric:true}));if(!runtimes.length)throw Error('No iOS simulator runtime');
  const runtime=runtimes[0];const types=JSON.parse(run('xcrun',['simctl','list','devicetypes','-j'],{capture:true})).devicetypes;
  const preferred=[{kind:'iphone',names:['iPhone 16 Pro Max','iPhone 17 Pro Max','iPhone 15 Pro Max']},{kind:'ipad',names:['iPad Pro 13-inch (M4)','iPad Pro 13-inch (M5)','iPad Pro (12.9-inch) (6th generation)']}];
- for(const spec of preferred){const type=spec.names.map(n=>types.find(t=>t.name===n)).find(Boolean);if(!type)throw Error('Required screenshot device unavailable');const udid=run('xcrun',['simctl','create','FootNation '+spec.kind,type.identifier,runtime.identifier],{capture:true}).trim();devices.push({...spec,udid,name:type.name,runtime:runtime.name});}
+ const selectedDevice=process.env.FN_CAPTURE_DEVICE||'all';if(!['all','iphone','ipad'].includes(selectedDevice))throw Error('Invalid capture device');
+ for(const spec of preferred.filter(d=>selectedDevice==='all'||d.kind===selectedDevice)){const type=spec.names.map(n=>types.find(t=>t.name===n)).find(Boolean);if(!type)throw Error('Required screenshot device unavailable');const udid=run('xcrun',['simctl','create','FootNation '+spec.kind,type.identifier,runtime.identifier],{capture:true}).trim();devices.push({...spec,udid,name:type.name,runtime:runtime.name});}
  const iphone=devices[0];run('xcrun',['simctl','boot',iphone.udid]);run('xcrun',['simctl','bootstatus',iphone.udid,'-b']);
  let nativeApp,products,appName;
  if(reuse){
@@ -82,7 +83,7 @@ try {
    }
    for(const [name,route] of routes){
     run('xcrun',['simctl','openurl',device.udid,'footnation://'+route]);await wait(18000);
-    maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- tapOn:\n    text: "Close invitation"\n    optional: true\n- tapOn:\n    text: "Later"\n    optional: true\n`,device.kind+'-dismiss',true);await wait(3000);
+    if(route==='home')maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- tapOn:\n    text: "Close invitation"\n    optional: true\n- tapOn:\n    text: "Later"\n    optional: true\n`,device.kind+'-dismiss',true);await wait(3000);
     const filename=locale+'-'+device.kind+'-'+name+'.png';screenshot(device.udid,filename);manifest.screens.push({filename,route,device:device.name,runtime:device.runtime,locale,sha256:createHash('sha256').update(readFileSync(path.join(output,filename))).digest('hex'),visuallyReviewed:false});
    }
   }

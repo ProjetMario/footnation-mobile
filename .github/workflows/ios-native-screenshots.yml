@@ -14,6 +14,11 @@ on:
         required: false
         default: ""
         type: string
+      reuse_artifact_name:
+        description: Artifact name from the prior simulator build
+        required: false
+        default: ""
+        type: string
 permissions:
   contents: read
   actions: read
@@ -23,6 +28,10 @@ concurrency:
 jobs:
   screenshots:
     if: github.event.repository.private == false
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ${{ fromJSON(inputs.reuse_run_id != '' && '["iphone","ipad"]' || '["all"]') }}
     runs-on: macos-26
     timeout-minutes: 100
     env:
@@ -38,7 +47,7 @@ jobs:
         if: inputs.reuse_run_id != ''
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: footnation-native-screenshots-${{ inputs.reuse_run_id }}
+          name: ${{ inputs.reuse_artifact_name || format('footnation-native-screenshots-{0}', inputs.reuse_run_id) }}
           run-id: ${{ inputs.reuse_run_id }}
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/footnation-reuse-simulator
@@ -48,12 +57,13 @@ jobs:
           FN_PAYLOAD_PATH: ${{ inputs.payload_path }}
           FN_PAYLOAD_SHA256: ${{ inputs.payload_sha256 }}
           FN_REUSE_RUN_ID: ${{ inputs.reuse_run_id }}
+          FN_CAPTURE_DEVICE: ${{ matrix.device }}
         run: node scripts/release/capture-ios.mjs
       - name: Preserve encrypted native captures and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: footnation-native-screenshots-${{ github.run_id }}
+          name: footnation-native-screenshots-${{ github.run_id }}-${{ matrix.device }}
           path: ${{ runner.temp }}/footnation-screenshot-artifacts/*
           if-no-files-found: warn
           retention-days: 1
