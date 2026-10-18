@@ -46,3 +46,16 @@ ruby -c scripts/release/Fastfile
 ```
 
 Official references: [GitHub standard runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/), [Fastlane code signing](https://docs.fastlane.tools/actions/update_code_signing_settings/), [Fastlane build_app](https://docs.fastlane.tools/actions/build_app/).
+
+## Genuine App Store screenshots
+
+`ios-native-screenshots.yml` builds the same app source in Release configuration for iOS Simulator, launches the actual native UI on an iPhone and iPad, signs in through the normal interface with the existing Apple review demonstration account, and captures native PNGs with `xcrun simctl io screenshot`. It does not create mockups or modify the application's behavior. Public discovery screens and a demonstration profile are appropriate; never capture private conversations or personal contact information.
+
+Its separately encrypted payload permits only `release-private/build-env.json` and `release-private/demo.json` (`email`, `password`). It rejects signing assets. Use a new `FN_IOS_SCREENSHOT_KEY` and the same authenticated envelope format. Credentials, native screenshots, simulator app and diagnostics remain encrypted in the public one-day artifacts. The simulator binary can be reused with `reuse_run_id` for a later capture pass without recompilation, using the same artifact encryption key. Human visual review and dimension checks are required before uploading any capture to App Store Connect. Remove the temporary GitHub secret, ciphertext and artifacts after verified local retrieval.
+
+Local checks:
+
+```sh
+node --check scripts/release/capture-ios.mjs
+python3 scripts/release/safe-extract-screenshots.test.py
+```

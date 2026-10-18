@@ -37,20 +37,32 @@ try {
  Object.assign(env,{CI:'1',EXPO_NO_TELEMETRY:'1',EXPO_NO_DOTENV:'1',EXPO_PUBLIC_SUPPORTERS_ENABLED:'false',EAS_BUILD_PLATFORM:'ios',NODE_ENV:'production',MAESTRO_CLI_NO_ANALYTICS:'1'});
  const app=JSON.parse(readFileSync(path.join(source,'app.json')));if(app.expo.ios.bundleIdentifier!=='com.footnation.app')throw Error('Unexpected app');app.expo.version='1.0.4';app.expo.ios.buildNumber='16';writeFileSync(path.join(source,'app.json'),JSON.stringify(app,null,2));
  const demo=JSON.parse(readFileSync(path.join(source,'release-private/demo.json')));if(typeof demo.email!=='string'||typeof demo.password!=='string'||!demo.email||!demo.password)throw Error('Missing private demo credentials');
- stage('install dependencies');run('npm',['ci','--include=dev','--legacy-peer-deps','--no-audit','--no-fund']);
- stage('generate native iOS project');run('npx',['--no-install','expo','prebuild','--platform','ios','--no-install']);run('pod',['install'],{cwd:path.join(source,'ios')});
+ const reuse=process.env.FN_REUSE_RUN_ID||'';if(reuse&&!/^\d+$/.test(reuse))throw Error('Invalid reuse run id');
+ if(!reuse){stage('install dependencies');run('npm',['ci','--include=dev','--legacy-peer-deps','--no-audit','--no-fund']);
+ stage('generate native iOS project');run('npx',['--no-install','expo','prebuild','--platform','ios','--no-install']);run('pod',['install'],{cwd:path.join(source,'ios')});}
  stage('prepare simulator devices');
  const runtimes=JSON.parse(run('xcrun',['simctl','list','runtimes','-j'],{capture:true})).runtimes.filter(r=>r.isAvailable&&r.name.startsWith('iOS ')).sort((a,b)=>b.version.localeCompare(a.version,undefined,{numeric:true}));if(!runtimes.length)throw Error('No iOS simulator runtime');
  const runtime=runtimes[0];const types=JSON.parse(run('xcrun',['simctl','list','devicetypes','-j'],{capture:true})).devicetypes;
  const preferred=[{kind:'iphone',names:['iPhone 16 Pro Max','iPhone 17 Pro Max','iPhone 15 Pro Max']},{kind:'ipad',names:['iPad Pro 13-inch (M4)','iPad Pro 13-inch (M5)','iPad Pro (12.9-inch) (6th generation)']}];
  for(const spec of preferred){const type=spec.names.map(n=>types.find(t=>t.name===n)).find(Boolean);if(!type)throw Error('Required screenshot device unavailable');const udid=run('xcrun',['simctl','create','FootNation '+spec.kind,type.identifier,runtime.identifier],{capture:true}).trim();devices.push({...spec,udid,name:type.name,runtime:runtime.name});}
  const iphone=devices[0];run('xcrun',['simctl','boot',iphone.udid]);run('xcrun',['simctl','bootstatus',iphone.udid,'-b']);
- const project=readdirSync(path.join(source,'ios')).find(n=>n.endsWith('.xcworkspace'));if(!project)throw Error('Missing generated workspace');
- const workspace=path.join(source,'ios',project);const scheme=project.replace('.xcworkspace','');
- stage('compile authentic Release app for iOS Simulator');run('xcodebuild',['-workspace',workspace,'-scheme',scheme,'-configuration','Release','-sdk','iphonesimulator','-destination','id='+iphone.udid,'-derivedDataPath',path.join(work,'DerivedData'),'CODE_SIGNING_ALLOWED=NO','build']);
- const products=path.join(work,'DerivedData/Build/Products/Release-iphonesimulator');const appName=readdirSync(products).find(n=>n.endsWith('.app'));if(!appName)throw Error('Native app product missing');const nativeApp=path.join(products,appName);
+ let nativeApp,products,appName;
+ if(reuse){
+  stage('restore authenticated native simulator build');
+  const encrypted=readFileSync(path.join(process.env.RUNNER_TEMP,'footnation-reuse-simulator/simulator-app.tar.gz.enc'));
+  const archive=path.join(work,'reuse-app.tar.gz');writeFileSync(archive,decrypt(encrypted,key));products=path.join(work,'restored-native-app');
+  run('python3',[path.join(scripts,'safe-extract-screenshots.py'),archive,products]);
+  appName=readdirSync(products).find(n=>n.endsWith('.app'));if(!appName)throw Error('Missing reused app');nativeApp=path.join(products,appName);
+  writeFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'),encrypted);
+ }else{
+  const project=readdirSync(path.join(source,'ios')).find(n=>n.endsWith('.xcworkspace'));if(!project)throw Error('Missing generated workspace');
+  const workspace=path.join(source,'ios',project);const scheme=project.replace('.xcworkspace','');
+  stage('compile authentic Release app for iOS Simulator');run('xcodebuild',['-workspace',workspace,'-scheme',scheme,'-configuration','Release','-sdk','iphonesimulator','-destination','id='+iphone.udid,'-derivedDataPath',path.join(work,'DerivedData'),'CODE_SIGNING_ALLOWED=NO','build']);
+  products=path.join(work,'DerivedData/Build/Products/Release-iphonesimulator');appName=readdirSync(products).find(n=>n.endsWith('.app'));if(!appName)throw Error('Native app product missing');nativeApp=path.join(products,appName);
+  run('tar',['-czf',path.join(work,'simulator-app.tar.gz'),'-C',products,appName]);writeFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'),encrypt(readFileSync(path.join(work,'simulator-app.tar.gz')),key));
+ }
  stage('install native UI automation');run('curl',['-fsSL','https://get.maestro.mobile.dev','-o',path.join(work,'install-maestro.sh')]);run('bash',[path.join(work,'install-maestro.sh')]);
- const manifest={app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:expected,githubCommit:process.env.GITHUB_SHA,native:true,method:'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
+ const manifest={app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:expected,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,method:'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
  const routes=[['01-accueil','home'],['02-recherche','search'],['03-clubs','clubs'],['04-matchs','matches'],['05-opportunites','opportunities'],['06-profil','my-profile'],['07-matching','matching']];
  for(const device of devices){
   stage('capture '+device.kind+' native interface');if(device!==iphone){run('xcrun',['simctl','boot',device.udid]);run('xcrun',['simctl','bootstatus',device.udid,'-b']);}
@@ -62,17 +74,23 @@ try {
   const loginFlow=`appId: com.footnation.app\n---\n- scrollUntilVisible:\n    element: "Adresse e-mail"\n    direction: DOWN\n    timeout: 20000\n- tapOn: "joueur@example.com"\n- inputText: ${JSON.stringify(demo.email)}\n- pressKey: Enter\n- inputText: ${JSON.stringify(demo.password)}\n- pressKey: Enter\n- extendedWaitUntil:\n    notVisible: "Connexion rapide"\n    timeout: 60000\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n`;
   maestro(device.udid,loginFlow,device.kind+'-login',true);await wait(12000);
   screenshot(device.udid,device.kind+'-00-login-result.png');
-  for(const [name,route] of routes){
-   run('xcrun',['simctl','openurl',device.udid,'footnation://'+route]);await wait(18000);
-   maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n`,device.kind+'-dismiss',true);await wait(3000);
-   const filename=device.kind+'-'+name+'.png';screenshot(device.udid,filename);manifest.screens.push({filename,route,device:device.name,runtime:device.runtime,locale:'fr-FR',sha256:createHash('sha256').update(readFileSync(path.join(output,filename))).digest('hex'),visuallyReviewed:false});
+  for(const locale of ['fr-FR','en-US']) {
+   if(locale==='en-US') {
+    run('xcrun',['simctl','terminate',device.udid,'com.footnation.app'],{allowFailure:true});
+    const settings=JSON.parse(readFileSync(path.join(storage,'manifest.json'),'utf8'));settings['footnation:language:v1']='en';writeFileSync(path.join(storage,'manifest.json'),JSON.stringify(settings));
+    run('xcrun',['simctl','launch',device.udid,'com.footnation.app','-AppleLanguages','(en)','-AppleLocale','en_US']);await wait(10000);
+   }
+   for(const [name,route] of routes){
+    run('xcrun',['simctl','openurl',device.udid,'footnation://'+route]);await wait(18000);
+    maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- tapOn:\n    text: "Close invitation"\n    optional: true\n- tapOn:\n    text: "Later"\n    optional: true\n`,device.kind+'-dismiss',true);await wait(3000);
+    const filename=locale+'-'+device.kind+'-'+name+'.png';screenshot(device.udid,filename);manifest.screens.push({filename,route,device:device.name,runtime:device.runtime,locale,sha256:createHash('sha256').update(readFileSync(path.join(output,filename))).digest('hex'),visuallyReviewed:false});
+   }
   }
   manifest.devices.push({kind:device.kind,name:device.name,runtime:device.runtime});run('xcrun',['simctl','terminate',device.udid,'com.footnation.app'],{allowFailure:true});run('xcrun',['simctl','shutdown',device.udid]);
  }
  writeFileSync(path.join(output,'manifest.json'),JSON.stringify(manifest,null,2));
  stage('encrypt native capture archive');run('tar',['-czf',path.join(work,'captures.tar.gz'),'-C',output,'.']);writeFileSync(path.join(deliverables,'captures.tar.gz.enc'),encrypt(readFileSync(path.join(work,'captures.tar.gz')),key));
- // Preserve simulator binary privately for a retry without recompiling.
- run('tar',['-czf',path.join(work,'simulator-app.tar.gz'),'-C',products,appName]);writeFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'),encrypt(readFileSync(path.join(work,'simulator-app.tar.gz')),key));
+ // The encrypted simulator binary was preserved immediately after compilation.
  console.log('Genuine native screenshots encrypted; human review is required before App Store upload.');
 } catch { console.error('Native screenshots failed during: '+phase+'. Diagnostics encrypted.'); process.exitCode=1; }
 finally {
