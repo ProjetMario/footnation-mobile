@@ -1,0 +1,48 @@
+name: Genuine iOS screenshots
+on:
+  workflow_dispatch:
+    inputs:
+      payload_path:
+        required: true
+        default: release/ios-screenshots.enc
+        type: string
+      payload_sha256:
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: footnation-native-screenshots
+  cancel-in-progress: false
+jobs:
+  screenshots:
+    if: github.event.repository.private == false
+    runs-on: macos-26
+    timeout-minutes: 100
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Build and capture real native app
+        env:
+          FN_IOS_SCREENSHOT_KEY: ${{ secrets.FN_IOS_SCREENSHOT_KEY }}
+          FN_PAYLOAD_PATH: ${{ inputs.payload_path }}
+          FN_PAYLOAD_SHA256: ${{ inputs.payload_sha256 }}
+        run: node scripts/release/capture-ios.mjs
+      - name: Preserve encrypted native captures and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: footnation-native-screenshots-${{ github.run_id }}
+          path: ${{ runner.temp }}/footnation-screenshot-artifacts/*
+          if-no-files-found: warn
+          retention-days: 1
+          compression-level: 0
+      - name: Cleanup temporary app data
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/footnation-native-screenshots"
