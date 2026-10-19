@@ -51,26 +51,35 @@ final class FootNationCaptureTests: XCTestCase {
     }
 
     private func open(_ route: String) {
-        // app.open waits for target accessibility synchronously, before the OS
-        // confirmation can be accepted. The runner requests the same real URL
-        // asynchronously and handles only the FootNation system prompt first.
+        // The trusted host opens this allowlisted route with simctl. UIKit URL
+        // opening from the unsigned test runner is intentionally not attempted.
+        // No application code, authentication state or signing trust is changed.
         if handleFootNationPrompt() { wait(1) }
-        var opened: Bool? = nil
+        let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("FootNationCaptureControl", isDirectory: true)
+        let requestId = UUID().uuidString
         let began = Date()
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let payload: [String: Any] = ["id": requestId, "route": route, "createdAt": began.timeIntervalSince1970 * 1000]
+            try JSONSerialization.data(withJSONObject: payload).write(to: folder.appendingPathComponent("request.json"), options: .atomic)
+        } catch { XCTFail("Could not request native host navigation"); return }
+        var opened: Bool? = nil
         var lastPrompt = began
-        UIApplication.shared.open(URL(string: "footnation://" + route)!, options: [:]) { success in
-            opened = success
-        }
-        let deadline = began.addingTimeInterval(30)
+        let deadline = began.addingTimeInterval(45)
         while Date() < deadline {
             let promptPresent = handleFootNationPrompt()
             if promptPresent { lastPrompt = Date() }
-            if opened == false { XCTFail("The operating system refused the FootNation route"); return }
+            if let data = try? Data(contentsOf: folder.appendingPathComponent("response.json")),
+               let response = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               response["id"] as? String == requestId {
+                opened = response["opened"] as? Bool
+            }
+            if opened == false { XCTFail("The host could not open the approved FootNation route"); return }
             if opened == true && !promptPresent
                 && Date().timeIntervalSince(began) >= 4
                 && Date().timeIntervalSince(lastPrompt) >= 2
                 && app.state == .runningForeground { return }
-            // Keep the main run loop available for UIKit's completion callback.
             wait(0.3)
         }
         XCTFail("FootNation route did not open after its system confirmation")

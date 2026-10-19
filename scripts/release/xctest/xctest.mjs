@@ -1,5 +1,5 @@
-import { spawnSync } from 'node:child_process';
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -31,10 +31,34 @@ function run(cmd, args, timeout=120000) {
 }
 function allFiles(dir) { return readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?allFiles(path.join(dir,e.name)):[path.join(dir,e.name)]); }
 try {
- if(!['prepare','run','clean'].includes(mode)||!options.work||!path.isAbsolute(options.work))throw Error('Invalid mode/work');
+ if(!['prepare','run','clean','bridge'].includes(mode)||!options.work||!path.isAbsolute(options.work))throw Error('Invalid mode/work');
  work=path.resolve(options.work);
  if(!work.includes('footnation')||work==='/'||work===here)throw Error('Use a distinct private footnation work directory');
- if(mode==='prepare') {
+ if(mode==='bridge') {
+  if(process.platform!=='darwin'||!/^[A-F0-9-]{36}$/i.test(options.udid||'')||!/^\d+$/.test(options.parent||''))throw Error('Invalid bridge parameters');
+  const allowedRoutes=new Set(['login?next=%2Fsearch','my-profile','home','search','clubs','matches','opportunities','matching']);
+  const began=Date.now(),deadline=began+12*60000;
+  let container,previous,lastLookup=0;
+  const call=(args)=>spawnSync('xcrun',args,{env,encoding:'utf8',timeout:20000,killSignal:'SIGKILL',maxBuffer:1024*1024});
+  while(Date.now()<deadline) {
+   try{process.kill(Number(options.parent),0);}catch{break;}
+   if(!container||Date.now()-lastLookup>2000){lastLookup=Date.now();const found=call(['simctl','get_app_container',options.udid,'com.footnation.captureUITests.xctrunner','data']);if(found.status===0&&found.stdout.trim().startsWith('/'))container=found.stdout.trim();}
+   if(container){
+    const control=path.join(container,'Documents/FootNationCaptureControl'),requestPath=path.join(control,'request.json');
+    if(existsSync(requestPath)&&statSync(requestPath).size<2048){
+     let request;try{request=JSON.parse(readFileSync(requestPath,'utf8'));}catch{}
+     if(request&&typeof request.id==='string'&&/^[A-F0-9-]{36}$/i.test(request.id)&&request.id!==previous&&Number.isFinite(request.createdAt)&&request.createdAt>=began-1000&&request.createdAt<=Date.now()+5000){
+      previous=request.id;
+      let opened=false;
+      if(allowedRoutes.has(request.route))opened=call(['simctl','openurl',options.udid,'footnation://'+request.route]).status===0;
+      const temporary=path.join(control,'response.'+request.id+'.tmp');
+      writeFileSync(temporary,JSON.stringify({id:request.id,opened}),{mode:0o600});renameSync(temporary,path.join(control,'response.json'));
+     }
+    }
+   }
+   await new Promise(resolve=>setTimeout(resolve,300));
+  }
+ } else if(mode==='prepare') {
   if(process.platform!=='darwin'||existsSync(work)||!options.demo||!path.isAbsolute(options.demo))throw Error('Fresh macOS work directory and private demo are required');
   if((statSync(options.demo).mode&0o077)!==0)throw Error('Demo file must not be group/world readable');
   credentials=JSON.parse(readFileSync(options.demo,'utf8'));
@@ -64,10 +88,11 @@ try {
   const resultPath=path.join(work,stamp+'.xcresult');rmSync(resultPath,{recursive:true,force:true});
   stage(options.mode==='login'?'real UI login and demo profile proof':'native '+options.locale+' '+options.device+' screenshots');
   let failure;
+  const bridge=spawn(process.execPath,[fileURLToPath(import.meta.url),'bridge','--work',work,'--udid',options.udid,'--parent',String(process.pid)],{env,stdio:'ignore'});
   try {
    run('xcodebuild',['test-without-building','-xctestrun',patched,'-destination','platform=iOS Simulator,id='+options.udid,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-resultBundlePath',resultPath,'-test-timeouts-enabled','YES','-default-test-execution-time-allowance','420','-maximum-test-execution-time-allowance','480'],10*60000);
   } catch(e) { failure=e; }
-  finally { rmSync(resultPath,{recursive:true,force:true}); rmSync(path.join(work,'DerivedData/Logs/Test'),{recursive:true,force:true}); }
+  finally { bridge.kill('SIGTERM'); rmSync(resultPath,{recursive:true,force:true}); rmSync(path.join(work,'DerivedData/Logs/Test'),{recursive:true,force:true}); }
   if(failure)throw failure;
   const container=run('xcrun',['simctl','get_app_container',options.udid,metadata.runnerBundle,'data']).trim();
   const captures=path.join(container,'Documents/FootNationNativeCaptures');
