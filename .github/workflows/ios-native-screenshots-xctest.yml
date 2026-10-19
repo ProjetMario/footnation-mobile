@@ -23,7 +23,7 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: footnation-native-screenshots-xctest
+  group: footnation-native-screenshots-xctest-${{ github.run_id }}
   cancel-in-progress: false
 jobs:
   screenshots:

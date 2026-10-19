@@ -25,18 +25,55 @@ final class FootNationCaptureTests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(seconds))
     }
 
-    private func open(_ route: String) {
-        app.open(URL(string: "footnation://" + route)!)
-        for context in [XCUIApplication(bundleIdentifier: "com.apple.springboard"), XCUIApplication(bundleIdentifier: "com.apple.mobilesafari"), app] {
-            let alert = context.alerts.firstMatch
-            if alert.exists {
-                for label in ["Open", "Ouvrir"] {
-                    let button = alert.buttons[label]
-                    if button.exists && button.isHittable { button.tap() }
-                }
-            }
+    @discardableResult
+    private func handleFootNationPrompt() -> Bool {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        let runner = XCUIApplication(bundleIdentifier: "com.footnation.captureUITests.xctrunner")
+        var contexts = [springboard]
+        for context in [safari, runner] where context.state == .runningForeground {
+            contexts.append(context)
         }
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "App did not become foreground")
+        for context in contexts {
+            let alert = context.alerts.firstMatch
+            guard alert.exists else { continue }
+            let isFootNation = alert.label.localizedCaseInsensitiveContains("FootNation")
+                || alert.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] 'FootNation'")).count > 0
+            guard isFootNation else { continue }
+            for label in ["Open", "Ouvrir"] {
+                let button = alert.buttons[label]
+                if button.exists && button.isHittable { button.tap(); return true }
+            }
+            // A matching prompt may still be animating: do not treat it as closed.
+            return true
+        }
+        return false
+    }
+
+    private func open(_ route: String) {
+        // app.open waits for target accessibility synchronously, before the OS
+        // confirmation can be accepted. The runner requests the same real URL
+        // asynchronously and handles only the FootNation system prompt first.
+        if handleFootNationPrompt() { wait(1) }
+        var opened: Bool? = nil
+        let began = Date()
+        var lastPrompt = began
+        UIApplication.shared.open(URL(string: "footnation://" + route)!, options: [:]) { success in
+            opened = success
+        }
+        let deadline = began.addingTimeInterval(30)
+        while Date() < deadline {
+            let promptPresent = handleFootNationPrompt()
+            if promptPresent { lastPrompt = Date() }
+            if opened == false { XCTFail("The operating system refused the FootNation route"); return }
+            if opened == true && !promptPresent
+                && Date().timeIntervalSince(began) >= 4
+                && Date().timeIntervalSince(lastPrompt) >= 2
+                && app.state == .runningForeground { return }
+            // Keep the main run loop available for UIKit's completion callback.
+            wait(0.3)
+        }
+        XCTFail("FootNation route did not open after its system confirmation")
     }
 
     private func dismissInvitations() {
