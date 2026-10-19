@@ -2,6 +2,15 @@ name: Genuine native iOS screenshots with XCTest
 on:
   workflow_dispatch:
     inputs:
+      capture_device:
+        description: Native device to capture
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - iphone
+          - ipad
       payload_path:
         required: true
         default: release/ios-screenshots.enc
@@ -31,7 +40,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device: ${{ fromJSON(inputs.reuse_run_id != '' && '["iphone","ipad"]' || '["all"]') }}
+        device: ${{ fromJSON(inputs.capture_device == 'iphone' && '["iphone"]' || inputs.capture_device == 'ipad' && '["ipad"]' || '["iphone","ipad"]') }}
     runs-on: macos-26
     timeout-minutes: 35
     env:

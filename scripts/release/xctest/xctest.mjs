@@ -93,7 +93,30 @@ try {
    run('xcodebuild',['test-without-building','-xctestrun',patched,'-destination','platform=iOS Simulator,id='+options.udid,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-resultBundlePath',resultPath,'-test-timeouts-enabled','YES','-default-test-execution-time-allowance','420','-maximum-test-execution-time-allowance','480'],10*60000);
   } catch(e) { failure=e; }
   finally { bridge.kill('SIGTERM'); rmSync(resultPath,{recursive:true,force:true}); rmSync(path.join(work,'DerivedData/Logs/Test'),{recursive:true,force:true}); }
-  if(failure)throw failure;
+  if(failure) {
+   // Preserve genuine frames completed before a later navigation failure.
+   // They remain explicitly unapproved and cannot count as a successful set.
+   try {
+    const partialContainer=run('xcrun',['simctl','get_app_container',options.udid,metadata.runnerBundle,'data'],20000).trim();
+    const partialDirectory=path.join(partialContainer,'Documents/FootNationNativeCaptures');
+    if(existsSync(partialDirectory)) {
+     mkdirSync(options.output,{recursive:true,mode:0o700});
+     const preserved=[];
+     for(const filename of readdirSync(partialDirectory).filter(name=>options.mode==='login'?name==='authenticated-profile.png':name.startsWith(options.locale+'-'+options.device+'-')&&/^[a-zA-Z0-9-]+\.png$/.test(name))) {
+      const data=readFileSync(path.join(partialDirectory,filename));
+      if(!data.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))continue;
+      const target='partial-'+options.device+'-'+filename;
+      writeFileSync(path.join(options.output,target),data,{mode:0o600});
+      preserved.push({filename:target,originalFilename:filename,sha256:createHash('sha256').update(data).digest('hex'),width:data.readUInt32BE(16),height:data.readUInt32BE(20),captureMethod:'XCUIScreen.main.screenshot',visuallyReviewed:false});
+     }
+     if(preserved.length) {
+      writeFileSync(path.join(options.output,'partial-'+stamp+'.json'),JSON.stringify({phaseFailed:true,appBundle:metadata.appBundle,version:'1.0.4',buildNumber:'16',locale:options.locale,device:options.device,mode:options.mode,screens:preserved},null,2),{mode:0o600});
+      console.log('Partial native frames preserved privately; this capture phase remains failed.');
+     }
+    }
+   }catch{}
+   throw failure;
+  }
   const container=run('xcrun',['simctl','get_app_container',options.udid,metadata.runnerBundle,'data']).trim();
   const captures=path.join(container,'Documents/FootNationNativeCaptures');
   const files=readdirSync(captures).filter(name=>options.mode==='login'?name==='authenticated-profile.png':name.startsWith(options.locale+'-'+options.device+'-')&&name.endsWith('.png')).sort();
