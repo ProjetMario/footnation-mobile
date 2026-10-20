@@ -56,7 +56,7 @@ jobs:
       matrix:
         device: [iphone, ipad]
     runs-on: macos-26
-    timeout-minutes: 35
+    timeout-minutes: 55
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
