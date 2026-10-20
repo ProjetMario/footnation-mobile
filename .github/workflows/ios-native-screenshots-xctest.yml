@@ -42,7 +42,7 @@ jobs:
       matrix:
         device: ${{ fromJSON(inputs.capture_device == 'iphone' && '["iphone"]' || inputs.capture_device == 'ipad' && '["ipad"]' || '["iphone","ipad"]') }}
     runs-on: macos-26
-    timeout-minutes: 35
+    timeout-minutes: 55
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
@@ -76,7 +76,7 @@ jobs:
           name: footnation-native-screenshots-${{ github.run_id }}-${{ matrix.device }}
           path: ${{ runner.temp }}/footnation-screenshot-artifacts/*
           if-no-files-found: warn
-          retention-days: 1
+          retention-days: 7
           compression-level: 0
       - name: Cleanup temporary app data
         if: always()

@@ -11,14 +11,7 @@ final class FootNationCaptureTests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         executionTimeAllowance = 420
-        addUIInterruptionMonitor(withDescription: "Open the installed FootNation app") { alert in
-            guard alert.label.localizedCaseInsensitiveContains("FootNation") || alert.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] 'FootNation'")).count > 0 else { return false }
-            for label in ["Open", "Ouvrir"] {
-                let button = alert.buttons[label]
-                if button.exists { button.tap(); return true }
-            }
-            return false
-        }
+
     }
 
     private func wait(_ seconds: TimeInterval) {
@@ -26,66 +19,170 @@ final class FootNationCaptureTests: XCTestCase {
     }
 
     @discardableResult
-    private func handleFootNationPrompt() -> Bool {
+    private func dismissPasswordSavePrompt() -> Bool {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
-        let runner = XCUIApplication(bundleIdentifier: "com.footnation.captureUITests.xctrunner")
-        var contexts = [springboard]
-        for context in [safari, runner] where context.state == .runningForeground {
-            contexts.append(context)
-        }
-        for context in contexts {
+        for context in [springboard, app] {
             let alert = context.alerts.firstMatch
-            guard alert.exists else { continue }
-            let isFootNation = alert.label.localizedCaseInsensitiveContains("FootNation")
-                || alert.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] 'FootNation'")).count > 0
-            guard isFootNation else { continue }
-            for label in ["Open", "Ouvrir"] {
-                let button = alert.buttons[label]
-                if button.exists && button.isHittable { button.tap(); return true }
+            let passwordTitle = NSPredicate(format: "label CONTAINS[c] 'Save Password' OR label CONTAINS[c] 'mot de passe'")
+            let matches = alert.exists && (passwordTitle.evaluate(with: alert)
+                || alert.staticTexts.matching(passwordTitle).count > 0)
+            let exactTitle = context.staticTexts.matching(NSPredicate(format: "label IN %@", ["Save Password?", "Enregistrer le mot de passe ?", "Enregistrer ce mot de passe ?"])).firstMatch
+            let isObservedSheet = exactTitle.exists && exactTitle.isHittable
+            guard matches || isObservedSheet else { continue }
+            for label in ["Not Now", "Pas maintenant", "Plus tard"] {
+                let button = (matches ? alert.buttons : context.buttons)[label].firstMatch
+                if button.exists && button.isHittable {
+                    // Decline only this observed native password-save prompt.
+                    // Never select Save or any sharing action.
+                    button.tap()
+                    wait(1)
+                    return true
+                }
             }
-            // A matching prompt may still be animating: do not treat it as closed.
-            return true
         }
         return false
     }
 
-    private func open(_ route: String) {
-        // The trusted host opens this allowlisted route with simctl. UIKit URL
-        // opening from the unsigned test runner is intentionally not attempted.
-        // No application code, authentication state or signing trust is changed.
-        if handleFootNationPrompt() { wait(1) }
-        let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("FootNationCaptureControl", isDirectory: true)
-        let requestId = UUID().uuidString
-        let began = Date()
-        do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let payload: [String: Any] = ["id": requestId, "route": route, "createdAt": began.timeIntervalSince1970 * 1000]
-            try JSONSerialization.data(withJSONObject: payload).write(to: folder.appendingPathComponent("request.json"), options: .atomic)
-        } catch { XCTFail("Could not request native host navigation"); return }
-        var opened: Bool? = nil
-        var lastPrompt = began
-        let deadline = began.addingTimeInterval(45)
-        while Date() < deadline {
-            let promptPresent = handleFootNationPrompt()
-            if promptPresent { lastPrompt = Date() }
-            if let data = try? Data(contentsOf: folder.appendingPathComponent("response.json")),
-               let response = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               response["id"] as? String == requestId {
-                opened = response["opened"] as? Bool
-            }
-            if opened == false { XCTFail("The host could not open the approved FootNation route"); return }
-            if opened == true && !promptPresent
-                && Date().timeIntervalSince(began) >= 4
-                && Date().timeIntervalSince(lastPrompt) >= 2
-                && app.state == .runningForeground { return }
-            wait(0.3)
+    private func passwordSavePromptVisible() -> Bool {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let title = NSPredicate(format: "label CONTAINS[c] 'Save Password' OR label CONTAINS[c] 'mot de passe'")
+        for context in [springboard, app] {
+            let alert = context.alerts.firstMatch
+            if alert.exists && (title.evaluate(with: alert) || alert.staticTexts.matching(title).count > 0) { return true }
+            let exactTitle = context.staticTexts.matching(NSPredicate(format: "label IN %@", ["Save Password?", "Enregistrer le mot de passe ?", "Enregistrer ce mot de passe ?"])).firstMatch
+            if exactTitle.exists && exactTitle.isHittable { return true }
         }
-        XCTFail("FootNation route did not open after its system confirmation")
+        return false
     }
 
+    private func clearPasswordPromptBeforeNavigation() {
+        let deadline = Date().addingTimeInterval(12)
+        var absentSince: Date? = nil
+        repeat {
+            dismissPasswordSavePrompt()
+            if passwordSavePromptVisible() { absentSince = nil }
+            else {
+                if absentSince == nil { absentSince = Date() }
+                if Date().timeIntervalSince(absentSince!) >= 0.7 { return }
+            }
+            wait(0.3)
+        } while Date() < deadline
+        XCTFail("Native password-save prompt did not close before navigation")
+    }
+
+    private func open(_ route: String) {
+        // All navigation is ordinary UI interaction. No URL opening, host IPC,
+        // authentication storage writes, app changes or generated screenshots.
+        let allowed = ["login?next=%2Fsearch", "home", "search", "clubs", "matches", "opportunities", "my-profile", "matching"]
+        guard allowed.contains(route) else { XCTFail("Unsupported UI capture destination"); return }
+
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30), "Installed app did not become foreground")
+        clearPasswordPromptBeforeNavigation()
+        XCTAssertFalse(app.alerts.firstMatch.exists || XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch.exists, "An unknown native alert blocks navigation")
+        dismissInvitations()
+
+        func control(_ labels: [String], bottomOnly: Bool = false, topOnly: Bool = false) -> XCUIElement? {
+            let predicate = NSPredicate(format: "label IN %@", labels)
+            for query in [app.buttons, app.links, app.otherElements] {
+                let matches = query.matching(predicate).allElementsBoundByIndex
+                for candidate in matches.prefix(15) where candidate.exists && candidate.isHittable {
+                    let frame = candidate.frame
+                    if bottomOnly && frame.midY < app.frame.minY + app.frame.height * 0.68 { continue }
+                    if topOnly && frame.midY > app.frame.minY + app.frame.height * 0.45 { continue }
+                    return candidate
+                }
+            }
+            return nil
+        }
+
+        @discardableResult
+        func tap(_ labels: [String], bottomOnly: Bool = false, topOnly: Bool = false) -> Bool {
+            guard let element = control(labels, bottomOnly: bottomOnly, topOnly: topOnly) else { return false }
+            element.tap()
+            wait(1.5)
+            return true
+        }
+
+        @discardableResult
+        func home() -> Bool {
+            for _ in 0..<5 {
+                dismissInvitations()
+                if tap(["Accueil", "Home"], bottomOnly: true) { return true }
+                if tap(["Retour"], topOnly: true) { continue }
+                wait(1)
+            }
+            return false
+        }
+
+        if route == "login?next=%2Fsearch" {
+            // Normal landing navigation intentionally has no synthetic `next`.
+            // The app's normal successful-login destination is Shorts; the
+            // subsequent profile proof uses the real bottom tab from there.
+            let deadline = Date().addingTimeInterval(35)
+            while Date() < deadline {
+                let email = app.textFields["Adresse e-mail"].firstMatch
+                let password = app.secureTextFields["Mot de passe"].firstMatch
+                if email.exists && password.exists { return }
+                if tap(["Se connecter", "Log in", "Se connecter à FootNation"]) {
+                    wait(2)
+                    continue
+                }
+                app.swipeUp()
+                wait(1)
+            }
+            XCTFail("Native login controls were not reachable from the landing page")
+            return
+        }
+
+        dismissInvitations()
+        if route == "home" {
+            XCTAssertTrue(home(), "Home tab was not reachable through the native UI")
+            return
+        }
+        if route == "my-profile" || route == "search" {
+            let labels = route == "my-profile" ? ["Mon profil", "My profile"] : ["Rechercher", "Search"]
+            if tap(labels, bottomOnly: true) { return }
+            guard home() else { XCTFail("Could not return to the native tab bar"); return }
+            XCTAssertTrue(tap(labels, bottomOnly: true), "Required native bottom tab was unavailable")
+            return
+        }
+
+        guard home() else { XCTFail("Could not reach home before selecting its navigation tab"); return }
+        let labels: [String]
+        switch route {
+        case "clubs": labels = ["Clubs"]
+        case "matches": labels = ["Matches"] // Exact native FR and EN label.
+        case "opportunities": labels = ["Opportunités", "Opportunities"]
+        case "matching": labels = ["Matching"]
+        default: XCTFail("Unknown native navigation tab"); return
+        }
+
+        let railPredicate = NSPredicate(format: "label IN %@", ["Navigation de l’accueil", "Home navigation"])
+        let deadline = Date().addingTimeInterval(35)
+        var attempt = 0
+        while Date() < deadline && attempt < 10 {
+            if tap(labels, topOnly: true) { return }
+            let rail = app.descendants(matching: .any).matching(railPredicate).firstMatch
+            guard rail.exists && rail.isHittable else {
+                XCTFail("Home navigation rail was not exposed by native accessibility")
+                return
+            }
+            // The actual labelled horizontal rail supplies the gesture frame.
+            // Reverse after four swipes so a retained offset cannot hide a tab.
+            let forward = attempt % 8 < 4
+            let start = rail.coordinate(withNormalizedOffset: CGVector(dx: forward ? 0.88 : 0.12, dy: 0.5))
+            let end = rail.coordinate(withNormalizedOffset: CGVector(dx: forward ? 0.12 : 0.88, dy: 0.5))
+            start.press(forDuration: 0.1, thenDragTo: end)
+            attempt += 1
+            wait(0.6)
+        }
+        XCTFail("Required home navigation button remained outside the accessible viewport")
+    }
+
+
     private func dismissInvitations() {
+        dismissPasswordSavePrompt()
         for label in ["Fermer l’invitation", "Plus tard", "Close invitation", "Later"] {
             let button = app.buttons[label].firstMatch
             if button.exists && button.isHittable { button.tap(); wait(1) }
@@ -94,15 +191,21 @@ final class FootNationCaptureTests: XCTestCase {
 
     private func profileVisible() -> Bool {
         let profile = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", profileName)).firstMatch
-        return profile.exists
+        return profile.exists && profile.isHittable
     }
 
     private func requireProfile() {
+        dismissInvitations()
         open("my-profile")
         let deadline = Date().addingTimeInterval(65)
         repeat {
             dismissInvitations()
-            if profileVisible() { return }
+            if profileVisible() {
+                wait(1)
+                dismissInvitations()
+                let system = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+                if profileVisible() && !app.alerts.firstMatch.exists && !system.alerts.firstMatch.exists { return }
+            }
             wait(2)
         } while Date() < deadline
         XCTFail("Authenticated demo profile was not visible")
@@ -221,6 +324,11 @@ final class FootNationCaptureTests: XCTestCase {
     }
 
     private func saveCapture(_ fileName: String) throws {
+        dismissInvitations()
+        let system = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        XCTAssertFalse(passwordSavePromptVisible() || app.alerts.firstMatch.exists || system.alerts.firstMatch.exists, "An unresolved native alert covers the screenshot")
+        let invitation = app.buttons.matching(NSPredicate(format: "label IN %@", ["Fermer l’invitation", "Close invitation"])).firstMatch
+        XCTAssertFalse(invitation.exists && invitation.isHittable, "An invitation covers the screenshot")
         let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("FootNationNativeCaptures", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -235,10 +343,8 @@ final class FootNationCaptureTests: XCTestCase {
         }
         requireProfile()
         let routes = [
-            ("01-accueil", "home"), ("02-recherche", "search"),
-            ("03-clubs", "clubs"), ("04-matchs", "matches"),
-            ("05-opportunites", "opportunities"), ("06-profil", "my-profile"),
-            ("07-matching", "matching")
+            ("06-profil", "my-profile"), ("02-recherche", "search"),
+            ("03-clubs", "clubs"), ("01-accueil", "home")
         ]
         for (name, route) in routes {
             open(route)

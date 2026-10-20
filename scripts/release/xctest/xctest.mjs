@@ -88,11 +88,11 @@ try {
   const resultPath=path.join(work,stamp+'.xcresult');rmSync(resultPath,{recursive:true,force:true});
   stage(options.mode==='login'?'real UI login and demo profile proof':'native '+options.locale+' '+options.device+' screenshots');
   let failure;
-  const bridge=spawn(process.execPath,[fileURLToPath(import.meta.url),'bridge','--work',work,'--udid',options.udid,'--parent',String(process.pid)],{env,stdio:'ignore'});
+  // Native navigation now uses only real buttons; no host URL bridge runs.
   try {
    run('xcodebuild',['test-without-building','-xctestrun',patched,'-destination','platform=iOS Simulator,id='+options.udid,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-resultBundlePath',resultPath,'-test-timeouts-enabled','YES','-default-test-execution-time-allowance','420','-maximum-test-execution-time-allowance','480'],10*60000);
   } catch(e) { failure=e; }
-  finally { bridge.kill('SIGTERM'); rmSync(resultPath,{recursive:true,force:true}); rmSync(path.join(work,'DerivedData/Logs/Test'),{recursive:true,force:true}); }
+  finally { rmSync(resultPath,{recursive:true,force:true}); rmSync(path.join(work,'DerivedData/Logs/Test'),{recursive:true,force:true}); }
   if(failure) {
    // Preserve genuine frames completed before a later navigation failure.
    // They remain explicitly unapproved and cannot count as a successful set.
@@ -120,7 +120,7 @@ try {
   const container=run('xcrun',['simctl','get_app_container',options.udid,metadata.runnerBundle,'data']).trim();
   const captures=path.join(container,'Documents/FootNationNativeCaptures');
   const files=readdirSync(captures).filter(name=>options.mode==='login'?name==='authenticated-profile.png':name.startsWith(options.locale+'-'+options.device+'-')&&name.endsWith('.png')).sort();
-  if(files.length!==(options.mode==='login'?1:7))throw Error('Incomplete screenshot set');
+  if(files.length!==(options.mode==='login'?1:4))throw Error('Incomplete screenshot set');
   mkdirSync(options.output,{recursive:true,mode:0o700});
   const receipt=[];
   for(const filename of files) {

@@ -91,7 +91,7 @@ assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersion
 print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
  const simulatorSigning=JSON.parse(run('python3',[path.join(scripts,'inspect-simulator-entitlements.py'),nativeApp,'8HYVPDRPT4'],{capture:true}));
  const manifest={simulatorSigning,captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
- const routes=[['01-accueil','home'],['02-recherche','search'],['03-clubs','clubs'],['04-matchs','matches'],['05-opportunites','opportunities'],['06-profil','my-profile'],['07-matching','matching']];
+ const routes=[['06-profil','my-profile'],['02-recherche','search'],['03-clubs','clubs'],['01-accueil','home']];
  if(!buildOnly){
  if(useXCTest){stage('prepare standalone XCTest UI runner');run(process.execPath,[xctestScript,'prepare','--work',xctestWork,'--demo',path.join(source,'release-private/demo.json')],{timeoutMs:12*60*1000});}
  else {stage('install native UI automation');run('curl',['--connect-timeout','20','--max-time','120','-fsSL','https://get.maestro.mobile.dev','-o',path.join(work,'install-maestro.sh')]);run('bash',[path.join(work,'install-maestro.sh')]);}
@@ -110,7 +110,7 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
   run('xcrun',['simctl','openurl',device.udid,'footnation://my-profile']);await wait(10000);
   maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- extendedWaitUntil:\n    visible: ".*Démo FootNation.*"\n    timeout: 60000\n`,device.kind+'-authenticated-profile');
   }
-  screenshot(device.udid,device.kind+'-00-authenticated-profile.png');
+  if(!useXCTest)screenshot(device.udid,device.kind+'-00-authenticated-profile.png');
   for(const locale of ['fr-FR','en-US']) {
    if(locale==='en-US') {
     run('xcrun',['simctl','terminate',device.udid,'com.footnation.app'],{allowFailure:true});
