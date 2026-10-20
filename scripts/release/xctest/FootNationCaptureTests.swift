@@ -195,7 +195,8 @@ final class FootNationCaptureTests: XCTestCase {
     }
 
     private func requireProfile() {
-        dismissInvitations()
+        // open activates the current app process before any accessibility query,
+        // including after a normal language-change restart.
         open("my-profile")
         let deadline = Date().addingTimeInterval(65)
         repeat {

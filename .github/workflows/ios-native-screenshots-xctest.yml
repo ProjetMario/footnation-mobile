@@ -11,6 +11,15 @@ on:
           - all
           - iphone
           - ipad
+      capture_locale:
+        description: Language set to capture
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - fr-FR
+          - en-US
       payload_path:
         required: true
         default: release/ios-screenshots.enc
@@ -68,6 +77,7 @@ jobs:
           FN_REUSE_RUN_ID: ${{ inputs.reuse_run_id }}
           FN_CAPTURE_DEVICE: ${{ matrix.device }}
           FN_CAPTURE_DRIVER: xctest
+          FN_CAPTURE_LOCALE: ${{ inputs.capture_locale }}
         run: node scripts/release/capture-ios.mjs
       - name: Preserve encrypted native captures and diagnostics
         if: always()

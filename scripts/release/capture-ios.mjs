@@ -41,6 +41,8 @@ try {
  const app=JSON.parse(readFileSync(path.join(source,'app.json')));if(app.expo.ios.bundleIdentifier!=='com.footnation.app')throw Error('Unexpected app');app.expo.version='1.0.4';app.expo.ios.buildNumber='16';writeFileSync(path.join(source,'app.json'),JSON.stringify(app,null,2));
  const demo=JSON.parse(readFileSync(path.join(source,'release-private/demo.json')));if(typeof demo.email!=='string'||typeof demo.password!=='string'||!demo.email||!demo.password)throw Error('Missing private demo credentials');
  const buildOnly=process.env.FN_BUILD_ONLY==='1';
+ const selectedLocale=process.env.FN_CAPTURE_LOCALE||'all';if(!['all','fr-FR','en-US'].includes(selectedLocale))throw Error('Invalid capture locale');
+ const captureLocales=selectedLocale==='all'?['fr-FR','en-US']:[selectedLocale];
  const reuse=process.env.FN_REUSE_RUN_ID||'';if(reuse&&!/^\d+$/.test(reuse))throw Error('Invalid reuse run id');
  if(!reuse){stage('install dependencies');run('npm',['ci','--include=dev','--legacy-peer-deps','--no-audit','--no-fund']);
  stage('generate native iOS project');run('npx',['--no-install','expo','prebuild','--platform','ios','--no-install']);run('pod',['install'],{cwd:path.join(source,'ios')});}
@@ -111,7 +113,7 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
   maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- extendedWaitUntil:\n    visible: ".*Démo FootNation.*"\n    timeout: 60000\n`,device.kind+'-authenticated-profile');
   }
   if(!useXCTest)screenshot(device.udid,device.kind+'-00-authenticated-profile.png');
-  for(const locale of ['fr-FR','en-US']) {
+  for(const locale of captureLocales) {
    if(locale==='en-US') {
     run('xcrun',['simctl','terminate',device.udid,'com.footnation.app'],{allowFailure:true});
     const settings=JSON.parse(readFileSync(path.join(storage,'manifest.json'),'utf8'));settings['footnation:language:v1']='en';writeFileSync(path.join(storage,'manifest.json'),JSON.stringify(settings));
