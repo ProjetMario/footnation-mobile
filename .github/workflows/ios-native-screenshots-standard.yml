@@ -1,0 +1,93 @@
+name: Native screenshots standard Xcode signing and capture
+on:
+  workflow_dispatch:
+    inputs:
+      payload_path:
+        required: true
+        default: release/ios-screenshots.enc
+        type: string
+      payload_sha256:
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: footnation-native-screenshots-standard
+  cancel-in-progress: false
+jobs:
+  compile:
+    if: github.event.repository.private == false
+    runs-on: macos-26
+    timeout-minutes: 50
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Compile standard ARM64 simulator app without booting CoreSimulator
+        env:
+          FN_IOS_SCREENSHOT_KEY: ${{ secrets.FN_IOS_SCREENSHOT_KEY }}
+          FN_PAYLOAD_PATH: ${{ inputs.payload_path }}
+          FN_PAYLOAD_SHA256: ${{ inputs.payload_sha256 }}
+          FN_CAPTURE_DEVICE: iphone
+          FN_BUILD_ONLY: '1'
+        run: node scripts/release/capture-ios.mjs
+      - name: Preserve encrypted native binary and source proof before UI testing
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: footnation-native-build-${{ github.run_id }}
+          path: ${{ runner.temp }}/footnation-screenshot-artifacts/*
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
+      - name: Cleanup temporary compile files
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/footnation-native-screenshots"
+  capture:
+    needs: compile
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [iphone, ipad]
+    runs-on: macos-26
+    timeout-minutes: 35
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: footnation-native-build-${{ github.run_id }}
+          path: ${{ runner.temp }}/footnation-reuse-simulator
+      - name: Capture genuine native screens with the preserved binary
+        env:
+          FN_IOS_SCREENSHOT_KEY: ${{ secrets.FN_IOS_SCREENSHOT_KEY }}
+          FN_PAYLOAD_PATH: ${{ inputs.payload_path }}
+          FN_PAYLOAD_SHA256: ${{ inputs.payload_sha256 }}
+          FN_REUSE_RUN_ID: ${{ github.run_id }}
+          FN_CAPTURE_DEVICE: ${{ matrix.device }}
+          FN_CAPTURE_DRIVER: xctest
+        run: node scripts/release/capture-ios.mjs
+      - name: Preserve encrypted native images and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: footnation-native-screenshots-${{ github.run_id }}-${{ matrix.device }}
+          path: ${{ runner.temp }}/footnation-screenshot-artifacts/*
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
+      - name: Cleanup temporary capture files
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/footnation-native-screenshots"

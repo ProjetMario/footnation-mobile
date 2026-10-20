@@ -67,7 +67,20 @@ try {
  }else{
   const project=readdirSync(path.join(source,'ios')).find(n=>n.endsWith('.xcworkspace'));if(!project)throw Error('Missing generated workspace');
   const workspace=path.join(source,'ios',project);const scheme=project.replace('.xcworkspace','');
-  stage('compile authentic Release app for iOS Simulator');run('xcodebuild',['-workspace',workspace,'-scheme',scheme,'-configuration','Release','-sdk','iphonesimulator','-destination','generic/platform=iOS Simulator','-derivedDataPath',path.join(work,'DerivedData'),'CODE_SIGNING_ALLOWED=NO','ONLY_ACTIVE_ARCH=YES','ARCHS=arm64','build'],{timeoutMs:40*60*1000});
+  stage('configure standard Xcode simulator signing');
+  // Identity only: no distribution certificate/profile or paid account access.
+  // Modify only the generated application target's entitlements, never Pods.
+  const entitlementFiles=JSON.parse(run('ruby',['-rjson','-rxcodeproj','-e',`p=Xcodeproj::Project.open(ARGV[0]);t=p.targets.select{|x|x.product_type=='com.apple.product-type.application'};raise 'Expected one application target' unless t.size==1;puts JSON.generate(t[0].build_configurations.map{|c|c.build_settings['CODE_SIGN_ENTITLEMENTS']}.compact.uniq)`,path.join(source,'ios',scheme+'.xcodeproj')],{capture:true}));
+  if(entitlementFiles.length!==1)throw Error('Missing unique generated app entitlements');
+  const entitlementSetting=entitlementFiles[0].replace(/\$\((SRCROOT|PROJECT_DIR)\)/g,path.join(source,'ios'));
+  const entitlementPath=path.resolve(source,'ios',entitlementSetting);
+  if(!entitlementPath.startsWith(path.join(source,'ios')+path.sep)||!existsSync(entitlementPath)||entitlementSetting.includes('$'))throw Error('Unsafe generated entitlement path');
+  run('python3',['-c',`import plistlib,sys
+p=sys.argv[1];d=plistlib.load(open(p,'rb'));identity='8HYVPDRPT4.com.footnation.app'
+d['application-identifier']=identity;d['com.apple.developer.team-identifier']='8HYVPDRPT4';d['keychain-access-groups']=[identity]
+with open(p,'wb') as f:plistlib.dump(d,f)
+`,entitlementPath]);
+  stage('compile authentic Release app with simulated entitlements');run('xcodebuild',['-workspace',workspace,'-scheme',scheme,'-configuration','Release','-sdk','iphonesimulator','-destination','generic/platform=iOS Simulator','-derivedDataPath',path.join(work,'DerivedData'),'CODE_SIGNING_ALLOWED=YES','CODE_SIGN_IDENTITY=-','CODE_SIGN_STYLE=Automatic','DEVELOPMENT_TEAM=8HYVPDRPT4','ONLY_ACTIVE_ARCH=YES','ARCHS=arm64','build'],{timeoutMs:40*60*1000});
   products=path.join(work,'DerivedData/Build/Products/Release-iphonesimulator');appName=readdirSync(products).find(n=>n.endsWith('.app'));if(!appName)throw Error('Native app product missing');nativeApp=path.join(products,appName);
   run('tar',['-czf',path.join(work,'simulator-app.tar.gz'),'-C',products,appName]);writeFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'),encrypt(readFileSync(path.join(work,'simulator-app.tar.gz')),key));
  }
@@ -76,7 +89,8 @@ try {
 p=plistlib.load(open(sys.argv[1],'rb'))
 assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.4' and p['CFBundleVersion']=='16'
 print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
- const manifest={captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
+ const simulatorSigning=JSON.parse(run('python3',[path.join(scripts,'inspect-simulator-entitlements.py'),nativeApp,'8HYVPDRPT4'],{capture:true}));
+ const manifest={simulatorSigning,captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.4',buildNumber:'16',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
  const routes=[['01-accueil','home'],['02-recherche','search'],['03-clubs','clubs'],['04-matchs','matches'],['05-opportunites','opportunities'],['06-profil','my-profile'],['07-matching','matching']];
  if(!buildOnly){
  if(useXCTest){stage('prepare standalone XCTest UI runner');run(process.execPath,[xctestScript,'prepare','--work',xctestWork,'--demo',path.join(source,'release-private/demo.json')],{timeoutMs:12*60*1000});}
