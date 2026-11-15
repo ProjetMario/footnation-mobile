@@ -182,15 +182,19 @@ final class FootNationCaptureTests: XCTestCase {
 
 
     private func dismissInvitations() {
-        dismissPasswordSavePrompt()
+        if dismissPasswordSavePrompt() { return }
+        // A dismissal can immediately replace the screen underneath. Avoid
+        // querying stale modal descendants during that navigation transition.
+        let invitation = app.buttons.matching(NSPredicate(format: "label IN %@", ["Fermer l’invitation", "Close invitation"])).firstMatch
+        if invitation.exists && invitation.isHittable {
+            invitation.tap(); wait(4); return
+        }
         let welcome = app.staticTexts.matching(NSPredicate(format: "label IN %@", ["Bienvenue sur FootNation", "Welcome to FootNation"])).firstMatch
         if welcome.exists {
             let close = app.buttons.matching(NSPredicate(format: "label IN %@", ["Fermer", "Close"])).firstMatch
-            if close.exists && close.isHittable { close.tap(); wait(1) }
-        }
-        for label in ["Fermer l’invitation", "Plus tard", "Close invitation", "Later"] {
-            let button = app.buttons[label].firstMatch
-            if button.exists && button.isHittable { button.tap(); wait(1) }
+            if close.exists && close.isHittable { close.tap(); wait(4); return }
+            let later = app.buttons.matching(NSPredicate(format: "label IN %@", ["Plus tard", "Later"])).firstMatch
+            if later.exists && later.isHittable { later.tap(); wait(4); return }
         }
     }
 
