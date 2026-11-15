@@ -32,9 +32,10 @@ def tap(node):
  v=list(map(int,re.findall(r'\d+',node.get('bounds',''))))
  if len(v)!=4:raise RuntimeError('Missing bounds')
  adb('shell','input','tap',str((v[0]+v[2])//2),str((v[1]+v[3])//2))
-def wait_for(test,seconds=40):
+def wait_for(test,seconds=40,dismiss=False):
  until=time.time()+seconds
  while time.time()<until:
+  if dismiss:dismiss_optional()
   t=tree();found=next((n for n in t.iter('node') if test(n)),None)
   if found is not None:return found
   time.sleep(1)
@@ -52,7 +53,7 @@ def route(value):
  adb('shell','am','start','-W','-a','android.intent.action.VIEW','-d',shlex.quote('footnation://'+value),'com.footnation.app')
 def dismiss_optional():
  for _ in range(3):
-  t=tree();button=next((n for n in t.iter('node') if label(n) in ['Fermer','Plus tard','Pas maintenant','Ne pas autoriser','Don’t allow',"Don't allow"]),None)
+  t=tree();button=next((n for n in t.iter('node') if label(n) in ['Fermer','Fermer l’invitation','Plus tard','Pas maintenant','Ne pas autoriser','Don’t allow',"Don't allow"]),None)
   if button is None:return
   tap(button);time.sleep(1)
 def capture(name):
@@ -85,15 +86,15 @@ try:
  time.sleep(6);dismiss_optional()
  stage='authenticated-profile'
  route('my-profile');dismiss_optional()
- wait_for(lambda n:bool(re.search(r'Modifier.*profil|Modifier|Edit profile',label(n))),60)
+ wait_for(lambda n:bool(re.search(r'Modifier.*profil|Modifier|Edit profile',label(n))),60,dismiss=True)
  checks.append('authenticated-demo-profile')
  time.sleep(3);capture('02-profil')
  for name,link,expected in [('01-recherche','search','Rechercher'),('03-clubs','clubs','Clubs'),('04-opportunites','opportunities','Opportunités'),('05-matchs','matches','Matchs')]:
   stage=name
-  route(link);dismiss_optional();wait_for(lambda n:expected.lower() in label(n).lower(),60)
+  route(link);dismiss_optional();wait_for(lambda n:expected.lower() in label(n).lower(),60,dismiss=True)
   time.sleep(5);capture(name)
  stage='home-controls'
- route('home');dismiss_optional();wait_for(lambda n:'Pour vous' in label(n),60)
+ route('home');dismiss_optional();wait_for(lambda n:'Pour vous' in label(n),60,dismiss=True)
  # Open/close real top controls repeatedly. No posts or social mutations.
  for _ in range(2):
   tap(wait_for(lambda n:'Changer la langue' in label(n)))
