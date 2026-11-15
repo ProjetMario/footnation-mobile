@@ -15,9 +15,11 @@ def adb(*args,timeout=30):
  return r.stdout
 def tree():
  def snapshot():
-  status=adb('shell','am','instrument','-w','com.footnation.audit/.Hierarchy',timeout=30).decode()
-  if 'auditSuccess=true' not in status:raise RuntimeError('Fresh native accessibility snapshot unavailable')
-  return adb('shell','run-as','com.footnation.audit','cat','files/hierarchy.xml').decode()
+  for _ in range(3):
+   status=adb('shell','am','instrument','-w','com.footnation.audit/.Hierarchy',timeout=30).decode()
+   if 'auditSuccess=true' in status:return adb('shell','run-as','com.footnation.audit','cat','files/hierarchy.xml').decode()
+   time.sleep(1)
+  raise RuntimeError('Fresh native accessibility snapshot unavailable')
  raw=snapshot()
  result=ET.fromstring(raw)
  if any(n.get('text')=="Pixel Launcher isn't responding" for n in result.iter('node')):

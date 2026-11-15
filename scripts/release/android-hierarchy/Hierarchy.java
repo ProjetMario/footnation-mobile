@@ -21,6 +21,10 @@ public final class Hierarchy extends Instrumentation {
     try {
       UiAutomation automation = getUiAutomation();
       AccessibilityNodeInfo root = automation.getRootInActiveWindow();
+      for (int attempt=0; root == null && attempt<30; attempt++) {
+        Thread.sleep(100);
+        root = automation.getRootInActiveWindow();
+      }
       if (root == null) throw new IllegalStateException("No foreground accessibility root");
       try (FileOutputStream stream = new FileOutputStream(output)) {
         XmlSerializer xml = Xml.newSerializer();
