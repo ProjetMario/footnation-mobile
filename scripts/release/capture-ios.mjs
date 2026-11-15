@@ -87,11 +87,12 @@ with open(p,'wb') as f:plistlib.dump(d,f)
   run('tar',['-czf',path.join(work,'simulator-app.tar.gz'),'-C',products,appName]);writeFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'),encrypt(readFileSync(path.join(work,'simulator-app.tar.gz')),key));
  }
  nativeArchiveSha256 ||= createHash('sha256').update(readFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'))).digest('hex');
+ stage('verify native simulator identity and signing');
  const nativeIdentity=JSON.parse(run('python3',['-c',`import plistlib,json,sys
 p=plistlib.load(open(sys.argv[1],'rb'))
 assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='17'
 print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
- const simulatorSigning=JSON.parse(run('python3',[path.join(scripts,'inspect-simulator-entitlements.py'),nativeApp,'8HYVPDRPT4'],{capture:true}));
+ const simulatorSigning=JSON.parse(run('python3',[path.join(scripts,'inspect-simulator-entitlements.py'),nativeApp,'8HYVPDRPT4',app.expo.version,String(app.expo.ios.buildNumber)],{capture:true}));
  const manifest={simulatorSigning,captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.5',buildNumber:'17',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
  const routes=[['06-profil','my-profile'],['02-recherche','search'],['03-clubs','clubs'],['01-accueil','home']];
  if(!buildOnly){
