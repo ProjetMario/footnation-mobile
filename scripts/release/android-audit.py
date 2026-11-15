@@ -25,6 +25,12 @@ def wait_for(test,seconds=40):
   if found is not None:return found
   time.sleep(1)
  raise RuntimeError('Expected native control not found')
+def find_in_feed(test):
+ for _ in range(8):
+  found=next((n for n in tree().iter('node') if test(n)),None)
+  if found is not None:return found
+  adb('shell','input','swipe','540','1650','540','650','450');time.sleep(2)
+ raise RuntimeError('Publication controls unavailable in feed')
 def text(value):
  if not value.isascii() or '\n' in value:raise RuntimeError('Unsupported test input')
  adb('shell','input','text',shlex.quote(value.replace(' ','%s')))
@@ -44,6 +50,8 @@ def capture(name):
  checks.append(name)
 try:
  adb('install',str(root/'universal.apk'),timeout=120)
+ adb('shell','wm','size','1080x1920')
+ adb('shell','wm','density','420')
  adb('shell','settings','put','system','system_locales','fr-FR')
  adb('shell','settings','put','global','window_animation_scale','0')
  adb('shell','settings','put','global','transition_animation_scale','0')
@@ -68,6 +76,13 @@ try:
   tap(wait_for(lambda n:'Changer la langue' in label(n)))
   tap(wait_for(lambda n:'Fermer le choix de langue' in label(n)))
  checks.append('language-open-close-twice')
+ # Read-only publication interactions: do not send comments or share to a person.
+ for _ in range(2):
+  tap(find_in_feed(lambda n:label(n)=='Partager'))
+  tap(wait_for(lambda n:'Fermer le partage' in label(n)))
+  tap(find_in_feed(lambda n:'Ouvrir les commentaires' in label(n)))
+  tap(wait_for(lambda n:'Fermer les commentaires' in label(n)))
+ checks.append('publication-share-and-comments-open-close-twice')
  (root/'report.json').write_text(json.dumps({'passed':True,'checks':checks,'physicalDevice':False,'signature':'test debug signature derived from release AAB','storeImagesApproved':False}))
  print('Native Android navigation and captures completed.')
 except Exception as exc:
