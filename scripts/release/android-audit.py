@@ -14,15 +14,17 @@ def adb(*args,timeout=30):
   raise RuntimeError('ADB '+args[0]+' failed: '+detail[:800])
  return r.stdout
 def tree():
- adb('shell','uiautomator','dump','/sdcard/footnation-audit.xml')
- raw=adb('shell','cat','/sdcard/footnation-audit.xml').decode()
+ def snapshot():
+  status=adb('shell','am','instrument','-w','com.footnation.audit/.Hierarchy',timeout=30).decode()
+  if 'auditSuccess=true' not in status:raise RuntimeError('Fresh native accessibility snapshot unavailable')
+  return adb('shell','run-as','com.footnation.audit','cat','files/hierarchy.xml').decode()
+ raw=snapshot()
  result=ET.fromstring(raw)
  if any(n.get('text')=="Pixel Launcher isn't responding" for n in result.iter('node')):
   button=next((n for n in result.iter('node') if n.get('text')=='Wait'),None)
   if button is not None:
    tap(button);time.sleep(4)
-   adb('shell','uiautomator','dump','/sdcard/footnation-audit.xml')
-   result=ET.fromstring(adb('shell','cat','/sdcard/footnation-audit.xml').decode())
+   result=ET.fromstring(snapshot())
  return result
 def label(node):return (node.get('text','')+' '+node.get('content-desc','')).strip()
 def visible(node):
@@ -92,6 +94,7 @@ def capture(name):
  checks.append(name)
 try:
  adb('install',str(root/'universal.apk'),timeout=120)
+ adb('install',str(root/'hierarchy.apk'),timeout=60)
  adb('shell','input','keyevent','224')
  adb('shell','wm','dismiss-keyguard')
  adb('shell','wm','size','1080x1920')
@@ -113,7 +116,13 @@ try:
  time.sleep(6);dismiss_optional()
  stage='authenticated-profile'
  route('my-profile');dismiss_optional()
- wait_for(lambda n:bool(re.search(r'Modifier.*profil|Modifier|Edit profile',label(n))),60,dismiss=True)
+ for attempt in range(4):
+  try:
+   wait_for(lambda n:bool(re.search(r'Modifier.*profil|Modifier|Edit profile',label(n))),15,dismiss=True)
+   break
+  except RuntimeError:
+   if attempt==3:raise
+   route('my-profile')
  checks.append('authenticated-demo-profile')
  time.sleep(3);capture('02-profil')
  for name,link,expected in [('01-recherche','search','Rechercher'),('03-clubs','clubs','Clubs'),('04-opportunites','opportunities','Opportunités'),('05-matchs','matches','Matchs')]:
