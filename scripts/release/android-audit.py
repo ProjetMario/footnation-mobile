@@ -52,7 +52,9 @@ def find_in_feed(test):
  raise RuntimeError('Publication controls unavailable in feed')
 def text(value):
  if not value.isascii() or '\n' in value:raise RuntimeError('Unsupported test input')
+ time.sleep(0.7)
  adb('shell','input','text',shlex.quote(value.replace(' ','%s')))
+ time.sleep(0.4)
 def route(value):
  if value.startswith('login?'):
   adb('shell','am','start','-W','-a','android.intent.action.VIEW','-d',shlex.quote('footnation://'+value),'com.footnation.app')
@@ -110,12 +112,17 @@ try:
  stage='enter-email'
  tap(find_in_feed(lambda n:n.get('class')=='android.widget.EditText' and n.get('content-desc')=='Adresse e-mail'))
  text(private['email']);adb('shell','input','keyevent','4')
+ email_field=next((n for n in tree().iter('node') if n.get('class')=='android.widget.EditText' and n.get('content-desc')=='Adresse e-mail'),None)
+ if email_field is None or email_field.get('text')!=private['email']:raise RuntimeError('Native email entry was not confirmed')
  stage='enter-password'
  tap(find_in_feed(lambda n:n.get('class')=='android.widget.EditText' and 'Mot de passe' in n.get('content-desc','')))
  text(private['password']);adb('shell','input','keyevent','4')
+ password_field=next((n for n in tree().iter('node') if n.get('class')=='android.widget.EditText' and n.get('content-desc')=='Mot de passe'),None)
+ if password_field is None or len(password_field.get('text',''))!=len(private['password']):raise RuntimeError('Native password entry was not confirmed')
  stage='submit-login'
  tap(find_in_feed(lambda n:n.get('class')=='android.widget.Button' and 'Se connecter' in label(n)))
- time.sleep(6);dismiss_optional()
+ stage='wait-login-completion'
+ wait_for(lambda n:n.get('content-desc')=='Mon profil' and visible(n),90,dismiss=True)
  stage='authenticated-profile'
  route('my-profile');dismiss_optional()
  for attempt in range(4):
