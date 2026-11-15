@@ -30,12 +30,12 @@ def tree():
  return result
 def label(node):return (node.get('text','')+' '+node.get('content-desc','')).strip()
 def visible(node):
- v=list(map(int,re.findall(r'\d+',node.get('bounds',''))))
- return len(v)==4 and v[2]>v[0] and v[3]-v[1]>35 and v[1]>90 and v[3]<1860
+ v=list(map(int,re.findall(r'-?\d+',node.get('bounds',''))))
+ return node.get('visible-to-user')=='true' and len(v)==4 and min(1080,v[2])-max(0,v[0])>=80 and v[3]-v[1]>35 and v[1]>90 and v[3]<1860
 def tap(node):
- v=list(map(int,re.findall(r'\d+',node.get('bounds',''))))
+ v=list(map(int,re.findall(r'-?\d+',node.get('bounds',''))))
  if len(v)!=4:raise RuntimeError('Missing bounds')
- adb('shell','input','tap',str((v[0]+v[2])//2),str((v[1]+v[3])//2))
+ adb('shell','input','tap',str((max(0,v[0])+min(1080,v[2]))//2),str((max(90,v[1])+min(1860,v[3]))//2))
 def wait_for(test,seconds=40,dismiss=False):
  until=time.time()+seconds
  while time.time()<until:
@@ -76,7 +76,9 @@ def route(value):
  for attempt in range(12):
   nodes=list(tree().iter('node'))
   target=next((n for n in nodes if n.get('content-desc') in names and visible(n)),None)
-  if target is not None:tap(target);time.sleep(2);return
+  if target is not None:
+   result=adb('shell','am','instrument','-w','-e','tapDescription',shlex.quote(target.get('content-desc')),'com.footnation.audit/.Hierarchy').decode()
+   if 'auditAction=true' in result:time.sleep(2);return
   rail=next((n for n in nodes if n.get('content-desc')=='Navigation de l’accueil'),None)
   if rail is None:raise RuntimeError('Native home navigation rail unavailable')
   x1,y1,x2,y2=map(int,re.findall(r'\d+',rail.get('bounds')))

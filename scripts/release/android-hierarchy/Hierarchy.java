@@ -5,6 +5,8 @@ import android.app.Instrumentation;
 import android.app.UiAutomation;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.view.MotionEvent;
 import android.util.Xml;
 import android.view.accessibility.AccessibilityNodeInfo;
 import java.io.File;
@@ -13,7 +15,12 @@ import org.xmlpull.v1.XmlSerializer;
 
 /** Test-only fresh accessibility snapshot; does not wait for animated UI to idle. */
 public final class Hierarchy extends Instrumentation {
-  @Override public void onCreate(Bundle arguments) { super.onCreate(arguments); start(); }
+  private String tapDescription;
+  @Override public void onCreate(Bundle arguments) {
+    super.onCreate(arguments);
+    tapDescription = arguments == null ? null : arguments.getString("tapDescription");
+    start();
+  }
   @Override public void onStart() {
     File output = new File(getContext().getFilesDir(), "hierarchy.xml");
     output.delete();
@@ -26,6 +33,20 @@ public final class Hierarchy extends Instrumentation {
         root = automation.getRootInActiveWindow();
       }
       if (root == null) throw new IllegalStateException("No foreground accessibility root");
+      if (tapDescription != null) {
+        if (!java.util.Arrays.asList("Clubs", "Opportunités", "Matches", "Matchs").contains(tapDescription))
+          throw new IllegalArgumentException("Unexpected test destination");
+        Rect target = findTarget(root, tapDescription, 0);
+        if (target == null) throw new IllegalStateException("Visible navigation target unavailable");
+        long now = SystemClock.uptimeMillis();
+        MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, target.centerX(), target.centerY(), 0);
+        MotionEvent up = MotionEvent.obtain(now, now + 70, MotionEvent.ACTION_UP, target.centerX(), target.centerY(), 0);
+        try {
+          if (!automation.injectInputEvent(down, true) || !automation.injectInputEvent(up, true))
+            throw new IllegalStateException("Native touch injection failed");
+          result.putString("auditAction", "true");
+        } finally { down.recycle(); up.recycle(); }
+      }
       try (FileOutputStream stream = new FileOutputStream(output)) {
         XmlSerializer xml = Xml.newSerializer();
         xml.setOutput(stream, "UTF-8"); xml.startDocument("UTF-8", true);
@@ -40,6 +61,24 @@ public final class Hierarchy extends Instrumentation {
     }
   }
   private static String value(CharSequence text) { return text == null ? "" : text.toString(); }
+  private static Rect findTarget(AccessibilityNodeInfo node, String description, int depth) {
+    if (depth > 80) return null;
+    if (node.isVisibleToUser() && node.isClickable() && description.equals(value(node.getContentDescription()))
+        && "com.footnation.app".equals(value(node.getPackageName()))) {
+      Rect frame = new Rect(); node.getBoundsInScreen(frame);
+      // Use the current visible intersection; never tap stale/offscreen bounds
+      // obtained before the continuously moving navigation rail advanced.
+      if (frame.intersect(0, 90, 1080, 1860) && frame.width() >= 80 && frame.height() >= 35) return frame;
+    }
+    for (int i = 0; i < node.getChildCount(); i++) {
+      AccessibilityNodeInfo child = node.getChild(i);
+      if (child != null) {
+        Rect found = findTarget(child, description, depth + 1); child.recycle();
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
   private static void write(XmlSerializer xml, AccessibilityNodeInfo node, int depth) throws Exception {
     if (depth > 80) return;
     Rect bounds = new Rect(); node.getBoundsInScreen(bounds);
