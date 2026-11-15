@@ -79,6 +79,7 @@ def route(value):
   if target is not None:
    result=adb('shell','am','instrument','-w','-e','tapDescription',shlex.quote(target.get('content-desc')),'com.footnation.audit/.Hierarchy').decode()
    if 'auditAction=true' in result:time.sleep(2);return
+   print('Navigation touch diagnostic: '+result,flush=True)
   rail=next((n for n in nodes if n.get('content-desc')=='Navigation de l’accueil'),None)
   if rail is None:raise RuntimeError('Native home navigation rail unavailable')
   x1,y1,x2,y2=map(int,re.findall(r'\d+',rail.get('bounds')))

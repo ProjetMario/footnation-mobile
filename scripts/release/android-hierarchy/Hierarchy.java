@@ -7,6 +7,7 @@ import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.MotionEvent;
+import android.view.InputDevice;
 import android.util.Xml;
 import android.view.accessibility.AccessibilityNodeInfo;
 import java.io.File;
@@ -41,6 +42,8 @@ public final class Hierarchy extends Instrumentation {
         long now = SystemClock.uptimeMillis();
         MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, target.centerX(), target.centerY(), 0);
         MotionEvent up = MotionEvent.obtain(now, now + 70, MotionEvent.ACTION_UP, target.centerX(), target.centerY(), 0);
+        down.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        up.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         try {
           if (!automation.injectInputEvent(down, true) || !automation.injectInputEvent(up, true))
             throw new IllegalStateException("Native touch injection failed");
@@ -57,6 +60,7 @@ public final class Hierarchy extends Instrumentation {
       finish(Activity.RESULT_OK, result);
     } catch (Exception error) {
       output.delete(); result.putString("auditSuccess", "false");
+      result.putString("auditFailure", error.getClass().getSimpleName() + ": " + error.getMessage());
       finish(Activity.RESULT_CANCELED, result);
     }
   }
