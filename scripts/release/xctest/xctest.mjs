@@ -120,7 +120,7 @@ try {
   const container=run('xcrun',['simctl','get_app_container',options.udid,metadata.runnerBundle,'data']).trim();
   const captures=path.join(container,'Documents/FootNationNativeCaptures');
   const files=readdirSync(captures).filter(name=>options.mode==='login'?name==='authenticated-profile.png':name.startsWith(options.locale+'-'+options.device+'-')&&name.endsWith('.png')).sort();
-  if(files.length!==(options.mode==='login'?1:4))throw Error('Incomplete screenshot set');
+  if(files.length!==(options.mode==='login'?1:6))throw Error('Incomplete screenshot set');
   mkdirSync(options.output,{recursive:true,mode:0o700});
   const receipt=[];
   for(const filename of files) {
