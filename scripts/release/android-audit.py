@@ -50,7 +50,34 @@ def text(value):
  if not value.isascii() or '\n' in value:raise RuntimeError('Unsupported test input')
  adb('shell','input','text',shlex.quote(value.replace(' ','%s')))
 def route(value):
- adb('shell','am','start','-W','-a','android.intent.action.VIEW','-d',shlex.quote('footnation://'+value),'com.footnation.app')
+ if value.startswith('login?'):
+  adb('shell','am','start','-W','-a','android.intent.action.VIEW','-d',shlex.quote('footnation://'+value),'com.footnation.app')
+  return
+ # Use the same real controls as a person, including after the asynchronous
+ # post-login redirect, instead of racing it with a second external intent.
+ bottom={'home':'Accueil','my-profile':'Mon profil','search':'Rechercher'}
+ if value in bottom:
+  for _ in range(12):
+   dismiss_optional();nodes=list(tree().iter('node'))
+   target=next((n for n in nodes if n.get('content-desc')==bottom[value] and visible(n)),None)
+   if target is not None:tap(target);time.sleep(2);return
+   back=next((n for n in nodes if n.get('content-desc')=='Retour' and visible(n)),None)
+   if back is not None:tap(back)
+   time.sleep(2)
+  raise RuntimeError('Native bottom navigation unavailable: '+value)
+ route('home')
+ names={'clubs':['Clubs'],'opportunities':['Opportunités'],'matches':['Matchs','Matches']}[value]
+ for attempt in range(12):
+  nodes=list(tree().iter('node'))
+  target=next((n for n in nodes if n.get('content-desc') in names and visible(n)),None)
+  if target is not None:tap(target);time.sleep(2);return
+  rail=next((n for n in nodes if n.get('content-desc')=='Navigation de l’accueil'),None)
+  if rail is None:raise RuntimeError('Native home navigation rail unavailable')
+  x1,y1,x2,y2=map(int,re.findall(r'\d+',rail.get('bounds')))
+  left=x1+int((x2-x1)*0.15);right=x1+int((x2-x1)*0.85);y=(y1+y2)//2
+  start,end=(right,left) if attempt%8<4 else (left,right)
+  adb('shell','input','swipe',str(start),str(y),str(end),str(y),'500');time.sleep(1)
+ raise RuntimeError('Native home navigation tab unavailable: '+value)
 def dismiss_optional():
  for _ in range(3):
   t=tree();button=next((n for n in t.iter('node') if label(n) in ['Fermer','Fermer l’invitation','Plus tard','Pas maintenant','Ne pas autoriser','Don’t allow',"Don't allow"]),None)
