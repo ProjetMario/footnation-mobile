@@ -336,8 +336,8 @@ final class FootNationCaptureTests: XCTestCase {
         try XCUIScreen.main.screenshot().pngRepresentation.write(to: folder.appendingPathComponent(fileName), options: .atomic)
     }
 
-    private func requireTap(_ label: String, prefix: Bool = false, scroll: Bool = false) {
-        let predicate = NSPredicate(format: prefix ? "label BEGINSWITH %@" : "label == %@", label)
+    private func requireTap(_ label: String, contains: Bool = false, scroll: Bool = false) {
+        let predicate = NSPredicate(format: contains ? "label CONTAINS %@" : "label == %@", label)
         for attempt in 0..<8 {
             let candidates = app.buttons.matching(predicate).allElementsBoundByIndex
             if let button = candidates.first(where: { $0.exists && $0.isHittable }) {
@@ -362,7 +362,7 @@ final class FootNationCaptureTests: XCTestCase {
         for _ in 0..<2 {
             requireTap("Partager", scroll: true)
             requireTap("Fermer le partage")
-            requireTap("Ouvrir les commentaires", prefix: true, scroll: true)
+            requireTap("Ouvrir les commentaires", contains: true, scroll: true)
             requireTap("Fermer les commentaires")
         }
         open("my-profile")
