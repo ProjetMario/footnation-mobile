@@ -358,7 +358,15 @@ final class FootNationCaptureTests: XCTestCase {
         for _ in 0..<2 {
             requireTap("Changer la langue")
             requireTap("Fermer le choix de langue")
+            requireTap("Ouvrir mon espace")
+            requireTap("Fermer le menu du compte")
         }
+        requireTap("Messagerie")
+        XCTAssertTrue(app.buttons["Voir mon profil"].firstMatch.waitForExistence(timeout: 20), "Messaging screen did not open")
+        open("home")
+        requireTap("Notifications", contains: true)
+        XCTAssertTrue(app.staticTexts["Activité récente FootNation"].firstMatch.waitForExistence(timeout: 20), "Notifications screen did not open")
+        open("home")
         for _ in 0..<2 {
             requireTap("Partager", scroll: true)
             requireTap("Fermer le partage")
@@ -378,7 +386,8 @@ final class FootNationCaptureTests: XCTestCase {
         requireProfile()
         let routes = [
             ("06-profil", "my-profile"), ("02-recherche", "search"),
-            ("03-clubs", "clubs"), ("01-accueil", "home")
+            ("03-clubs", "clubs"), ("04-opportunites", "opportunities"),
+            ("05-matchs", "matches"), ("01-accueil", "home")
         ]
         for (name, route) in routes {
             open(route)
