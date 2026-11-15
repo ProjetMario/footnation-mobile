@@ -41,7 +41,7 @@ try {
  }else if(process.argv[2]==='finalize'){
   fs.mkdirSync(output,{mode:0o700});
   if(fs.existsSync(base)){
-   const entries=['provenance.json','commands.log','ui.log','report.json','screens','hierarchies','failure.png','failure.xml'].filter(f=>fs.existsSync(path.join(base,f)));
+   const entries=['provenance.json','commands.log','ui.log','report.json','screens','hierarchies','failure.png','failure.xml','native-errors.log'].filter(f=>fs.existsSync(path.join(base,f)));
    if(entries.length){run('tar',['-czf','proof.tar.gz',...entries]);fs.writeFileSync(path.join(output,'proof.tar.gz.enc'),encrypt(fs.readFileSync(path.join(base,'proof.tar.gz')),key));}
    fs.rmSync(base,{recursive:true,force:true});
   }
