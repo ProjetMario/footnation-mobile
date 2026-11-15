@@ -17,6 +17,9 @@ def tree():
  raw=adb('shell','cat','/sdcard/footnation-audit.xml').decode()
  return ET.fromstring(raw)
 def label(node):return (node.get('text','')+' '+node.get('content-desc','')).strip()
+def visible(node):
+ v=list(map(int,re.findall(r'\d+',node.get('bounds',''))))
+ return len(v)==4 and v[2]>v[0] and v[3]-v[1]>35 and v[1]>90 and v[3]<1860
 def tap(node):
  v=list(map(int,re.findall(r'\d+',node.get('bounds',''))))
  if len(v)!=4:raise RuntimeError('Missing bounds')
@@ -30,7 +33,7 @@ def wait_for(test,seconds=40):
  raise RuntimeError('Expected native control not found')
 def find_in_feed(test):
  for _ in range(8):
-  found=next((n for n in tree().iter('node') if test(n)),None)
+  found=next((n for n in tree().iter('node') if test(n) and visible(n)),None)
   if found is not None:return found
   adb('shell','input','swipe','540','1650','540','650','450');time.sleep(2)
  raise RuntimeError('Publication controls unavailable in feed')
@@ -61,13 +64,12 @@ try:
  adb('shell','settings','put','global','window_animation_scale','0')
  adb('shell','settings','put','global','transition_animation_scale','0')
  route('login?next=%2Fsearch')
- wait_for(lambda n:n.get('class')=='android.widget.EditText',60)
- edits=[n for n in tree().iter('node') if n.get('class')=='android.widget.EditText']
- if len(edits)<2:raise RuntimeError('Login inputs unavailable')
- tap(edits[0]);text(private['email']);adb('shell','input','keyevent','4')
- edits=[n for n in tree().iter('node') if n.get('class')=='android.widget.EditText']
- tap(edits[1]);text(private['password']);adb('shell','input','keyevent','4')
- tap(wait_for(lambda n:label(n)=='Se connecter'))
+ wait_for(lambda n:'Connexion' in label(n),60)
+ tap(find_in_feed(lambda n:n.get('class')=='android.widget.EditText' and n.get('content-desc')=='Adresse e-mail'))
+ text(private['email']);adb('shell','input','keyevent','4')
+ tap(find_in_feed(lambda n:n.get('class')=='android.widget.EditText' and 'Mot de passe' in n.get('content-desc','')))
+ text(private['password']);adb('shell','input','keyevent','4')
+ tap(find_in_feed(lambda n:n.get('class')=='android.widget.Button' and 'Se connecter' in label(n)))
  time.sleep(6);dismiss_optional()
  route('my-profile');dismiss_optional()
  wait_for(lambda n:bool(re.search(r'Modifier.*profil|Modifier|Edit profile',label(n))),60)
