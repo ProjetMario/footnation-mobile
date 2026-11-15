@@ -32,7 +32,10 @@ try {
   const manifest=run('java',['-jar','bundletool.jar','dump','manifest','--bundle=app.aab']);
   if(!manifest.includes('package="com.footnation.app"')||!manifest.includes('android:versionName="'+data.version+'"')||!manifest.includes('android:versionCode="'+data.build+'"'))throw Error('Wrong app identity');
   if(/android.permission.READ_MEDIA_(IMAGES|VIDEO|VISUAL_USER_SELECTED)\b/.test(manifest))throw Error('Broad media permission present');
-  run('java',['-jar','bundletool.jar','build-apks','--bundle=app.aab','--output=app.apks','--mode=universal']);
+  // A fresh hosted runner has no default debug keystore. Sign only the derived
+  // emulator APK with an ephemeral test identity; never alter the store AAB.
+  run('keytool',['-genkeypair','-keystore','audit.keystore','-storepass','android','-keypass','android','-alias','androiddebugkey','-dname','CN=Android Debug,O=Android,C=US','-keyalg','RSA','-keysize','2048','-validity','2','-noprompt']);
+  run('java',['-jar','bundletool.jar','build-apks','--bundle=app.aab','--output=app.apks','--mode=universal','--ks=audit.keystore','--ks-pass=pass:android','--key-pass=pass:android','--ks-key-alias=androiddebugkey']);
   run('unzip',['-q','app.apks','universal.apk']);
   console.log('Android store bundle validated; native audit APK prepared.');
  }else if(process.argv[2]==='finalize'){

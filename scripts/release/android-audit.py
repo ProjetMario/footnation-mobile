@@ -7,7 +7,10 @@ hierarchies=root/'hierarchies';hierarchies.mkdir()
 checks=[]
 def adb(*args,timeout=30):
  r=subprocess.run(['adb',*args],capture_output=True,timeout=timeout)
- if r.returncode:raise RuntimeError('ADB command failed')
+ if r.returncode:
+  detail=(r.stderr+r.stdout).decode(errors='replace')
+  for value in [private['email'],private['password']]:detail=detail.replace(value,'[REDACTED]')
+  raise RuntimeError('ADB '+args[0]+' failed: '+detail[:800])
  return r.stdout
 def tree():
  adb('shell','uiautomator','dump','/sdcard/footnation-audit.xml')
@@ -50,6 +53,8 @@ def capture(name):
  checks.append(name)
 try:
  adb('install',str(root/'universal.apk'),timeout=120)
+ adb('shell','input','keyevent','224')
+ adb('shell','wm','dismiss-keyguard')
  adb('shell','wm','size','1080x1920')
  adb('shell','wm','density','420')
  adb('shell','settings','put','system','system_locales','fr-FR')
