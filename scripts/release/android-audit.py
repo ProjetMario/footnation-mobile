@@ -67,7 +67,8 @@ try:
  route('my-profile');dismiss_optional()
  wait_for(lambda n:bool(re.search(r'Modifier.*profil|Modifier|Edit profile',label(n))),60)
  checks.append('authenticated-demo-profile')
- for name,link,expected in [('01-recherche','search','Rechercher'),('02-clubs','clubs','Clubs'),('03-opportunites','opportunities','Opportunités'),('04-matchs','matches','Matchs')]:
+ time.sleep(3);capture('02-profil')
+ for name,link,expected in [('01-recherche','search','Rechercher'),('03-clubs','clubs','Clubs'),('04-opportunites','opportunities','Opportunités'),('05-matchs','matches','Matchs')]:
   route(link);dismiss_optional();wait_for(lambda n:expected.lower() in label(n).lower(),60)
   time.sleep(5);capture(name)
  route('home');dismiss_optional();wait_for(lambda n:'Pour vous' in label(n),60)
