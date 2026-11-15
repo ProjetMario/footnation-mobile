@@ -183,6 +183,11 @@ final class FootNationCaptureTests: XCTestCase {
 
     private func dismissInvitations() {
         dismissPasswordSavePrompt()
+        let welcome = app.staticTexts.matching(NSPredicate(format: "label IN %@", ["Bienvenue sur FootNation", "Welcome to FootNation"])).firstMatch
+        if welcome.exists {
+            let close = app.buttons.matching(NSPredicate(format: "label IN %@", ["Fermer", "Close"])).firstMatch
+            if close.exists && close.isHittable { close.tap(); wait(1) }
+        }
         for label in ["Fermer l’invitation", "Plus tard", "Close invitation", "Later"] {
             let button = app.buttons[label].firstMatch
             if button.exists && button.isHittable { button.tap(); wait(1) }
@@ -201,6 +206,9 @@ final class FootNationCaptureTests: XCTestCase {
         let deadline = Date().addingTimeInterval(65)
         repeat {
             dismissInvitations()
+            // Closing the first-login presentation intentionally returns home.
+            // Restore the requested destination after that real UI action.
+            if !profileVisible() { open("my-profile") }
             if profileVisible() {
                 wait(1)
                 dismissInvitations()
