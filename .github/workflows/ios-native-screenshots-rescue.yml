@@ -1,4 +1,4 @@
-name: Native screenshots separate build and capture
+name: Native iOS release audit and screenshots
 on:
   workflow_dispatch:
     inputs:
@@ -77,6 +77,8 @@ jobs:
           FN_PAYLOAD_SHA256: ${{ inputs.payload_sha256 }}
           FN_REUSE_RUN_ID: ${{ github.run_id }}
           FN_CAPTURE_DEVICE: ${{ matrix.device }}
+          FN_CAPTURE_DRIVER: xctest
+          FN_CAPTURE_LOCALE: fr-FR
         run: node scripts/release/capture-ios.mjs
       - name: Preserve encrypted native images and diagnostics
         if: always()

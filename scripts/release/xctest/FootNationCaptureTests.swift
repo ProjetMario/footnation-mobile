@@ -336,6 +336,39 @@ final class FootNationCaptureTests: XCTestCase {
         try XCUIScreen.main.screenshot().pngRepresentation.write(to: folder.appendingPathComponent(fileName), options: .atomic)
     }
 
+    private func requireTap(_ label: String, prefix: Bool = false, scroll: Bool = false) {
+        let predicate = NSPredicate(format: prefix ? "label BEGINSWITH %@" : "label == %@", label)
+        for attempt in 0..<8 {
+            let candidates = app.buttons.matching(predicate).allElementsBoundByIndex
+            if let button = candidates.first(where: { $0.exists && $0.isHittable }) {
+                button.tap()
+                wait(1.5)
+                return
+            }
+            if scroll && attempt > 0 { app.swipeUp(); wait(1) }
+            else { wait(1) }
+        }
+        XCTFail("Native control did not respond: " + label)
+    }
+
+    private func verifyReadOnlyPublicationControls() {
+        open("home")
+        // Repeated modal/tab transitions exercise the iOS hit-testing regression.
+        // Nothing is liked, published, sent to another person, or commented.
+        for _ in 0..<2 {
+            requireTap("Changer la langue")
+            requireTap("Fermer le choix de langue")
+        }
+        for _ in 0..<2 {
+            requireTap("Partager", scroll: true)
+            requireTap("Fermer le partage")
+            requireTap("Ouvrir les commentaires", prefix: true, scroll: true)
+            requireTap("Fermer les commentaires")
+        }
+        open("my-profile")
+        requireProfile()
+    }
+
     func testCapture() throws {
         let env = ProcessInfo.processInfo.environment
         guard let locale = env["FN_CAPTURE_LOCALE"], ["fr-FR", "en-US"].contains(locale),
@@ -357,5 +390,6 @@ final class FootNationCaptureTests: XCTestCase {
             // for asynchronous content errors, localization and empty states.
             try saveCapture(locale + "-" + device + "-" + name + ".png")
         }
+        if locale == "fr-FR" { verifyReadOnlyPublicationControls() }
     }
 }
