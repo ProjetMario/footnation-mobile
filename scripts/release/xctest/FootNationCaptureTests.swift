@@ -8,6 +8,7 @@ import Vision
 final class FootNationCaptureTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.footnation.app")
     private let profileName = "Démo FootNation"
+    private var passwordPromptMayBePending = false
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -32,6 +33,7 @@ final class FootNationCaptureTests: XCTestCase {
 
     @discardableResult
     private func dismissPasswordSavePrompt() -> Bool {
+        guard passwordPromptMayBePending else { return false }
         // iOS 26 can expose the Passwords sheet visually while its remote AX
         // process no longer answers queries. Recognize only the observed system
         // prompt and its explicit decline button in the current framebuffer.
@@ -94,14 +96,13 @@ final class FootNationCaptureTests: XCTestCase {
     }
 
     private func clearPasswordPromptBeforeNavigation() {
-        let deadline = Date().addingTimeInterval(12)
-        var absentSince: Date? = nil
+        guard passwordPromptMayBePending else { return }
+        let deadline = Date().addingTimeInterval(30)
         repeat {
             dismissPasswordSavePrompt()
-            if passwordSavePromptVisible() { absentSince = nil }
-            else {
-                if absentSince == nil { absentSince = Date() }
-                if Date().timeIntervalSince(absentSince!) >= 0.7 { return }
+            if !passwordSavePromptVisible() {
+                passwordPromptMayBePending = false
+                return
             }
             wait(0.3)
         } while Date() < deadline
@@ -362,6 +363,7 @@ final class FootNationCaptureTests: XCTestCase {
         let passwordField = app.secureTextFields["Mot de passe"].firstMatch
         paste(email, into: emailField, advanceToPassword: true)
         paste(password, into: passwordField)
+        passwordPromptMayBePending = true
         let submit = app.buttons["Se connecter"].firstMatch
         if submit.exists && submit.isHittable {
             submit.tap()
@@ -448,7 +450,7 @@ final class FootNationCaptureTests: XCTestCase {
         guard let match else { XCTFail("No visible match card to verify"); return }
         match.tap()
         XCTAssertTrue(app.staticTexts["Match"].firstMatch.waitForExistence(timeout: 20), "Match card did not open its detail")
-        XCTAssertFalse(app.buttons["Changer la langue"].firstMatch.exists, "Home remained over match detail")
+        XCTAssertFalse(app.buttons["Changer la langue"].firstMatch.isHittable, "Home remained over match detail")
         XCTAssertFalse(app.staticTexts["Match introuvable pour cette date"].firstMatch.exists, "Selected match preview was lost")
         open("home")
         requireTap("Voir tous les matchs")
