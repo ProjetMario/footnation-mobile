@@ -156,15 +156,22 @@ try:
  adb('shell','settings','put','system','system_locales','fr-FR')
  adb('shell','settings','put','global','window_animation_scale','0')
  adb('shell','settings','put','global','transition_animation_scale','0')
- stage='open-login'
- route('login?next=%2Fsearch')
+ stage='open-guest-landing'
+ # Verify the first-install entry point too: a direct login intent can hide
+ # broken links on the public landing page.
+ adb('shell','am','start','-W','-a','android.intent.action.MAIN','-c','android.intent.category.LAUNCHER','com.footnation.app/.MainActivity')
  # The stock Pixel Launcher can ANR during the hosted emulator's cold boot
  # and steal keyboard input although FootNation is healthy. Stop only that
  # background launcher after our app opens; never suppress an app ANR.
  launcher=adb('shell','cmd','package','resolve-activity','--brief','-a','android.intent.action.MAIN','-c','android.intent.category.HOME').decode().strip().splitlines()[-1].split('/')[0]
  if launcher in ['com.google.android.apps.nexuslauncher','com.android.launcher3']:
   adb('shell','am','force-stop',launcher)
+ stage='guest-login-link'
+ login=find_in_feed(lambda n:n.get('content-desc')=='Se connecter' or n.get('text')=='Se connecter')
+ tap(login)
  wait_for(lambda n:'Connexion' in label(n),60)
+ wait_for(lambda n:n.get('class')=='android.widget.EditText' and n.get('content-desc')=='Adresse e-mail',20)
+ checks.append('guest-landing-login-link')
  stage='enter-email'
  focus_input('Adresse e-mail')
  text(private['email'],'Adresse e-mail');adb('shell','input','keyevent','4')
