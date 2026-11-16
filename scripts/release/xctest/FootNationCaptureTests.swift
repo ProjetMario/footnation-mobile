@@ -534,12 +534,20 @@ final class FootNationCaptureTests: XCTestCase {
             switch route {
             case "clubs": destinationText = "Trouver un club"
             case "matches": destinationText = "Compétitions"
-            case "opportunities": destinationText = locale == "en-US" ? "Opportunities" : "Opportunités"
+            // The opportunity deck is full-screen and identifies each listing
+            // by its author/title. It intentionally has no page-title heading.
+            case "opportunities": destinationText = nil
             default: destinationText = nil
             }
             if let expected = destinationText {
-                XCTAssertFalse(app.buttons["Changer la langue"].firstMatch.exists, "Home remained visible after route selection")
+                let homeLanguage = app.buttons["Changer la langue"].firstMatch
+                XCTAssertFalse(homeLanguage.exists && homeLanguage.isHittable, "Home remained visible after route selection")
                 XCTAssertTrue(app.staticTexts[expected].firstMatch.waitForExistence(timeout: 15), "Destination heading did not appear")
+            }
+            if route == "opportunities" {
+                let publish = app.buttons["Publier une annonce"].firstMatch
+                XCTAssertTrue(publish.waitForExistence(timeout: 25) && publish.isHittable, "The opportunity deck did not open")
+                XCTAssertTrue(app.buttons["Voir l’annonce"].firstMatch.isHittable, "The opportunity listing action is missing")
             }
             // This is a genuine device framebuffer. Human review remains required
             // for asynchronous content errors, localization and empty states.
