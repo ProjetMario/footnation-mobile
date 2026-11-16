@@ -33,6 +33,10 @@ patch('Libraries/Components/ScrollView/ScrollView.js',
   '      if (this._isAnimating()) {\n        return true;');
 patch('Libraries/Pressability/Pressability.js',
   'this._performTransitionSideEffects(prevState, nextState, signal, event);',
-  'global.nativeLoggingHook?.("FN_DIAG_PRESSABILITY " + prevState + " " + nextState + " " + signal, 3);\n' +
+  'global.nativeLoggingHook?.("FN_DIAG_PRESSABILITY " + prevState + " " + nextState + " " + signal + " " + event?.nativeEvent?.target, 3);\n' +
   '      this._performTransitionSideEffects(prevState, nextState, signal, event);');
+patch('Libraries/Pressability/Pressability.js',
+  '          onPress(event);',
+  '          global.nativeLoggingHook?.("FN_DIAG_PRESS_CALLBACK " + event?.nativeEvent?.target, 3);\n' +
+  '          onPress(event);');
 writeFileSync(path.join(source, 'touch-trace-receipt.json'), JSON.stringify({diagnosticOnly:true, files:receipt}));
