@@ -106,6 +106,11 @@ public final class Hierarchy extends Instrumentation {
     xml.attribute(null, "clickable", String.valueOf(node.isClickable()));
     xml.attribute(null, "selected", String.valueOf(node.isSelected()));
     xml.attribute(null, "visible-to-user", String.valueOf(node.isVisibleToUser()));
+    AccessibilityNodeInfo.RangeInfo range = node.getRangeInfo();
+    if (range != null) {
+      xml.attribute(null, "range-current", String.valueOf(range.getCurrent()));
+      xml.attribute(null, "range-max", String.valueOf(range.getMax()));
+    }
     for (int i=0; i<node.getChildCount(); i++) {
       AccessibilityNodeInfo child = node.getChild(i);
       if (child != null) { write(xml, child, depth+1); child.recycle(); }

@@ -62,7 +62,7 @@ def route(value):
   return
  # Use the same real controls as a person, including after the asynchronous
  # post-login redirect, instead of racing it with a second external intent.
- bottom={'home':'Accueil','my-profile':'Mon profil','search':'Rechercher'}
+ bottom={'home':'Accueil','my-profile':'Mon profil','search':'Rechercher','shorts':'Shorts'}
  if value in bottom:
   for _ in range(12):
    dismiss_optional();nodes=list(tree().iter('node'))
@@ -100,6 +100,16 @@ def capture(name):
  (hierarchies/(name+'.xml')).write_text(ET.tostring(t,encoding='unicode'))
  (screens/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
  checks.append(name)
+def control(description,contains=False):
+ return wait_for(lambda n:visible(n) and (description in n.get('content-desc','') if contains else n.get('content-desc')==description))
+def video_progress():
+ slider=wait_for(lambda n:n.get('content-desc')=='Position de la vidéo' and n.get('range-current') is not None,45)
+ values={slider.get('range-current')}
+ for _ in range(4):
+  time.sleep(1.2)
+  slider=wait_for(lambda n:n.get('content-desc')=='Position de la vidéo' and n.get('range-current') is not None,8)
+  values.add(slider.get('range-current'))
+ if len(values)<2:raise RuntimeError('Native video timeline did not advance')
 try:
  adb('install',str(root/'universal.apk'),timeout=120)
  adb('install',str(root/'hierarchy.apk'),timeout=60)
@@ -141,6 +151,7 @@ try:
  for name,link,expected in [('01-recherche','search','Rechercher'),('03-clubs','clubs','Clubs'),('04-opportunites','opportunities','Opportunités'),('05-matchs','matches','Matchs')]:
   stage=name
   route(link);dismiss_optional();wait_for(lambda n:expected.lower() in label(n).lower(),60,dismiss=True)
+  if any(n.get('content-desc')=='Changer la langue' and visible(n) for n in tree().iter('node')):raise RuntimeError('Home remained visible after selecting '+link)
   time.sleep(5);capture(name)
  stage='home-controls'
  route('home');dismiss_optional();wait_for(lambda n:'Pour vous' in label(n),60,dismiss=True)
@@ -148,7 +159,21 @@ try:
  for _ in range(2):
   tap(wait_for(lambda n:'Changer la langue' in label(n)))
   tap(wait_for(lambda n:'Fermer le choix de langue' in label(n)))
+  tap(control('Ouvrir mon espace'))
+  tap(control('Fermer le menu du compte'))
  checks.append('language-open-close-twice')
+ tap(control('Messagerie'))
+ wait_for(lambda n:'Voir mon profil' in label(n),30)
+ route('home');tap(control('Notifications',contains=True))
+ wait_for(lambda n:'Activité récente FootNation' in label(n),30)
+ route('home');checks.append('account-messages-notifications')
+ stage='match-controls'
+ tap(control(' contre ',contains=True))
+ wait_for(lambda n:n.get('text')=='Match',30)
+ if any('Match introuvable pour cette date' in label(n) for n in tree().iter('node')):raise RuntimeError('Selected match preview was lost')
+ route('home');tap(control('Voir tous les matchs'))
+ wait_for(lambda n:n.get('text')=='Compétitions',30)
+ route('home');checks.append('match-card-and-all-matches')
  # Read-only publication interactions: do not send comments or share to a person.
  for _ in range(2):
   tap(find_in_feed(lambda n:label(n)=='Partager'))
@@ -156,6 +181,16 @@ try:
   tap(find_in_feed(lambda n:'Ouvrir les commentaires' in label(n)))
   tap(wait_for(lambda n:'Fermer les commentaires' in label(n)))
  checks.append('publication-share-and-comments-open-close-twice')
+ stage='video-playback'
+ route('shorts');video_progress()
+ tap(control('Mettre le short en pause'));time.sleep(1)
+ paused=wait_for(lambda n:n.get('content-desc')=='Position de la vidéo').get('range-current');time.sleep(2)
+ if wait_for(lambda n:n.get('content-desc')=='Position de la vidéo').get('range-current')!=paused:raise RuntimeError('Manual video pause was not preserved')
+ tap(control('Reprendre le short'));video_progress()
+ adb('shell','input','swipe','432','1056','432','806','600');video_progress()
+ adb('shell','input','swipe','432','1500','432','450','400');video_progress()
+ route('search');route('shorts');video_progress()
+ checks.append('video-autoplay-pause-resume-scroll-and-return')
  (root/'report.json').write_text(json.dumps({'passed':True,'checks':checks,'physicalDevice':False,'signature':'test debug signature derived from release AAB','storeImagesApproved':False}))
  print('Native Android navigation and captures completed.')
 except Exception as exc:
