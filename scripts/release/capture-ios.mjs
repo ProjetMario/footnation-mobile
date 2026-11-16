@@ -142,7 +142,9 @@ finally {
   const appProcess=processes.split('\n').find(line=>/^\d+\s/.test(line)&&line.includes('UIKitApplication:com.footnation.app['));
   const pid=appProcess?.trim().split(/\s+/)[0];
   if(pid&&/^\d+$/.test(pid)) {
-   const debug=spawnSync('xcrun',['lldb','--batch','-p',pid,'-o','thread select 1','-o','thread backtrace','-o','expression -l objc++ -- @import UIKit','-o','expression -l objc++ -O -- [[(UIWindowScene *)[[UIApplication sharedApplication].connectedScenes anyObject] windows] valueForKey:@"recursiveDescription"]','-o','process detach'],{cwd:source,env,encoding:'utf8',timeout:55000,killSignal:'SIGKILL',maxBuffer:8*1024*1024});
+   // Runtime dispatch avoids compiling UIKit's entire Clang module in a cold
+   // debugger. Read-only inspection; no app state or security setting changes.
+   const debug=spawnSync('xcrun',['lldb','--batch','-p',pid,'-o','thread select 1','-o','thread backtrace','-o','expression -l objc -O -- [(id)[(id)objc_getClass("UIApplication") sharedApplication] valueForKeyPath:@"windows.recursiveDescription"]','-o','process detach'],{cwd:source,env,encoding:'utf8',timeout:55000,killSignal:'SIGKILL',maxBuffer:8*1024*1024});
    writeFileSync(path.join(work,device.kind+'-views.log'),((debug.stdout||'')+'\n'+(debug.stderr||'')+'\nDebugger status: '+debug.status+' '+(debug.error?.code||'')).slice(-8*1024*1024),{mode:0o600});
   }
  }catch{}
