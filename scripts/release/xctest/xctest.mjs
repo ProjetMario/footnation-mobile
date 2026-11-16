@@ -75,7 +75,7 @@ try {
   writeFileSync(path.join(work,'runner.json'),JSON.stringify({schema:1,xctestrun:candidates[0],runnerBundle:'com.footnation.captureUITests.xctrunner',appBundle:'com.footnation.app'}),{mode:0o600});
   console.log('Standalone UI runner prepared; FootNation was not compiled or launched.');
  } else if(mode==='run') {
-  if(process.platform!=='darwin'||!/^[A-F0-9-]{36}$/i.test(options.udid||'')||!['login','capture','header','publication'].includes(options.mode)||!['fr-FR','en-US'].includes(options.locale)||!['iphone','ipad'].includes(options.device)||!options.output||!path.isAbsolute(options.output))throw Error('Invalid run parameters');
+  if(process.platform!=='darwin'||!/^[A-F0-9-]{36}$/i.test(options.udid||'')||!['login','capture','header','publication','matches','video'].includes(options.mode)||!['fr-FR','en-US'].includes(options.locale)||!['iphone','ipad'].includes(options.device)||!options.output||!path.isAbsolute(options.output))throw Error('Invalid run parameters');
   credentials=JSON.parse(readFileSync(path.join(work,'private-demo.json'),'utf8'));
   const metadata=JSON.parse(readFileSync(path.join(work,'runner.json'),'utf8'));
   // Inspect the already installed binary; never install or rebuild FootNation.
@@ -119,7 +119,7 @@ try {
    throw failure;
   }
   const container=run('xcrun',['simctl','get_app_container',options.udid,metadata.runnerBundle,'data']).trim();
-  if(['header','publication'].includes(options.mode)) {
+  if(['header','publication','matches','video'].includes(options.mode)) {
    writeFileSync(path.join(options.output,'xctest-'+stamp+'.json'),JSON.stringify({passed:true,mode:options.mode,appBundle:metadata.appBundle,native:true}),{mode:0o600});
    console.log('Native '+options.mode+' controls passed.');process.exit(0);
   }

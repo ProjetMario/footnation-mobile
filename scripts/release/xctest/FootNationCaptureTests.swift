@@ -84,7 +84,7 @@ final class FootNationCaptureTests: XCTestCase {
     private func open(_ route: String) {
         // All navigation is ordinary UI interaction. No URL opening, host IPC,
         // authentication storage writes, app changes or generated screenshots.
-        let allowed = ["login?next=%2Fsearch", "home", "search", "clubs", "matches", "opportunities", "my-profile", "matching"]
+        let allowed = ["login?next=%2Fsearch", "home", "search", "shorts", "clubs", "matches", "opportunities", "my-profile", "matching"]
         guard allowed.contains(route) else { XCTFail("Unsupported UI capture destination"); return }
 
         app.activate()
@@ -151,8 +151,8 @@ final class FootNationCaptureTests: XCTestCase {
             XCTAssertTrue(home(), "Home tab was not reachable through the native UI")
             return
         }
-        if route == "my-profile" || route == "search" {
-            let labels = route == "my-profile" ? ["Mon profil", "My profile"] : ["Rechercher", "Search"]
+        if route == "my-profile" || route == "search" || route == "shorts" {
+            let labels = route == "my-profile" ? ["Mon profil", "My profile"] : route == "shorts" ? ["Shorts"] : ["Rechercher", "Search"]
             if tap(labels, bottomOnly: true) { return }
             guard home() else { XCTFail("Could not return to the native tab bar"); return }
             XCTAssertTrue(tap(labels, bottomOnly: true), "Required native bottom tab was unavailable")
@@ -414,6 +414,55 @@ final class FootNationCaptureTests: XCTestCase {
         }
         open("my-profile")
         requireProfile()
+    }
+
+    func testMatchControls() throws {
+        open("home")
+        let match = app.buttons.matching(NSPredicate(format: "label CONTAINS ' contre ' AND label CONTAINS ' pour '")).allElementsBoundByIndex.first { $0.exists && $0.isHittable }
+        guard let match else { XCTFail("No visible match card to verify"); return }
+        match.tap()
+        XCTAssertTrue(app.staticTexts["Match"].firstMatch.waitForExistence(timeout: 20), "Match card did not open its detail")
+        XCTAssertFalse(app.buttons["Changer la langue"].firstMatch.exists, "Home remained over match detail")
+        XCTAssertFalse(app.staticTexts["Match introuvable pour cette date"].firstMatch.exists, "Selected match preview was lost")
+        open("home")
+        requireTap("Voir tous les matchs")
+        XCTAssertTrue(app.staticTexts["Compétitions"].firstMatch.waitForExistence(timeout: 25), "All matches did not open")
+        open("home")
+    }
+
+    private func requireVideoProgress() {
+        let progress = app.sliders["Position de la vidéo"].firstMatch
+        XCTAssertTrue(progress.waitForExistence(timeout: 35), "The native video did not become ready")
+        var values = Set<String>()
+        for _ in 0..<4 {
+            if let value = progress.value as? String { values.insert(value) }
+            wait(1.2)
+        }
+        XCTAssertGreaterThan(values.count, 1, "The native video timeline did not advance")
+    }
+
+    func testVideoPlayback() throws {
+        open("shorts")
+        requireVideoProgress()
+        requireTap("Mettre le short en pause")
+        let progress = app.sliders["Position de la vidéo"].firstMatch
+        wait(1)
+        let paused = progress.value as? String
+        wait(2)
+        XCTAssertEqual(progress.value as? String, paused, "Manual pause was not preserved")
+        requireTap("Reprendre le short")
+        requireVideoProgress()
+        // A short drag stays below the card-switch threshold. Then a full
+        // swipe checks that the next card resumes native playback.
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.55))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.42))
+        start.press(forDuration: 0.1, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1)
+        requireVideoProgress()
+        app.swipeUp()
+        requireVideoProgress()
+        open("search")
+        open("shorts")
+        requireVideoProgress()
     }
 
     func testCapture() throws {

@@ -114,7 +114,7 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
   maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- extendedWaitUntil:\n    visible: ".*Démo FootNation.*"\n    timeout: 60000\n`,device.kind+'-authenticated-profile');
   }
   if(!useXCTest)screenshot(device.udid,device.kind+'-00-authenticated-profile.png');
-  if(useXCTest)for(const mode of ['header','publication']) {
+  if(useXCTest)for(const mode of ['header','matches','publication','video']) {
    stage('verify native '+device.kind+' '+mode+' controls');
    run(process.execPath,[xctestScript,'run','--work',xctestWork,'--udid',device.udid,'--mode',mode,'--locale','fr-FR','--device',device.kind,'--output',output],{timeoutMs:12*60*1000});
   }
