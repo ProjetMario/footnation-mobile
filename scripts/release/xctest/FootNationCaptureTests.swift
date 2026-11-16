@@ -11,7 +11,18 @@ final class FootNationCaptureTests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         executionTimeAllowance = 420
-
+        // The iOS 26 Passwords sheet is hosted by a separate system process.
+        // Let XCTest resolve the actual interrupting element before inspecting
+        // the application tree, which can otherwise time out on that process.
+        addUIInterruptionMonitor(withDescription: "Decline saving the review password") { alert in
+            let title = NSPredicate(format: "label CONTAINS[c] 'Save Password' OR label CONTAINS[c] 'mot de passe'")
+            guard title.evaluate(with: alert) || alert.staticTexts.matching(title).firstMatch.exists else { return false }
+            for label in ["Not Now", "Pas maintenant", "Plus tard"] {
+                let decline = alert.buttons[label].firstMatch
+                if decline.exists { decline.tap(); return true }
+            }
+            return false
+        }
     }
 
     private func wait(_ seconds: TimeInterval) {
@@ -189,7 +200,7 @@ final class FootNationCaptureTests: XCTestCase {
         if invitation.exists && invitation.isHittable {
             invitation.tap(); wait(4); return
         }
-        let welcome = app.staticTexts.matching(NSPredicate(format: "label IN %@", ["Bienvenue sur FootNation", "Welcome to FootNation"])).firstMatch
+        let welcome = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Bienvenue' OR label BEGINSWITH 'Welcome' OR label BEGINSWITH 'Salut' OR label BEGINSWITH 'Hello' ")).firstMatch
         if welcome.exists {
             let close = app.buttons.matching(NSPredicate(format: "label IN %@", ["Fermer", "Close"])).firstMatch
             if close.exists && close.isHittable { close.tap(); wait(4); return }
@@ -332,6 +343,11 @@ final class FootNationCaptureTests: XCTestCase {
             passwordField.typeText("\n")
         }
         wait(10)
+        // A harmless single centre tap lets XCTest handle an asynchronous
+        // password-save interruption. It may pause the initial short, but
+        // never likes, comments, shares or sends content to another person.
+        app.tap()
+        wait(2)
         requireProfile()
         try saveCapture("authenticated-profile.png")
     }
