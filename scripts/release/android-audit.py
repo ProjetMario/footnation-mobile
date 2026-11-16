@@ -6,6 +6,7 @@ screens=root/'screens';screens.mkdir()
 hierarchies=root/'hierarchies';hierarchies.mkdir()
 checks=[]
 stage='install'
+display_width,display_height=1080,1920
 def adb(*args,timeout=30):
  r=subprocess.run(['adb',*args],capture_output=True,timeout=timeout)
  if r.returncode:
@@ -31,11 +32,11 @@ def tree():
 def label(node):return (node.get('text','')+' '+node.get('content-desc','')).strip()
 def visible(node):
  v=list(map(int,re.findall(r'-?\d+',node.get('bounds',''))))
- return node.get('visible-to-user')=='true' and len(v)==4 and min(1080,v[2])-max(0,v[0])>=80 and v[3]-v[1]>35 and v[1]>90 and v[3]<1860
+ return node.get('visible-to-user')=='true' and len(v)==4 and min(display_width,v[2])-max(0,v[0])>=80 and v[3]-v[1]>35 and v[1]>90 and v[3]<display_height-60
 def tap(node):
  v=list(map(int,re.findall(r'-?\d+',node.get('bounds',''))))
  if len(v)!=4:raise RuntimeError('Missing bounds')
- adb('shell','input','tap',str((max(0,v[0])+min(1080,v[2]))//2),str((max(90,v[1])+min(1860,v[3]))//2))
+ adb('shell','input','tap',str((max(0,v[0])+min(display_width,v[2]))//2),str((max(90,v[1])+min(display_height-60,v[3]))//2))
 def wait_for(test,seconds=40,dismiss=False):
  until=time.time()+seconds
  while time.time()<until:
@@ -155,6 +156,12 @@ try:
  adb('shell','settings','put','global','transition_animation_scale','0')
  stage='open-login'
  route('login?next=%2Fsearch')
+ # The stock Pixel Launcher can ANR during the hosted emulator's cold boot
+ # and steal keyboard input although FootNation is healthy. Stop only that
+ # background launcher after our app opens; never suppress an app ANR.
+ launcher=adb('shell','cmd','package','resolve-activity','--brief','-a','android.intent.action.MAIN','-c','android.intent.category.HOME').decode().strip().splitlines()[-1].split('/')[0]
+ if launcher in ['com.google.android.apps.nexuslauncher','com.android.launcher3']:
+  adb('shell','am','force-stop',launcher)
  wait_for(lambda n:'Connexion' in label(n),60)
  stage='enter-email'
  focus_input('Adresse e-mail')
@@ -226,6 +233,17 @@ try:
  adb('shell','input','swipe','432','1500','432','450','400');video_progress()
  route('search');route('shorts');video_progress()
  checks.append('video-autoplay-pause-resume-scroll-and-return')
+ stage='tablet-captures'
+ # Capture actual responsive Android renders, never resize phone PNGs.
+ # Smallest widths of 720dp and 1067dp exercise tablet layouts on this emulator.
+ route('search')
+ adb('shell','wm','density','240');time.sleep(6)
+ capture('tablet7-recherche')
+ route('my-profile');time.sleep(3);capture('tablet7-profil')
+ adb('shell','wm','size','1600x2560')
+ display_width,display_height=1600,2560
+ time.sleep(6);capture('tablet10-profil')
+ route('search');time.sleep(3);capture('tablet10-recherche')
  (root/'report.json').write_text(json.dumps({'passed':True,'checks':checks,'physicalDevice':False,'signature':'test debug signature derived from release AAB','storeImagesApproved':False}))
  print('Native Android navigation and captures completed.')
 except Exception as exc:
