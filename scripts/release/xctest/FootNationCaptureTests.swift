@@ -370,10 +370,9 @@ final class FootNationCaptureTests: XCTestCase {
             passwordField.typeText("\n")
         }
         wait(10)
-        // A harmless single centre tap lets XCTest handle an asynchronous
-        // password-save interruption. It may pause the initial short, but
-        // never likes, comments, shares or sends content to another person.
-        app.tap()
+        // Dismiss only a recognized password prompt. A generic centre tap
+        // would pause the first short and invalidate the later autoplay test.
+        dismissPasswordSavePrompt()
         wait(2)
         requireProfile()
         try saveCapture("authenticated-profile.png")
