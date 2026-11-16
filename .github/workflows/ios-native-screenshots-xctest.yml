@@ -37,6 +37,11 @@ on:
         required: true
         default: ""
         type: string
+      reduce_motion_diagnostic:
+        description: Diagnostic accessibility comparison, not the normal release acceptance run
+        required: false
+        default: false
+        type: boolean
 permissions:
   contents: read
   actions: read
@@ -78,6 +83,7 @@ jobs:
           FN_CAPTURE_DEVICE: ${{ matrix.device }}
           FN_CAPTURE_DRIVER: xctest
           FN_CAPTURE_LOCALE: ${{ inputs.capture_locale }}
+          FN_REDUCE_MOTION_DIAGNOSTIC: ${{ inputs.reduce_motion_diagnostic }}
         run: node scripts/release/capture-ios.mjs
       - name: Preserve encrypted native captures and diagnostics
         if: always()

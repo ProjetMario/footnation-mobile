@@ -13,6 +13,7 @@ const env={...process.env}; delete env.FN_IOS_SCREENSHOT_KEY; delete env.GITHUB_
 let log,key,phase='configuration',created=false;
 const devices=[];
 const useXCTest=process.env.FN_CAPTURE_DRIVER==='xctest';
+const reducedMotionDiagnostic=process.env.FN_REDUCE_MOTION_DIAGNOSTIC==='true';
 const xctestScript=path.join(scripts,'xctest','xctest.mjs');
 const xctestWork=path.join(work,'native-ui-driver');
 function run(command,args,{cwd=source,capture=false,allowFailure=false,commandEnv=env,timeoutMs=8*60*1000}={}) {
@@ -93,13 +94,14 @@ p=plistlib.load(open(sys.argv[1],'rb'))
 assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='19'
 print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
  const simulatorSigning=JSON.parse(run('python3',[path.join(scripts,'inspect-simulator-entitlements.py'),nativeApp,'8HYVPDRPT4',app.expo.version,String(app.expo.ios.buildNumber)],{capture:true}));
- const manifest={simulatorSigning,captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.5',buildNumber:'19',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
+ const manifest={simulatorSigning,reducedMotionDiagnostic,captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.5',buildNumber:'19',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
  const routes=[['06-profil','my-profile'],['02-recherche','search'],['03-clubs','clubs'],['04-opportunites','opportunities'],['05-matchs','matches'],['01-accueil','home']];
  if(!buildOnly){
  if(useXCTest){stage('prepare standalone XCTest UI runner');run(process.execPath,[xctestScript,'prepare','--work',xctestWork,'--demo',path.join(source,'release-private/demo.json')],{timeoutMs:12*60*1000});}
  else {stage('install native UI automation');run('curl',['--connect-timeout','20','--max-time','120','-fsSL','https://get.maestro.mobile.dev','-o',path.join(work,'install-maestro.sh')]);run('bash',[path.join(work,'install-maestro.sh')]);}
  for(const device of devices){
   stage('capture '+device.kind+' native interface');run('xcrun',['simctl','boot',device.udid]);run('xcrun',['simctl','bootstatus',device.udid,'-b']);
+  if(reducedMotionDiagnostic){stage('diagnostic reduced motion accessibility preference');run('xcrun',['simctl','spawn',device.udid,'defaults','write','com.apple.Accessibility','ReduceMotionEnabled','-bool','true']);}
   run('xcrun',['simctl','ui',device.udid,'appearance','light']);run('xcrun',['simctl','status_bar',device.udid,'override','--time','9:41','--dataNetwork','wifi','--wifiMode','active','--wifiBars','3','--batteryState','charged','--batteryLevel','100']);
   run('xcrun',['simctl','install',device.udid,nativeApp]);
   const container=run('xcrun',['simctl','get_app_container',device.udid,'com.footnation.app','data'],{capture:true}).trim();const storage=path.join(container,'Library/Application Support/com.footnation.app/RCTAsyncLocalStorage_V1');mkdirSync(storage,{recursive:true});const preferences={'footnation:language:v1':'fr','footnation:appearance:v1':'light'};if(/^[0-9a-f-]{36}$/.test(demo.userId||'')){preferences['footnation:first-login-onboarding:v1:'+demo.userId]='seen';preferences['footnation:invitation-prompt-until:v1:'+demo.userId]=String(Date.now()+7*86400000);}writeFileSync(path.join(storage,'manifest.json'),JSON.stringify(preferences));
