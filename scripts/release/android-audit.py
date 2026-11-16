@@ -148,9 +148,10 @@ try:
    route('my-profile')
  checks.append('authenticated-demo-profile')
  time.sleep(3);capture('02-profil')
- for name,link,expected in [('01-recherche','search','Rechercher'),('03-clubs','clubs','Clubs'),('04-opportunites','opportunities','Opportunités'),('05-matchs','matches','Matchs')]:
+ for name,link,expected in [('01-recherche','search','Rechercher'),('03-clubs','clubs','Clubs'),('04-opportunites','opportunities','Publier une annonce'),('05-matchs','matches','Matchs')]:
   stage=name
   route(link);dismiss_optional();wait_for(lambda n:expected.lower() in label(n).lower(),60,dismiss=True)
+  if link=='opportunities':wait_for(lambda n:n.get('content-desc')=='Voir l’annonce' and visible(n),20)
   if any(n.get('content-desc')=='Changer la langue' and visible(n) for n in tree().iter('node')):raise RuntimeError('Home remained visible after selecting '+link)
   time.sleep(5);capture(name)
  stage='home-controls'
