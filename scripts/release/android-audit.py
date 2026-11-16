@@ -32,7 +32,9 @@ def tree():
 def label(node):return (node.get('text','')+' '+node.get('content-desc','')).strip()
 def visible(node):
  v=list(map(int,re.findall(r'-?\d+',node.get('bounds',''))))
- return node.get('visible-to-user')=='true' and len(v)==4 and min(display_width,v[2])-max(0,v[0])>=80 and v[3]-v[1]>35 and v[1]>90 and v[3]<display_height-60
+ # Use device-independent hit target tolerances at both phone and tablet
+ # densities. A standard 44dp Back button is only 66px at 240dpi.
+ return node.get('visible-to-user')=='true' and len(v)==4 and min(display_width,v[2])-max(0,v[0])>=40 and v[3]-v[1]>24 and v[1]>60 and v[3]<display_height-40
 def tap(node):
  v=list(map(int,re.findall(r'-?\d+',node.get('bounds',''))))
  if len(v)!=4:raise RuntimeError('Missing bounds')
@@ -244,11 +246,14 @@ try:
  # Smallest widths of 720dp and 1067dp exercise tablet layouts on this emulator.
  route('search')
  adb('shell','wm','density','240');time.sleep(6)
+ # Android can recreate the activity after display-density changes and
+ # restore its original login intent. Navigate via the actual Back/tab UI.
+ route('search');wait_for(lambda n:n.get('content-desc')=='Mon profil' and visible(n),20)
  capture('tablet7-recherche')
  route('my-profile');time.sleep(3);capture('tablet7-profil')
  adb('shell','wm','size','1600x2560')
  display_width,display_height=1600,2560
- time.sleep(6);capture('tablet10-profil')
+ time.sleep(6);route('my-profile');time.sleep(3);capture('tablet10-profil')
  route('search');time.sleep(3);capture('tablet10-recherche')
  (root/'report.json').write_text(json.dumps({'passed':True,'checks':checks,'physicalDevice':False,'signature':'test debug signature derived from release AAB','storeImagesApproved':False}))
  print('Native Android navigation and captures completed.')
