@@ -458,7 +458,15 @@ final class FootNationCaptureTests: XCTestCase {
             requireTap("Partager", scroll: true)
             requireTap("Fermer le partage")
             requireTap("Ouvrir les commentaires", contains: true, scroll: true)
-            requireTap("Fermer les commentaires")
+            XCTAssertTrue(app.buttons["Publier le commentaire"].firstMatch.waitForExistence(timeout: 20), "Comments sheet did not open")
+            wait(3)
+            XCTAssertFalse(app.staticTexts["Les réactions aux commentaires sont temporairement indisponibles."].firstMatch.exists, "Comment reactions are unavailable")
+            // The compact close button is labelled "Fermer". The longer
+            // label belongs to the backdrop behind the preview and sheet.
+            requireTap("Fermer")
+            let closeDeadline = Date().addingTimeInterval(10)
+            while app.buttons["Publier le commentaire"].firstMatch.exists && Date() < closeDeadline { wait(0.5) }
+            XCTAssertFalse(app.buttons["Publier le commentaire"].firstMatch.exists, "Comments sheet did not close")
         }
         open("my-profile")
         requireProfile()
