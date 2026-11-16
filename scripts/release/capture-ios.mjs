@@ -142,7 +142,10 @@ finally {
   const appProcess=processes.split('\n').find(line=>/^\d+\s/.test(line)&&line.includes('UIKitApplication:com.footnation.app['));
   const pid=appProcess?.trim().split(/\s+/)[0];
   if(pid&&/^\d+$/.test(pid)) {
-   const debug=spawnSync('xcrun',['lldb','--batch','-p',pid,'-o','thread select 1','-o','thread backtrace','-o','expression -l objc++ -- @import UIKit','-o','expression -l objc++ -O -- [[(UIWindowScene *)[[UIApplication sharedApplication].connectedScenes anyObject] windows] valueForKey:@"recursiveDescription"]','-o','process detach'],{cwd:source,env,encoding:'utf8',timeout:55000,killSignal:'SIGKILL',maxBuffer:8*1024*1024});
+   // Inspect the actual UIKit hit target and ancestor recognizers on failure.
+   // No route, authentication state, gesture state or view is modified.
+   const hitProbe = `({ UIWindow *w = [(UIWindowScene *)[[UIApplication sharedApplication].connectedScenes anyObject] windows].firstObject; NSMutableArray *pending = [NSMutableArray arrayWithObject:w]; NSMutableString *report = [NSMutableString string]; while (pending.count) { UIView *v = pending.lastObject; [pending removeLastObject]; [pending addObjectsFromArray:v.subviews]; if ([v.accessibilityLabel isEqualToString:@"Se connecter"] && !v.hidden && v.alpha > 0) { CGRect f = [v convertRect:v.bounds toView:w]; CGPoint p = CGPointMake(CGRectGetMidX(f), CGRectGetMidY(f)); [report appendFormat:@"CONTROL %@ WINDOW_FRAME %@ HIT %@\\n", v, NSStringFromCGRect(f), [w hitTest:p withEvent:nil]]; for (UIView *a = v; a; a = a.superview) { [report appendFormat:@"ANCESTOR %@ ENABLED %d RECOGNIZERS %@\\n", a, a.userInteractionEnabled, a.gestureRecognizers]; } } } report; })`;
+   const debug=spawnSync('xcrun',['lldb','--batch','-p',pid,'-o','thread select 1','-o','thread backtrace','-o','expression -l objc++ -- @import UIKit','-o','expression -l objc++ -O -- '+hitProbe,'-o','expression -l objc++ -O -- [[(UIWindowScene *)[[UIApplication sharedApplication].connectedScenes anyObject] windows] valueForKey:@"recursiveDescription"]','-o','process detach'],{cwd:source,env,encoding:'utf8',timeout:120000,killSignal:'SIGKILL',maxBuffer:8*1024*1024});
    writeFileSync(path.join(work,device.kind+'-views.log'),((debug.stdout||'')+'\n'+(debug.stderr||'')+'\nDebugger status: '+debug.status+' '+(debug.error?.code||'')).slice(-8*1024*1024),{mode:0o600});
   }
  }catch{}
