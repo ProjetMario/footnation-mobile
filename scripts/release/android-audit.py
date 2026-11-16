@@ -113,7 +113,21 @@ def capture(name):
  (screens/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
  checks.append(name)
 def control(description,contains=False):
- return wait_for(lambda n:visible(n) and (description in n.get('content-desc','') if contains else n.get('content-desc')==description))
+ predicate=lambda n:visible(n) and (description in n.get('content-desc','') if contains else n.get('content-desc')==description)
+ wait_for(predicate)
+ candidates=[n for n in tree().iter('node') if predicate(n)]
+ def area(n):
+  x1,y1,x2,y2=map(int,re.findall(r'-?\d+',n.get('bounds','')))
+  return (x2-x1)*(y2-y1)
+ # A modal backdrop and its X button can share the same close label. Tap
+ # the actual compact button, not the backdrop centre covered by the sheet.
+ return min(candidates,key=area) if candidates else wait_for(predicate)
+def require_closed(description):
+ until=time.time()+12
+ while time.time()<until:
+  if not any(n.get('content-desc')==description and visible(n) for n in tree().iter('node')):return
+  time.sleep(0.5)
+ raise RuntimeError('Native sheet did not close: '+description)
 def video_progress():
  slider=wait_for(lambda n:n.get('content-desc')=='Position de la vidéo' and n.get('range-current') is not None,45)
  values={slider.get('range-current')}
@@ -187,12 +201,13 @@ try:
  route('home');tap(control('Voir tous les matchs'))
  wait_for(lambda n:n.get('text')=='Compétitions',30)
  route('home');checks.append('match-card-and-all-matches')
+ stage='publication-controls'
  # Read-only publication interactions: do not send comments or share to a person.
  for _ in range(2):
   tap(find_in_feed(lambda n:label(n)=='Partager'))
-  tap(wait_for(lambda n:'Fermer le partage' in label(n)))
+  tap(control('Fermer le partage'));require_closed('Fermer le partage')
   tap(find_in_feed(lambda n:'Ouvrir les commentaires' in label(n)))
-  tap(wait_for(lambda n:'Fermer les commentaires' in label(n)))
+  tap(control('Fermer les commentaires'));require_closed('Fermer les commentaires')
  checks.append('publication-share-and-comments-open-close-twice')
  stage='video-playback'
  route('shorts');video_progress()
