@@ -141,6 +141,15 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
  console.log(buildOnly?'Native simulator build encrypted and preserved for separate capture jobs.':'Genuine native screenshots encrypted; human review is required before App Store upload.');
 } catch { console.error('Native screenshots failed during: '+phase+'. Diagnostics encrypted.'); for(const device of devices){try{run('xcrun',['simctl','io',device.udid,'screenshot',path.join(output,device.kind+'-00-failure.png')],{allowFailure:true,timeoutMs:30000});}catch{}} process.exitCode=1; }
 finally {
+ for(const device of devices)if(process.exitCode && /controls|capture fr|capture en/.test(phase))try {
+  const processes=run('xcrun',['simctl','spawn',device.udid,'launchctl','list'],{capture:true,allowFailure:true,timeoutMs:15000});
+  const appProcess=processes.split('\n').find(line=>/^\d+\s/.test(line)&&line.includes('UIKitApplication:com.footnation.app['));
+  const pid=appProcess?.trim().split(/\s+/)[0];
+  if(pid&&/^\d+$/.test(pid)) {
+   const debug=run('xcrun',['lldb','--batch','-p',pid,'-o','thread select 1','-o','expression -l objc++ -- @import UIKit','-o','expression -l objc++ -O -- [[(UIWindowScene *)[[UIApplication sharedApplication].connectedScenes anyObject] windows] valueForKey:@"recursiveDescription"]','-o','process detach'],{capture:true,allowFailure:true,timeoutMs:40000});
+   writeFileSync(path.join(work,device.kind+'-views.log'),debug.slice(-8*1024*1024),{mode:0o600});
+  }
+ }catch{}
  for(const device of devices)try {
   const nativeLogs=run('xcrun',['simctl','spawn',device.udid,'log','show','--style','compact','--last','25m','--predicate','process == "FootNation" OR eventMessage CONTAINS[c] "RCTFabricModal" OR eventMessage CONTAINS[c] "already presenting"'],{capture:true,allowFailure:true,timeoutMs:30000});
   writeFileSync(path.join(work,device.kind+'-native.log'),nativeLogs.slice(-12*1024*1024),{mode:0o600});
