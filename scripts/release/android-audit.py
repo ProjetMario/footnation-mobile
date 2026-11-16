@@ -221,7 +221,13 @@ try:
   tap(find_in_feed(lambda n:label(n)=='Partager'))
   tap(control('Fermer le partage'));require_closed('Fermer le partage')
   tap(find_in_feed(lambda n:'Ouvrir les commentaires' in label(n)))
-  tap(control('Fermer les commentaires'));require_closed('Fermer les commentaires')
+  # The comments sheet exposes the compact X as "Fermer"; its backdrop
+  # has the longer label and is covered by the keyboard/preview container.
+  wait_for(lambda n:n.get('content-desc')=='Publier le commentaire',20)
+  time.sleep(3)
+  if any('temporairement indisponibles' in label(n) or 'Impossible de charger les commentaires' in label(n) for n in tree().iter('node')):
+   raise RuntimeError('Publication comments or reactions unavailable')
+  tap(control('Fermer'));require_closed('Publier le commentaire')
  checks.append('publication-share-and-comments-open-close-twice')
  stage='video-playback'
  route('shorts');video_progress()
