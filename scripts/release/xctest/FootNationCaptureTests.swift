@@ -8,7 +8,9 @@ import Vision
 final class FootNationCaptureTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.footnation.app")
     private let profileName = "Démo FootNation"
-    private var passwordPromptMayBePending = false
+    // A system Passwords sheet can appear well after authentication, including
+    // after this runner has reattached. Keep watching until it is observed.
+    private var passwordPromptMayBePending = true
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -31,9 +33,7 @@ final class FootNationCaptureTests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(seconds))
     }
 
-    @discardableResult
-    private func dismissPasswordSavePrompt() -> Bool {
-        guard passwordPromptMayBePending else { return false }
+    private func passwordPromptOnScreen() -> (visible: Bool, decline: CGPoint?) {
         // iOS 26 can expose the Passwords sheet visually while its remote AX
         // process no longer answers queries. Recognize only the observed system
         // prompt and its explicit decline button in the current framebuffer.
@@ -50,15 +50,26 @@ final class FootNationCaptureTests: XCTestCase {
                 let recognizedPrompt = observations.contains {
                     ["save password?", "save password ?", "enregistrer le mot de passe ?", "enregistrer ce mot de passe ?"].contains(normalized($0))
                 }
-                if recognizedPrompt, let decline = observations.first(where: {
+                let decline = observations.first(where: {
                     ["not now", "pas maintenant", "plus tard"].contains(normalized($0))
-                }) {
-                    let box = decline.boundingBox
-                    app.coordinate(withNormalizedOffset: CGVector(dx: box.midX, dy: 1 - box.midY)).tap()
-                    wait(1)
-                    return true
-                }
+                })
+                return (recognizedPrompt, recognizedPrompt ? decline.map {
+                    CGPoint(x: $0.boundingBox.midX, y: 1 - $0.boundingBox.midY)
+                } : nil)
             }
+        }
+        return (false, nil)
+    }
+
+    @discardableResult
+    private func dismissPasswordSavePrompt() -> Bool {
+        guard passwordPromptMayBePending else { return false }
+        if let decline = passwordPromptOnScreen().decline {
+            app.coordinate(withNormalizedOffset: CGVector(dx: decline.x, dy: decline.y)).tap()
+            wait(1)
+            // Do not disarm if the observed sheet has not actually disappeared.
+            passwordPromptMayBePending = passwordPromptOnScreen().visible
+            return true
         }
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         for context in [springboard, app] {
@@ -76,6 +87,7 @@ final class FootNationCaptureTests: XCTestCase {
                     // Never select Save or any sharing action.
                     button.tap()
                     wait(1)
+                    passwordPromptMayBePending = passwordPromptOnScreen().visible
                     return true
                 }
             }
@@ -84,6 +96,9 @@ final class FootNationCaptureTests: XCTestCase {
     }
 
     private func passwordSavePromptVisible() -> Bool {
+        // The remote Passwords AX process can be unavailable even while the
+        // sheet is plainly visible. Its actual pixels are authoritative here.
+        if passwordPromptOnScreen().visible { return true }
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let title = NSPredicate(format: "label CONTAINS[c] 'Save Password' OR label CONTAINS[c] 'mot de passe'")
         for context in [springboard, app] {
@@ -101,7 +116,8 @@ final class FootNationCaptureTests: XCTestCase {
         repeat {
             dismissPasswordSavePrompt()
             if !passwordSavePromptVisible() {
-                passwordPromptMayBePending = false
+                // Absence now does not prove that the delayed system prompt
+                // cannot arrive during the next navigation action.
                 return
             }
             wait(0.3)
@@ -417,8 +433,18 @@ final class FootNationCaptureTests: XCTestCase {
 
     private func requireTap(_ label: String, contains: Bool = false, scroll: Bool = false) {
         let predicate = NSPredicate(format: contains ? "label CONTAINS %@" : "label == %@", label)
+        let uniqueControls: Set<String> = [
+            "Changer la langue", "Ouvrir mon espace", "Messagerie",
+            "Voir tous les matchs", "Mettre le short en pause", "Reprendre le short"
+        ]
         for attempt in 0..<(scroll ? 22 : 8) {
-            let candidates = app.buttons.matching(predicate).allElementsBoundByIndex
+            dismissPasswordSavePrompt()
+            // Stop at the unique control rather than enumerating every button
+            // in the animated home feed. All taps and result assertions remain
+            // native; no animation or application behavior is disabled.
+            let query = app.buttons.matching(predicate)
+            let candidates = uniqueControls.contains(label) && !contains
+                ? [query.firstMatch] : query.allElementsBoundByIndex
             // A labelled backdrop may share the X button's close label. Its
             // centre is covered by the sheet, so prefer the compact control.
             if let button = candidates.filter({ $0.exists && $0.isHittable })
