@@ -24,9 +24,15 @@ function redact(text) {
 }
 function stage(value) { phase=value; console.log('XCTest fallback: '+value); }
 function run(cmd, args, timeout=120000) {
+ const started=Date.now();
  const result=spawnSync(cmd,args,{env,encoding:'utf8',timeout,killSignal:'SIGKILL',maxBuffer:64*1024*1024,cwd:work});
  if(work)writeFileSync(path.join(work,'redacted.log'),redact(result.stdout)+'\n'+redact(result.stderr),{flag:'a',mode:0o600});
- if(result.error||result.status!==0)throw Error('Command failed');
+ if(result.error||result.status!==0){
+  // Arguments can contain private fixture paths. Record only process outcome
+  // so an unresponsive CoreSimulator is distinguishable from a UI assertion.
+  if(work)writeFileSync(path.join(work,'redacted.log'),JSON.stringify({command:path.basename(cmd),elapsedMs:Date.now()-started,errorCode:result.error?.code||null,status:result.status,signal:result.signal})+'\n',{flag:'a',mode:0o600});
+  throw Error('Command failed');
+ }
  return result.stdout||'';
 }
 function allFiles(dir) { return readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?allFiles(path.join(dir,e.name)):[path.join(dir,e.name)]); }
@@ -79,7 +85,9 @@ try {
   credentials=JSON.parse(readFileSync(path.join(work,'private-demo.json'),'utf8'));
   const metadata=JSON.parse(readFileSync(path.join(work,'runner.json'),'utf8'));
   // Inspect the already installed binary; never install or rebuild FootNation.
+  stage('inspect installed application container');
   const appPath=run('xcrun',['simctl','get_app_container',options.udid,metadata.appBundle,'app']).trim();
+  stage('verify installed application identity');
   run('python3',['-c',"import plistlib,sys;p=plistlib.load(open(sys.argv[1],'rb'));assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='22'",path.join(appPath,'Info.plist')]);
   const stamp=options.mode+'-'+options.locale+'-'+options.device;
   // Keep patched file beside the original so __TESTROOT__ resolves identically.

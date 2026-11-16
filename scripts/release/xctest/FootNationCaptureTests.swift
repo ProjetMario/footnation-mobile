@@ -11,10 +11,17 @@ final class FootNationCaptureTests: XCTestCase {
     // A system Passwords sheet can appear well after authentication, including
     // after this runner has reattached. Keep watching until it is observed.
     private var passwordPromptMayBePending = true
+    private var passwordPromptReceipt: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("FootNationPasswordPromptDeclined")
+    }
 
     override func setUpWithError() throws {
         continueAfterFailure = false
         executionTimeAllowance = 420
+        // The login and audit run in separate XCTest processes on the same
+        // disposable device. Preserve only a verified system-sheet dismissal.
+        passwordPromptMayBePending = !FileManager.default.fileExists(atPath: passwordPromptReceipt.path)
         // The iOS 26 Passwords sheet is hosted by a separate system process.
         // Let XCTest resolve the actual interrupting element before inspecting
         // the application tree, which can otherwise time out on that process.
@@ -69,45 +76,21 @@ final class FootNationCaptureTests: XCTestCase {
             wait(1)
             // Do not disarm if the observed sheet has not actually disappeared.
             passwordPromptMayBePending = passwordPromptOnScreen().visible
+            if !passwordPromptMayBePending {
+                try? Data("declined".utf8).write(to: passwordPromptReceipt, options: .atomic)
+            }
             return true
         }
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        for context in [springboard, app] {
-            let alert = context.alerts.firstMatch
-            let passwordTitle = NSPredicate(format: "label CONTAINS[c] 'Save Password' OR label CONTAINS[c] 'mot de passe'")
-            let matches = alert.exists && (passwordTitle.evaluate(with: alert)
-                || alert.staticTexts.matching(passwordTitle).count > 0)
-            let exactTitle = context.staticTexts.matching(NSPredicate(format: "label IN %@", ["Save Password?", "Enregistrer le mot de passe ?", "Enregistrer ce mot de passe ?"])).firstMatch
-            let isObservedSheet = exactTitle.exists && exactTitle.isHittable
-            guard matches || isObservedSheet else { continue }
-            for label in ["Not Now", "Pas maintenant", "Plus tard"] {
-                let button = (matches ? alert.buttons : context.buttons)[label].firstMatch
-                if button.exists && button.isHittable {
-                    // Decline only this observed native password-save prompt.
-                    // Never select Save or any sharing action.
-                    button.tap()
-                    wait(1)
-                    passwordPromptMayBePending = passwordPromptOnScreen().visible
-                    return true
-                }
-            }
-        }
+        // Do not query the remote Passwords accessibility process after the
+        // framebuffer proved no matching prompt. iOS 26 can leave its AX server
+        // unavailable after dismissal and stall unrelated controls for minutes.
         return false
     }
 
     private func passwordSavePromptVisible() -> Bool {
         // The remote Passwords AX process can be unavailable even while the
         // sheet is plainly visible. Its actual pixels are authoritative here.
-        if passwordPromptOnScreen().visible { return true }
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let title = NSPredicate(format: "label CONTAINS[c] 'Save Password' OR label CONTAINS[c] 'mot de passe'")
-        for context in [springboard, app] {
-            let alert = context.alerts.firstMatch
-            if alert.exists && (title.evaluate(with: alert) || alert.staticTexts.matching(title).count > 0) { return true }
-            let exactTitle = context.staticTexts.matching(NSPredicate(format: "label IN %@", ["Save Password?", "Enregistrer le mot de passe ?", "Enregistrer ce mot de passe ?"])).firstMatch
-            if exactTitle.exists && exactTitle.isHittable { return true }
-        }
-        return false
+        return passwordPromptOnScreen().visible
     }
 
     private func clearPasswordPromptBeforeNavigation() {
@@ -174,6 +157,9 @@ final class FootNationCaptureTests: XCTestCase {
             // Cover a plain Pressable before a Link/asChild and before any
             // authentication/onboarding modal. This separates cold-launch
             // touch failures from post-login transition regressions.
+            // Exercise the first tap after the automatic ticker has started,
+            // independent of how quickly the test harness inspects the screen.
+            wait(20)
             requireTap("Changer la langue")
             requireTap("Fermer le choix de langue")
             print("Native guest language control opened and closed")
@@ -388,6 +374,8 @@ final class FootNationCaptureTests: XCTestCase {
     }
 
     func testAuthenticate() throws {
+        try? FileManager.default.removeItem(at: passwordPromptReceipt)
+        passwordPromptMayBePending = true
         let bundle = Bundle(for: FootNationCaptureTests.self)
         guard let url = bundle.url(forResource: "private-demo", withExtension: "json"),
               let object = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
