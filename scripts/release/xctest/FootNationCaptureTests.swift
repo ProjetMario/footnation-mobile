@@ -1,5 +1,6 @@
 import XCTest
 import UIKit
+import Vision
 
 // This runner controls the already installed Release app. It has no application
 // source dependency, authentication shortcut, or synthetic content.
@@ -31,6 +32,32 @@ final class FootNationCaptureTests: XCTestCase {
 
     @discardableResult
     private func dismissPasswordSavePrompt() -> Bool {
+        // iOS 26 can expose the Passwords sheet visually while its remote AX
+        // process no longer answers queries. Recognize only the observed system
+        // prompt and its explicit decline button in the current framebuffer.
+        // This never guesses a coordinate or selects Save.
+        if let image = XCUIScreen.main.screenshot().image.cgImage {
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = ["en-US", "fr-FR"]
+            if (try? VNImageRequestHandler(cgImage: image).perform([request])) != nil {
+                let observations = request.results ?? []
+                let normalized: (VNRecognizedTextObservation) -> String = {
+                    ($0.topCandidates(1).first?.string ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                let recognizedPrompt = observations.contains {
+                    ["save password?", "save password ?", "enregistrer le mot de passe ?", "enregistrer ce mot de passe ?"].contains(normalized($0))
+                }
+                if recognizedPrompt, let decline = observations.first(where: {
+                    ["not now", "pas maintenant", "plus tard"].contains(normalized($0))
+                }) {
+                    let box = decline.boundingBox
+                    app.coordinate(withNormalizedOffset: CGVector(dx: box.midX, dy: 1 - box.midY)).tap()
+                    wait(1)
+                    return true
+                }
+            }
+        }
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         for context in [springboard, app] {
             let alert = context.alerts.firstMatch
