@@ -37,7 +37,18 @@ public final class Hierarchy extends Instrumentation {
       if (tapDescription != null) {
         if (!java.util.Arrays.asList("Clubs", "Opportunités", "Matches", "Matchs").contains(tapDescription))
           throw new IllegalArgumentException("Unexpected test destination");
-        Rect target = findTarget(root, tapDescription, 0);
+        Rect target = null;
+        // UiAutomation may initially expose a cached window before its app
+        // hierarchy arrives. Refresh until the real target is present.
+        for (int attempt=0; target == null && attempt<25; attempt++) {
+          root.refresh();
+          target = findTarget(root, tapDescription, 0);
+          if (target == null) {
+            Thread.sleep(80);
+            AccessibilityNodeInfo fresh = automation.getRootInActiveWindow();
+            if (fresh != null) { root.recycle(); root = fresh; }
+          }
+        }
         if (target == null) throw new IllegalStateException("Visible navigation target unavailable");
         long now = SystemClock.uptimeMillis();
         MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, target.centerX(), target.centerY(), 0);

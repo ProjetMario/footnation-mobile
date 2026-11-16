@@ -45,7 +45,8 @@ def wait_for(test,seconds=40,dismiss=False):
   time.sleep(1)
  raise RuntimeError('Expected native control not found')
 def find_in_feed(test):
- for _ in range(8):
+ # Home can start with five full-height news cards before member publications.
+ for _ in range(18):
   found=next((n for n in tree().iter('node') if test(n) and visible(n)),None)
   if found is not None:return found
   adb('shell','input','swipe','540','1650','540','650','450');time.sleep(2)
