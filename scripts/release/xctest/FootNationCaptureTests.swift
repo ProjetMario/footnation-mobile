@@ -159,17 +159,34 @@ final class FootNationCaptureTests: XCTestCase {
             // The app's normal successful-login destination is Shorts; the
             // subsequent profile proof uses the real bottom tab from there.
             let deadline = Date().addingTimeInterval(35)
+            var loginAttempts = 0
             while Date() < deadline {
                 let email = app.textFields["Adresse e-mail"].firstMatch
                 let password = app.secureTextFields["Mot de passe"].firstMatch
                 if email.exists && password.exists { return }
-                if tap(["Se connecter", "Log in", "Se connecter à FootNation"]) {
+                if let loginLink = control(["Se connecter", "Log in", "Se connecter à FootNation"]) {
+                    if loginAttempts == 0 {
+                        loginLink.tap()
+                    } else if loginAttempts == 1 {
+                        // Compare a normal tap with a brief deliberate press on
+                        // the same observed control. No accessibility action or
+                        // route injection bypasses the app's real touch path.
+                        print("Landing touch diagnostic: frame \(loginLink.frame)")
+                        loginLink.press(forDuration: 0.15)
+                    } else if loginAttempts == 2 {
+                        print("Landing hierarchy before scroll: \(app.debugDescription)")
+                        app.swipeUp()
+                    } else {
+                        loginLink.tap()
+                    }
+                    loginAttempts += 1
                     wait(2)
                     continue
                 }
                 app.swipeUp()
                 wait(1)
             }
+            print("Landing hierarchy after touches: \(app.debugDescription)")
             XCTFail("Native login controls were not reachable from the landing page")
             return
         }
