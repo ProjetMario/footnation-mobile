@@ -396,7 +396,10 @@ final class FootNationCaptureTests: XCTestCase {
         let predicate = NSPredicate(format: contains ? "label CONTAINS %@" : "label == %@", label)
         for attempt in 0..<(scroll ? 22 : 8) {
             let candidates = app.buttons.matching(predicate).allElementsBoundByIndex
-            if let button = candidates.first(where: { $0.exists && $0.isHittable }) {
+            // A labelled backdrop may share the X button's close label. Its
+            // centre is covered by the sheet, so prefer the compact control.
+            if let button = candidates.filter({ $0.exists && $0.isHittable })
+                .min(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) {
                 button.tap()
                 wait(1.5)
                 return
