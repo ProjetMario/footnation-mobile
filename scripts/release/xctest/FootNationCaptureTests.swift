@@ -155,6 +155,12 @@ final class FootNationCaptureTests: XCTestCase {
         }
 
         if route == "login?next=%2Fsearch" {
+            // Cover a plain Pressable before a Link/asChild and before any
+            // authentication/onboarding modal. This separates cold-launch
+            // touch failures from post-login transition regressions.
+            requireTap("Changer la langue")
+            requireTap("Fermer le choix de langue")
+            print("Native guest language control opened and closed")
             // Normal landing navigation intentionally has no synthetic `next`.
             // The app's normal successful-login destination is Shorts; the
             // subsequent profile proof uses the real bottom tab from there.
