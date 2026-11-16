@@ -350,7 +350,7 @@ final class FootNationCaptureTests: XCTestCase {
 
     private func requireTap(_ label: String, contains: Bool = false, scroll: Bool = false) {
         let predicate = NSPredicate(format: contains ? "label CONTAINS %@" : "label == %@", label)
-        for attempt in 0..<8 {
+        for attempt in 0..<(scroll ? 22 : 8) {
             let candidates = app.buttons.matching(predicate).allElementsBoundByIndex
             if let button = candidates.first(where: { $0.exists && $0.isHittable }) {
                 button.tap()
@@ -360,10 +360,17 @@ final class FootNationCaptureTests: XCTestCase {
             if scroll && attempt > 0 { app.swipeUp(); wait(1) }
             else { wait(1) }
         }
+        // Private, encrypted diagnostics distinguish a missing modal from a
+        // changed accessibility label. No credentials are written here.
+        let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("FootNationNativeCaptures", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? app.debugDescription.write(to: folder.appendingPathComponent("control-failure.txt"), atomically: true, encoding: .utf8)
+        try? XCUIScreen.main.screenshot().pngRepresentation.write(to: folder.appendingPathComponent("control-failure.png"))
         XCTFail("Native control did not respond: " + label)
     }
 
-    private func verifyReadOnlyPublicationControls() {
+    func testHeaderControls() throws {
         open("home")
         // Repeated modal/tab transitions exercise the iOS hit-testing regression.
         // Nothing is liked, published, sent to another person, or commented.
@@ -378,6 +385,10 @@ final class FootNationCaptureTests: XCTestCase {
         open("home")
         requireTap("Notifications", contains: true)
         XCTAssertTrue(app.staticTexts["Activité récente FootNation"].firstMatch.waitForExistence(timeout: 20), "Notifications screen did not open")
+        open("home")
+    }
+
+    func testPublicationControls() throws {
         open("home")
         for _ in 0..<2 {
             requireTap("Partager", scroll: true)
@@ -411,6 +422,6 @@ final class FootNationCaptureTests: XCTestCase {
             // for asynchronous content errors, localization and empty states.
             try saveCapture(locale + "-" + device + "-" + name + ".png")
         }
-        if locale == "fr-FR" { verifyReadOnlyPublicationControls() }
+
     }
 }

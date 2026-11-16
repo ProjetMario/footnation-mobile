@@ -75,7 +75,7 @@ try {
   writeFileSync(path.join(work,'runner.json'),JSON.stringify({schema:1,xctestrun:candidates[0],runnerBundle:'com.footnation.captureUITests.xctrunner',appBundle:'com.footnation.app'}),{mode:0o600});
   console.log('Standalone UI runner prepared; FootNation was not compiled or launched.');
  } else if(mode==='run') {
-  if(process.platform!=='darwin'||!/^[A-F0-9-]{36}$/i.test(options.udid||'')||!['login','capture'].includes(options.mode)||!['fr-FR','en-US'].includes(options.locale)||!['iphone','ipad'].includes(options.device)||!options.output||!path.isAbsolute(options.output))throw Error('Invalid run parameters');
+  if(process.platform!=='darwin'||!/^[A-F0-9-]{36}$/i.test(options.udid||'')||!['login','capture','header','publication'].includes(options.mode)||!['fr-FR','en-US'].includes(options.locale)||!['iphone','ipad'].includes(options.device)||!options.output||!path.isAbsolute(options.output))throw Error('Invalid run parameters');
   credentials=JSON.parse(readFileSync(path.join(work,'private-demo.json'),'utf8'));
   const metadata=JSON.parse(readFileSync(path.join(work,'runner.json'),'utf8'));
   // Inspect the already installed binary; never install or rebuild FootNation.
@@ -99,6 +99,7 @@ try {
    try {
     const partialContainer=run('xcrun',['simctl','get_app_container',options.udid,metadata.runnerBundle,'data'],20000).trim();
     const partialDirectory=path.join(partialContainer,'Documents/FootNationNativeCaptures');
+    for(const name of ['control-failure.txt','control-failure.png'])if(existsSync(path.join(partialDirectory,name)))cpSync(path.join(partialDirectory,name),path.join(options.output,options.device+'-'+name));
     if(existsSync(partialDirectory)) {
      mkdirSync(options.output,{recursive:true,mode:0o700});
      const preserved=[];
@@ -118,6 +119,10 @@ try {
    throw failure;
   }
   const container=run('xcrun',['simctl','get_app_container',options.udid,metadata.runnerBundle,'data']).trim();
+  if(['header','publication'].includes(options.mode)) {
+   writeFileSync(path.join(options.output,'xctest-'+stamp+'.json'),JSON.stringify({passed:true,mode:options.mode,appBundle:metadata.appBundle,native:true}),{mode:0o600});
+   console.log('Native '+options.mode+' controls passed.');process.exit(0);
+  }
   const captures=path.join(container,'Documents/FootNationNativeCaptures');
   const files=readdirSync(captures).filter(name=>options.mode==='login'?name==='authenticated-profile.png':name.startsWith(options.locale+'-'+options.device+'-')&&name.endsWith('.png')).sort();
   if(files.length!==(options.mode==='login'?1:6))throw Error('Incomplete screenshot set');
