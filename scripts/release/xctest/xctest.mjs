@@ -75,7 +75,7 @@ try {
   writeFileSync(path.join(work,'runner.json'),JSON.stringify({schema:1,xctestrun:candidates[0],runnerBundle:'com.footnation.captureUITests.xctrunner',appBundle:'com.footnation.app'}),{mode:0o600});
   console.log('Standalone UI runner prepared; FootNation was not compiled or launched.');
  } else if(mode==='run') {
-  if(process.platform!=='darwin'||!/^[A-F0-9-]{36}$/i.test(options.udid||'')||!['login','capture','header','publication','matches','video'].includes(options.mode)||!['fr-FR','en-US'].includes(options.locale)||!['iphone','ipad'].includes(options.device)||!options.output||!path.isAbsolute(options.output))throw Error('Invalid run parameters');
+  if(process.platform!=='darwin'||!/^[A-F0-9-]{36}$/i.test(options.udid||'')||!['login','capture','header','publication','matches','video','audit'].includes(options.mode)||!['fr-FR','en-US'].includes(options.locale)||!['iphone','ipad'].includes(options.device)||!options.output||!path.isAbsolute(options.output))throw Error('Invalid run parameters');
   credentials=JSON.parse(readFileSync(path.join(work,'private-demo.json'),'utf8'));
   const metadata=JSON.parse(readFileSync(path.join(work,'runner.json'),'utf8'));
   // Inspect the already installed binary; never install or rebuild FootNation.
@@ -90,7 +90,7 @@ try {
   let failure;
   // Native navigation now uses only real buttons; no host URL bridge runs.
   try {
-   run('xcodebuild',['test-without-building','-xctestrun',patched,'-destination','platform=iOS Simulator,id='+options.udid,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-resultBundlePath',resultPath,'-test-timeouts-enabled','YES','-default-test-execution-time-allowance','420','-maximum-test-execution-time-allowance','480'],10*60000);
+   run('xcodebuild',['test-without-building','-xctestrun',patched,'-destination','platform=iOS Simulator,id='+options.udid,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-resultBundlePath',resultPath,'-test-timeouts-enabled','YES','-default-test-execution-time-allowance',options.mode==='audit'?'900':'420','-maximum-test-execution-time-allowance',options.mode==='audit'?'1000':'480'],(options.mode==='audit'?20:10)*60000);
   } catch(e) { failure=e; }
   finally { rmSync(resultPath,{recursive:true,force:true}); rmSync(path.join(work,'DerivedData/Logs/Test'),{recursive:true,force:true}); }
   if(failure) {
@@ -99,7 +99,7 @@ try {
    try {
     const partialContainer=run('xcrun',['simctl','get_app_container',options.udid,metadata.runnerBundle,'data'],20000).trim();
     const partialDirectory=path.join(partialContainer,'Documents/FootNationNativeCaptures');
-    for(const name of ['control-failure.txt','control-failure.png'])if(existsSync(path.join(partialDirectory,name)))cpSync(path.join(partialDirectory,name),path.join(options.output,options.device+'-'+name));
+    for(const name of ['control-failure.txt','control-failure.png','native-checks.json'])if(existsSync(path.join(partialDirectory,name)))cpSync(path.join(partialDirectory,name),path.join(options.output,options.device+'-'+name));
     if(existsSync(partialDirectory)) {
      mkdirSync(options.output,{recursive:true,mode:0o700});
      const preserved=[];
@@ -124,6 +124,7 @@ try {
    console.log('Native '+options.mode+' controls passed.');process.exit(0);
   }
   const captures=path.join(container,'Documents/FootNationNativeCaptures');
+  if(options.mode==='audit')cpSync(path.join(captures,'native-checks.json'),path.join(options.output,options.device+'-native-checks.json'));
   const files=readdirSync(captures).filter(name=>options.mode==='login'?name==='authenticated-profile.png':name.startsWith(options.locale+'-'+options.device+'-')&&name.endsWith('.png')).sort();
   if(files.length!==(options.mode==='login'?1:6))throw Error('Incomplete screenshot set');
   mkdirSync(options.output,{recursive:true,mode:0o700});

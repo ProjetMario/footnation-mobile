@@ -114,17 +114,13 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
   maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- extendedWaitUntil:\n    visible: ".*Démo FootNation.*"\n    timeout: 60000\n`,device.kind+'-authenticated-profile');
   }
   if(!useXCTest)screenshot(device.udid,device.kind+'-00-authenticated-profile.png');
-  if(useXCTest)for(const mode of ['header','matches','publication','video']) {
-   stage('verify native '+device.kind+' '+mode+' controls');
-   run(process.execPath,[xctestScript,'run','--work',xctestWork,'--udid',device.udid,'--mode',mode,'--locale','fr-FR','--device',device.kind,'--output',output],{timeoutMs:12*60*1000});
-  }
   for(const locale of captureLocales) {
    if(locale==='en-US') {
     run('xcrun',['simctl','terminate',device.udid,'com.footnation.app'],{allowFailure:true});
     const settings=JSON.parse(readFileSync(path.join(storage,'manifest.json'),'utf8'));settings['footnation:language:v1']='en';writeFileSync(path.join(storage,'manifest.json'),JSON.stringify(settings));
     run('xcrun',['simctl','launch',device.udid,'com.footnation.app','-AppleLanguages','(en)','-AppleLocale','en_US']);await wait(10000);
    }
-   if(useXCTest){stage('capture '+locale+' '+device.kind+' with native XCTest');run(process.execPath,[xctestScript,'run','--work',xctestWork,'--udid',device.udid,'--mode','capture','--locale',locale,'--device',device.kind,'--output',output],{timeoutMs:12*60*1000});}
+   if(useXCTest){const mode=locale==='fr-FR'?'audit':'capture';stage('capture '+locale+' '+device.kind+' with native XCTest and controls');run(process.execPath,[xctestScript,'run','--work',xctestWork,'--udid',device.udid,'--mode',mode,'--locale',locale,'--device',device.kind,'--output',output],{timeoutMs:(mode==='audit'?22:12)*60*1000});}
    for(const [name,route] of routes){
     if(!useXCTest){run('xcrun',['simctl','openurl',device.udid,'footnation://'+route]);await wait(18000);
     if(route==='home')maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- tapOn:\n    text: "Close invitation"\n    optional: true\n- tapOn:\n    text: "Later"\n    optional: true\n`,device.kind+'-dismiss',true);await wait(3000);

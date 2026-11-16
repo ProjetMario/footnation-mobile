@@ -491,6 +491,26 @@ final class FootNationCaptureTests: XCTestCase {
         requireVideoProgress()
     }
 
+    func testReleaseAudit() throws {
+        // One UI-test session avoids repeatedly interrupting the native app
+        // between related checks. Every check still uses real touch input.
+        executionTimeAllowance = 900
+        var completed: [String] = []
+        let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("FootNationNativeCaptures", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        func record(_ name: String) throws {
+            completed.append(name)
+            try JSONSerialization.data(withJSONObject: ["completed": completed, "native": true])
+                .write(to: directory.appendingPathComponent("native-checks.json"), options: .atomic)
+        }
+        try testHeaderControls(); try record("header")
+        try testMatchControls(); try record("matches")
+        try testPublicationControls(); try record("publication")
+        try testVideoPlayback(); try record("video")
+        try testCapture(); try record("captures")
+    }
+
     func testCapture() throws {
         let env = ProcessInfo.processInfo.environment
         guard let locale = env["FN_CAPTURE_LOCALE"], ["fr-FR", "en-US"].contains(locale),
