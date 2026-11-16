@@ -56,6 +56,18 @@ def text(value):
  time.sleep(0.7)
  adb('shell','input','text',shlex.quote(value.replace(' ','%s')))
  time.sleep(0.4)
+def focus_input(description):
+ # Wait for the real TextInput to own focus before sending keyboard events.
+ # A cold emulator can still be laying out the login card after its title
+ # appears. Retarget the current bounds instead of typing into an unfocused UI.
+ for _ in range(3):
+  field=find_in_feed(lambda n:n.get('class')=='android.widget.EditText' and n.get('content-desc')==description)
+  tap(field)
+  try:
+   wait_for(lambda n:n.get('class')=='android.widget.EditText' and n.get('content-desc')==description and n.get('focused')=='true',8)
+   return
+  except RuntimeError:time.sleep(1)
+ raise RuntimeError('Native input did not acquire focus: '+description)
 def route(value):
  if value.startswith('login?'):
   adb('shell','am','start','-W','-a','android.intent.action.VIEW','-d',shlex.quote('footnation://'+value),'com.footnation.app')
@@ -124,12 +136,12 @@ try:
  route('login?next=%2Fsearch')
  wait_for(lambda n:'Connexion' in label(n),60)
  stage='enter-email'
- tap(find_in_feed(lambda n:n.get('class')=='android.widget.EditText' and n.get('content-desc')=='Adresse e-mail'))
+ focus_input('Adresse e-mail')
  text(private['email']);adb('shell','input','keyevent','4')
  email_field=next((n for n in tree().iter('node') if n.get('class')=='android.widget.EditText' and n.get('content-desc')=='Adresse e-mail'),None)
  if email_field is None or email_field.get('text')!=private['email']:raise RuntimeError('Native email entry was not confirmed')
  stage='enter-password'
- tap(find_in_feed(lambda n:n.get('class')=='android.widget.EditText' and 'Mot de passe' in n.get('content-desc','')))
+ focus_input('Mot de passe')
  text(private['password']);adb('shell','input','keyevent','4')
  password_field=next((n for n in tree().iter('node') if n.get('class')=='android.widget.EditText' and n.get('content-desc')=='Mot de passe'),None)
  if password_field is None or len(password_field.get('text',''))!=len(private['password']):raise RuntimeError('Native password entry was not confirmed')

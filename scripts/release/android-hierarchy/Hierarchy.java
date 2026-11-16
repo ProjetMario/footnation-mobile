@@ -105,6 +105,7 @@ public final class Hierarchy extends Instrumentation {
     xml.attribute(null, "bounds", "[" + bounds.left + "," + bounds.top + "][" + bounds.right + "," + bounds.bottom + "]");
     xml.attribute(null, "clickable", String.valueOf(node.isClickable()));
     xml.attribute(null, "selected", String.valueOf(node.isSelected()));
+    xml.attribute(null, "focused", String.valueOf(node.isFocused()));
     xml.attribute(null, "visible-to-user", String.valueOf(node.isVisibleToUser()));
     AccessibilityNodeInfo.RangeInfo range = node.getRangeInfo();
     if (range != null) {
