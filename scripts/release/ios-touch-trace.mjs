@@ -31,6 +31,14 @@ patch('Libraries/Components/ScrollView/ScrollView.js',
   'if (this._isAnimating()) {\n        return true;',
   'global.nativeLoggingHook?.("FN_DIAG_SCROLL_CAPTURE " + !!this.props.horizontal + " " + this._isAnimating(), 3);\n' +
   '      if (this._isAnimating()) {\n        return true;');
+patch('Libraries/Components/ScrollView/ScrollView.js',
+  '_handleScrollShouldSetResponder: (e: ScrollEvent) => boolean = (e: ScrollEvent) => {',
+  '_handleScrollShouldSetResponder: (e: ScrollEvent) => boolean = (e: ScrollEvent) => {\n' +
+  '    if (this._isTouching) global.nativeLoggingHook?.("FN_DIAG_SCROLL_TRANSFER " + !!this.props.horizontal + " " + !!this.props.disableScrollViewPanResponder + " " + (e.target === this.getNativeScrollRef()) + " " + e.nativeEvent?.target, 3);');
+patch('Libraries/Components/ScrollView/ScrollView.js',
+  'this._lastMomentumScrollEndTime = global.performance.now();',
+  'this._lastMomentumScrollEndTime = global.performance.now();\n' +
+  '    if (this._isTouching) global.nativeLoggingHook?.("FN_DIAG_SCROLL_END_TOUCH " + !!this.props.horizontal + " " + (e.target === this.getNativeScrollRef()) + " " + e.nativeEvent?.target, 3);');
 patch('Libraries/Pressability/Pressability.js',
   'this._performTransitionSideEffects(prevState, nextState, signal, event);',
   'global.nativeLoggingHook?.("FN_DIAG_PRESSABILITY " + prevState + " " + nextState + " " + signal + " " + event?.nativeEvent?.target, 3);\n' +
