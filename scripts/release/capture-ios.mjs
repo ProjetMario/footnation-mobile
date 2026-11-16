@@ -14,6 +14,7 @@ let log,key,phase='configuration',created=false;
 const devices=[];
 const useXCTest=process.env.FN_CAPTURE_DRIVER==='xctest';
 const reducedMotionDiagnostic=process.env.FN_REDUCE_MOTION_DIAGNOSTIC==='true';
+const touchTraceDiagnostic=process.env.FN_TOUCH_TRACE_DIAGNOSTIC==='true';
 const xctestScript=path.join(scripts,'xctest','xctest.mjs');
 const xctestWork=path.join(work,'native-ui-driver');
 function run(command,args,{cwd=source,capture=false,allowFailure=false,commandEnv=env,timeoutMs=8*60*1000}={}) {
@@ -88,12 +89,25 @@ with open(p,'wb') as f:plistlib.dump(d,f)
   run('tar',['-czf',path.join(work,'simulator-app.tar.gz'),'-C',products,appName]);writeFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'),encrypt(readFileSync(path.join(work,'simulator-app.tar.gz')),key));
  }
  nativeArchiveSha256 ||= createHash('sha256').update(readFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'))).digest('hex');
+ if(touchTraceDiagnostic){
+  if(!reuse)throw Error('Touch tracing requires an existing simulator build');
+  stage('derive diagnostic-only JavaScript bundle with touch tracing');
+  run('npm',['ci','--include=dev','--legacy-peer-deps','--no-audit','--no-fund']);
+  run(process.execPath,[path.join(scripts,'ios-touch-trace.mjs'),source]);
+  run('npx',['--no-install','expo','export:embed','--platform','ios','--dev','false','--entry-file','node_modules/expo-router/entry.js','--bundle-output',path.join(nativeApp,'main.jsbundle'),'--assets-dest',nativeApp,'--bytecode'],{timeoutMs:12*60*1000});
+  // Re-sign only this disposable simulator copy after replacing JavaScript.
+  // The original encrypted binary remains unchanged and distribution never
+  // consumes this derived product. Simulated keychain sections are preserved.
+  run('codesign',['--force','--sign','-',nativeApp]);
+  writeFileSync(path.join(output,'touch-trace-receipt.json'),readFileSync(path.join(source,'touch-trace-receipt.json')));
+ }
  stage('verify native simulator identity and signing');
  const nativeIdentity=JSON.parse(run('python3',['-c',`import plistlib,json,sys
 p=plistlib.load(open(sys.argv[1],'rb'))
 assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='19'
 print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
  const simulatorSigning=JSON.parse(run('python3',[path.join(scripts,'inspect-simulator-entitlements.py'),nativeApp,'8HYVPDRPT4',app.expo.version,String(app.expo.ios.buildNumber)],{capture:true}));
+ if(touchTraceDiagnostic)simulatorSigning.method='Diagnostic-only JavaScript trace derived from existing simulator binary; simulator copy re-signed ad hoc, never a release candidate';
  const manifest={simulatorSigning,reducedMotionDiagnostic,captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.5',buildNumber:'19',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
  const routes=[['06-profil','my-profile'],['02-recherche','search'],['03-clubs','clubs'],['04-opportunites','opportunities'],['05-matchs','matches'],['01-accueil','home']];
  if(!buildOnly){
