@@ -51,11 +51,18 @@ def find_in_feed(test):
   if found is not None:return found
   adb('shell','input','swipe','540','1650','540','650','450');time.sleep(2)
  raise RuntimeError('Publication controls unavailable in feed')
-def text(value):
+def text(value,description,secure=False):
  if not value.isascii() or '\n' in value:raise RuntimeError('Unsupported test input')
  time.sleep(0.7)
- adb('shell','input','text',shlex.quote(value.replace(' ','%s')))
- time.sleep(0.4)
+ # A single fast ADB key stream can outrun a controlled input on a cold
+ # emulator. Type as a person does and wait for the complete rendered value
+ # before dismissing the keyboard. Never print credentials or their prefixes.
+ for character in value:
+  adb('shell','input','text',shlex.quote(character.replace(' ','%s')))
+  time.sleep(0.12)
+ wait_for(lambda n:n.get('class')=='android.widget.EditText'
+  and n.get('content-desc')==description
+  and (len(n.get('text',''))==len(value) if secure else n.get('text')==value),15)
 def focus_input(description):
  # Wait for the real TextInput to own focus before sending keyboard events.
  # A cold emulator can still be laying out the login card after its title
@@ -151,12 +158,12 @@ try:
  wait_for(lambda n:'Connexion' in label(n),60)
  stage='enter-email'
  focus_input('Adresse e-mail')
- text(private['email']);adb('shell','input','keyevent','4')
+ text(private['email'],'Adresse e-mail');adb('shell','input','keyevent','4')
  email_field=next((n for n in tree().iter('node') if n.get('class')=='android.widget.EditText' and n.get('content-desc')=='Adresse e-mail'),None)
  if email_field is None or email_field.get('text')!=private['email']:raise RuntimeError('Native email entry was not confirmed')
  stage='enter-password'
  focus_input('Mot de passe')
- text(private['password']);adb('shell','input','keyevent','4')
+ text(private['password'],'Mot de passe',secure=True);adb('shell','input','keyevent','4')
  password_field=next((n for n in tree().iter('node') if n.get('class')=='android.widget.EditText' and n.get('content-desc')=='Mot de passe'),None)
  if password_field is None or len(password_field.get('text',''))!=len(private['password']):raise RuntimeError('Native password entry was not confirmed')
  stage='submit-login'
