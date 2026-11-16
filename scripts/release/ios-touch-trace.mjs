@@ -22,16 +22,17 @@ function patch(file, before, after) {
   const hash = data => createHash('sha256').update(data).digest('hex');
   receipt.push({file, originalSha256:hash(original), diagnosticSha256:hash(modified)});
 }
+// Native level 3 persists in the simulator unified log; bypass console/Sentry.
 patch('Libraries/Renderer/implementations/ReactFabric-prod.js',
   'function dispatchEvent(target, topLevelType, nativeEvent) {',
   'function dispatchEvent(target, topLevelType, nativeEvent) {\n' +
-  '  if (/touch/i.test(topLevelType)) console.info("FN_DIAG_FABRIC", topLevelType, nativeEvent?.target);');
+  '  if (/touch/i.test(topLevelType)) global.nativeLoggingHook?.("FN_DIAG_FABRIC " + topLevelType + " " + nativeEvent?.target, 3);');
 patch('Libraries/Components/ScrollView/ScrollView.js',
   'if (this._isAnimating()) {\n        return true;',
-  'console.info("FN_DIAG_SCROLL_CAPTURE", !!this.props.horizontal, this._isAnimating());\n' +
+  'global.nativeLoggingHook?.("FN_DIAG_SCROLL_CAPTURE " + !!this.props.horizontal + " " + this._isAnimating(), 3);\n' +
   '      if (this._isAnimating()) {\n        return true;');
 patch('Libraries/Pressability/Pressability.js',
   'this._performTransitionSideEffects(prevState, nextState, signal, event);',
-  'console.info("FN_DIAG_PRESSABILITY", prevState, nextState, signal);\n' +
+  'global.nativeLoggingHook?.("FN_DIAG_PRESSABILITY " + prevState + " " + nextState + " " + signal, 3);\n' +
   '      this._performTransitionSideEffects(prevState, nextState, signal, event);');
 writeFileSync(path.join(source, 'touch-trace-receipt.json'), JSON.stringify({diagnosticOnly:true, files:receipt}));
