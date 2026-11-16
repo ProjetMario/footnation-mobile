@@ -36,7 +36,8 @@ patch('Libraries/Pressability/Pressability.js',
   'global.nativeLoggingHook?.("FN_DIAG_PRESSABILITY " + prevState + " " + nextState + " " + signal + " " + event?.nativeEvent?.target, 3);\n' +
   '      this._performTransitionSideEffects(prevState, nextState, signal, event);');
 patch('Libraries/Pressability/Pressability.js',
-  '          onPress(event);',
+  '            SoundManager.playTouchSound();\n          }\n          onPress(event);',
+  '            SoundManager.playTouchSound();\n          }\n' +
   '          global.nativeLoggingHook?.("FN_DIAG_PRESS_CALLBACK " + event?.nativeEvent?.target, 3);\n' +
   '          onPress(event);');
 writeFileSync(path.join(source, 'touch-trace-receipt.json'), JSON.stringify({diagnosticOnly:true, files:receipt}));

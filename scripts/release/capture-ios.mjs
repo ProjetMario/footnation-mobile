@@ -40,7 +40,7 @@ try {
  const buildEnv=JSON.parse(readFileSync(path.join(source,'release-private/build-env.json')));
  for(const [name,value] of Object.entries(buildEnv)){if(!/^EXPO_PUBLIC_[A-Z0-9_]+$/.test(name)||typeof value!=='string')throw Error('Unexpected build setting');env[name]=value;}
  Object.assign(env,{CI:'1',EXPO_NO_TELEMETRY:'1',EXPO_NO_DOTENV:'1',EXPO_PUBLIC_SUPPORTERS_ENABLED:'false',EAS_BUILD_PLATFORM:'ios',NODE_ENV:'production',MAESTRO_CLI_NO_ANALYTICS:'1'});
- const app=JSON.parse(readFileSync(path.join(source,'app.json')));if(app.expo.ios.bundleIdentifier!=='com.footnation.app')throw Error('Unexpected app');app.expo.version='1.0.5';app.expo.ios.buildNumber='21';writeFileSync(path.join(source,'app.json'),JSON.stringify(app,null,2));
+ const app=JSON.parse(readFileSync(path.join(source,'app.json')));if(app.expo.ios.bundleIdentifier!=='com.footnation.app')throw Error('Unexpected app');app.expo.version='1.0.5';app.expo.ios.buildNumber='22';writeFileSync(path.join(source,'app.json'),JSON.stringify(app,null,2));
  const demo=JSON.parse(readFileSync(path.join(source,'release-private/demo.json')));if(typeof demo.email!=='string'||typeof demo.password!=='string'||!demo.email||!demo.password)throw Error('Missing private demo credentials');
  const buildOnly=process.env.FN_BUILD_ONLY==='1';
  const selectedLocale=process.env.FN_CAPTURE_LOCALE||'all';if(!['all','fr-FR','en-US'].includes(selectedLocale))throw Error('Invalid capture locale');
@@ -62,7 +62,7 @@ try {
   const encrypted=readFileSync(path.join(process.env.RUNNER_TEMP,'footnation-reuse-simulator/simulator-app.tar.gz.enc'));
   nativeArchiveSha256=createHash('sha256').update(encrypted).digest('hex');
   const previousCaptures=path.join(process.env.RUNNER_TEMP,'footnation-reuse-simulator/captures.tar.gz.enc');
-  if(existsSync(previousCaptures)){const archive=path.join(work,'previous-captures.tar.gz');writeFileSync(archive,decrypt(readFileSync(previousCaptures),key));const previous=JSON.parse(run('tar',['-xOf',archive,'./manifest.json'],{capture:true}));if(previous.app!=='com.footnation.app'||previous.version!=='1.0.5'||previous.buildNumber!=='21')throw Error('Native source provenance mismatch');compiledSourceSha256=previous.compiledSourceSha256||previous.sourceSha256;compiledGithubCommit=previous.compiledGithubCommit||previous.githubCommit;rmSync(archive);}
+  if(existsSync(previousCaptures)){const archive=path.join(work,'previous-captures.tar.gz');writeFileSync(archive,decrypt(readFileSync(previousCaptures),key));const previous=JSON.parse(run('tar',['-xOf',archive,'./manifest.json'],{capture:true}));if(previous.app!=='com.footnation.app'||previous.version!=='1.0.5'||previous.buildNumber!=='22')throw Error('Native source provenance mismatch');compiledSourceSha256=previous.compiledSourceSha256||previous.sourceSha256;compiledGithubCommit=previous.compiledGithubCommit||previous.githubCommit;rmSync(archive);}
   else throw Error('Missing original native build provenance');
   const archive=path.join(work,'reuse-app.tar.gz');writeFileSync(archive,decrypt(encrypted,key));products=path.join(work,'restored-native-app');
   run('python3',[path.join(scripts,'safe-extract-screenshots.py'),archive,products]);
@@ -104,11 +104,11 @@ with open(p,'wb') as f:plistlib.dump(d,f)
  stage('verify native simulator identity and signing');
  const nativeIdentity=JSON.parse(run('python3',['-c',`import plistlib,json,sys
 p=plistlib.load(open(sys.argv[1],'rb'))
-assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='21'
+assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='22'
 print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
  const simulatorSigning=JSON.parse(run('python3',[path.join(scripts,'inspect-simulator-entitlements.py'),nativeApp,'8HYVPDRPT4',app.expo.version,String(app.expo.ios.buildNumber)],{capture:true}));
  if(touchTraceDiagnostic)simulatorSigning.method='Diagnostic-only JavaScript trace derived from existing simulator binary; simulator copy re-signed ad hoc, never a release candidate';
- const manifest={simulatorSigning,reducedMotionDiagnostic,touchTraceDiagnostic,releaseAcceptanceEligible:!reducedMotionDiagnostic&&!touchTraceDiagnostic,captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.5',buildNumber:'21',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
+ const manifest={simulatorSigning,reducedMotionDiagnostic,touchTraceDiagnostic,releaseAcceptanceEligible:!reducedMotionDiagnostic&&!touchTraceDiagnostic,captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.5',buildNumber:'22',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
  const routes=[['06-profil','my-profile'],['02-recherche','search'],['03-clubs','clubs'],['04-opportunites','opportunities'],['05-matchs','matches'],['01-accueil','home']];
  if(!buildOnly){
  if(useXCTest){stage('prepare standalone XCTest UI runner');run(process.execPath,[xctestScript,'prepare','--work',xctestWork,'--demo',path.join(source,'release-private/demo.json')],{timeoutMs:12*60*1000});}
