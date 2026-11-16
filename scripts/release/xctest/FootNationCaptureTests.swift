@@ -418,6 +418,18 @@ final class FootNationCaptureTests: XCTestCase {
             dismissInvitations()
             wait(3)
             XCTAssertTrue(app.state == .runningForeground, "App left foreground before screenshot")
+            // A successful tap is not evidence of successful navigation.
+            let destinationText: String?
+            switch route {
+            case "clubs": destinationText = "Trouver un club"
+            case "matches": destinationText = "Compétitions"
+            case "opportunities": destinationText = locale == "en-US" ? "Opportunities" : "Opportunités"
+            default: destinationText = nil
+            }
+            if let expected = destinationText {
+                XCTAssertFalse(app.buttons["Changer la langue"].firstMatch.exists, "Home remained visible after route selection")
+                XCTAssertTrue(app.staticTexts[expected].firstMatch.waitForExistence(timeout: 15), "Destination heading did not appear")
+            }
             // This is a genuine device framebuffer. Human review remains required
             // for asynchronous content errors, localization and empty states.
             try saveCapture(locale + "-" + device + "-" + name + ".png")
