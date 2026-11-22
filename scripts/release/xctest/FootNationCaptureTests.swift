@@ -542,7 +542,14 @@ final class FootNationCaptureTests: XCTestCase {
     }
 
     func testProfileShortGrid() throws {
-        requireProfile()
+        open("shorts")
+        requireVideoProgress()
+        let author = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH 'Voir le profil de '")
+        ).firstMatch
+        XCTAssertTrue(author.waitForExistence(timeout: 30), "The playing Short author profile link was unavailable")
+        XCTAssertTrue(author.isHittable, "The playing Short author profile link was not tappable")
+        author.tap()
         let profileTabDeadline = Date().addingTimeInterval(45)
         var profileShortsTab: XCUIElement?
         repeat {
