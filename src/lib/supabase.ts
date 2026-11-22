@@ -1,5 +1,6 @@
-import sessionStorage from "./sessionStorage";
+import sessionStorage, { sessionStorageKey } from "./sessionStorage";
 import { createClient } from "@supabase/supabase-js";
+import { clubLogoFetch } from "./clubLogoFetch.mjs";
 
 // Public client settings only. No service-role key belongs in a mobile bundle.
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -9,9 +10,10 @@ export const supabase = createClient(
   url || "https://configuration-required.supabase.co",
   key || "configuration-required",
   {
+    global: { fetch: clubLogoFetch(url || "https://configuration-required.supabase.co") },
     auth: {
       storage: sessionStorage,
-      storageKey: "footnation-native-auth",
+      storageKey: sessionStorageKey,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,

@@ -17,7 +17,7 @@ vi.mock("react", async (importOriginal) => ({
   },
   useState: (initial: unknown) => {
     const slot = state.cursor++;
-    state.slots[slot] ||= { value: initial };
+    state.slots[slot] ||= { value: typeof initial === "function" ? initial() : initial };
     return [
       state.slots[slot].value,
       (next: unknown) => {

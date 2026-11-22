@@ -11,13 +11,12 @@ import {
 import { router } from "expo-router";
 import {
   Award,
-  BookOpen,
+  ChevronDown,
+  Quote,
   Briefcase,
   Edit3,
   GraduationCap,
   Heart,
-  MapPin,
-  Ruler,
   Shirt,
   Sparkles,
   Trophy,
@@ -33,7 +32,6 @@ import {
   normalizeExperiences,
 } from "../lib/profileCareer";
 import { useTheme, useThemedStyles, type ThemeColors } from "../theme";
-import { Button } from "./ui";
 import { ProfileIdentity } from "./ProfileIdentity";
 import { OrganizationDetails } from "./OrganizationDetails";
 import { ProfileInfoLink, ProfileInfoProvider } from "./ProfileInfo";
@@ -41,10 +39,7 @@ import { clubInfoAction, profileInfoActions } from "../lib/profileInfoActions";
 
 const icons: Record<string, LucideIcon> = {
   identity: UserRound,
-  presentation: BookOpen,
-  location: MapPin,
   football: Shirt,
-  physical: Ruler,
   skills: Sparkles,
   favorites: Heart,
   education: GraduationCap,
@@ -61,7 +56,32 @@ export function ProfileAbout({
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const columns = width >= 600;
-  const sections = profileAboutSections(profile, ownProfile);
+  const sourceSections = profileAboutSections(profile, ownProfile);
+  const sections = [
+    { id: "football", title: "Football", sources: ["football", "physical"] },
+    {
+      id: "identity",
+      title: "Informations personnelles",
+      sources: ["identity", "location", "presentation"],
+    },
+    { id: "skills", title: "Points forts", sources: ["skills"] },
+    {
+      id: "education",
+      title: "Formations et diplômes",
+      sources: ["education"],
+    },
+    { id: "favorites", title: "Clubs favoris", sources: ["favorites"] },
+  ]
+    .map((section) => ({
+      ...section,
+      fields: sourceSections
+        .filter((source) => section.sources.includes(source.id))
+        .flatMap((source) =>
+          source.fields.map((field) => ({ ...field, sourceId: source.id })),
+        )
+        .filter((field) => field.value !== null),
+    }))
+    .filter((section) => section.fields.length > 0);
   const experiences = normalizeExperiences(profile);
   const highest = getBestExperience(experiences, profile.highest_level);
   const achievements = normalizeAchievements(profile.achievements);
@@ -69,7 +89,8 @@ export function ProfileAbout({
   const organization = ["club", "business", "institution"].includes(
     profile.account_type || "",
   );
-  const showCareer = !organization && (ownProfile || experiences.length > 0);
+  const showCareer =
+    !organization && (ownProfile || experiences.length > 0 || !!highest?.level);
   const editProfile = () => router.push("/settings");
   const [careerEditor, setCareerEditor] = useState<
     "career" | "achievements" | null
@@ -88,7 +109,7 @@ export function ProfileAbout({
         <View style={styles.heading}>
           <View style={styles.headingText}>
             <Text accessibilityRole="header" style={styles.title}>
-              À propos
+              En bref
             </Text>
           </View>
           {ownProfile && (
@@ -97,13 +118,12 @@ export function ProfileAbout({
         </View>
         <ProfileIdentity profile={profile} />
         {sections.map((section) => (
-          <View key={section.id} style={styles.card}>
-            <SectionHeading
-              title={
-                section.id === "presentation" ? "Présentation" : section.title
-              }
-              icon={icons[section.id] || UserRound}
-            />
+          <AboutDetails
+            key={`${profile.id}-${section.id}`}
+            title={section.title}
+            icon={icons[section.id] || UserRound}
+            defaultOpen={section.id === "football"}
+          >
             <View style={styles.fields}>
               {section.fields.map((field) => (
                 <ProfileInfoLink
@@ -111,18 +131,19 @@ export function ProfileAbout({
                     ...field,
                     actions: profileInfoActions(
                       profile,
-                      section.id,
+                      field.sourceId,
                       field.label,
                       field.value,
                       ownProfile,
                     ),
                   }}
                   key={field.label}
+                  showIndicator={false}
                   style={[
                     styles.field,
                     columns &&
                       !["presentation", "skills", "education"].includes(
-                        section.id,
+                        field.sourceId,
                       ) &&
                       styles.halfField,
                   ]}
@@ -139,70 +160,69 @@ export function ProfileAbout({
                 </ProfileInfoLink>
               ))}
             </View>
-          </View>
+          </AboutDetails>
         ))}
         {organization && (
           <OrganizationDetails profile={profile} ownProfile={ownProfile} />
         )}
-        {!organization && !!highest?.level && (
-          <View style={[styles.card, styles.highlight]}>
-            <SectionHeading title="Plus haut niveau atteint" icon={Trophy} />
-            <ProfileInfoLink
-              info={{
-                label: "Plus haut niveau",
-                value: [
-                  highest.level,
-                  highest.club,
-                  highest.ageCategory,
-                  highest.highestYear ||
-                    (highest.startYear && formatExperienceYears(highest)),
-                ]
-                  .filter(Boolean)
-                  .join(" · "),
-                actions: [
-                  ...profileInfoActions(
-                    profile,
-                    "football",
-                    "Plus haut niveau",
-                    highest.level,
-                    ownProfile,
-                  ),
-                  ...(highest.club
-                    ? [clubInfoAction(highest.club, highest.clubId)]
-                    : []),
-                ],
-              }}
-            >
-              <Text style={styles.level}>{highest.level}</Text>
-              {!!(highest.club || highest.ageCategory) && (
-                <Text style={styles.value}>
-                  {[highest.club, highest.ageCategory]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Text>
-              )}
-              {!!(highest.highestYear || highest.startYear) && (
-                <Text style={styles.subtitle}>
-                  {highest.highestYear || formatExperienceYears(highest)}
-                </Text>
-              )}
-            </ProfileInfoLink>
-          </View>
-        )}
         {showCareer && (
-          <View style={styles.card}>
-            <SectionHeading
-              title="Parcours et expériences"
-              icon={Briefcase}
-              action={
-                ownProfile ? (
-                  <EditAction
-                    label="Modifier mon parcours"
-                    onPress={editCareer}
-                  />
-                ) : undefined
-              }
-            />
+          <AboutDetails title="Parcours" icon={Briefcase}>
+            <View style={styles.sectionActions}>
+              {ownProfile ? (
+                <EditAction
+                  label="Modifier mon parcours"
+                  onPress={editCareer}
+                />
+              ) : undefined}
+            </View>
+            {!organization && !!highest?.level && (
+              <View style={[styles.card, styles.highlight]}>
+                <SectionHeading
+                  title="Plus haut niveau atteint"
+                  icon={Trophy}
+                />
+                <ProfileInfoLink
+                  info={{
+                    label: "Plus haut niveau",
+                    value: [
+                      highest.level,
+                      highest.club,
+                      highest.ageCategory,
+                      highest.highestYear ||
+                        (highest.startYear && formatExperienceYears(highest)),
+                    ]
+                      .filter(Boolean)
+                      .join(" · "),
+                    actions: [
+                      ...profileInfoActions(
+                        profile,
+                        "football",
+                        "Plus haut niveau",
+                        highest.level,
+                        ownProfile,
+                      ),
+                      ...(highest.club
+                        ? [clubInfoAction(highest.club, highest.clubId)]
+                        : []),
+                    ],
+                  }}
+                >
+                  <Text style={styles.level}>{highest.level}</Text>
+                  {!!(highest.club || highest.ageCategory) && (
+                    <Text style={styles.value}>
+                      {[highest.club, highest.ageCategory]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </Text>
+                  )}
+                  {!!(highest.highestYear || highest.startYear) && (
+                    <Text style={styles.subtitle}>
+                      {highest.highestYear || formatExperienceYears(highest)}
+                    </Text>
+                  )}
+                </ProfileInfoLink>
+              </View>
+            )}
             {experiences.length ? (
               experiences.map((experience, index) => (
                 <View
@@ -272,25 +292,21 @@ export function ProfileAbout({
                 Aucune expérience renseignée pour le moment.
               </Text>
             )}
-          </View>
+          </AboutDetails>
         )}
         {!organization &&
           (achievements.length > 0 ||
             awards.length > 0 ||
             (ownProfile && isPlayerProfile(profile))) && (
-            <View style={styles.card}>
-              <SectionHeading
-                title="Palmarès et distinctions"
-                icon={Award}
-                action={
-                  ownProfile ? (
-                    <EditAction
-                      label="Modifier mon palmarès"
-                      onPress={() => setCareerEditor("achievements")}
-                    />
-                  ) : undefined
-                }
-              />
+            <AboutDetails title="Palmarès" icon={Award}>
+              <View style={styles.sectionActions}>
+                {ownProfile ? (
+                  <EditAction
+                    label="Modifier mon palmarès"
+                    onPress={() => setCareerEditor("achievements")}
+                  />
+                ) : undefined}
+              </View>
               {achievements.length + awards.length === 0 && (
                 <Text style={styles.subtitle}>
                   Aucun palmarès renseigné pour le moment.
@@ -319,16 +335,15 @@ export function ProfileAbout({
                     ))}
                   </View>
                 ))}
-            </View>
+            </AboutDetails>
           )}
-        <ProfileRecommendations key={profile.id} profile={profile} />
-        {ownProfile && (
-          <Button
-            title="Compléter mon profil"
-            secondary
-            onPress={editProfile}
-          />
-        )}
+        <AboutDetails
+          key={`recommendations-${profile.id}`}
+          title="Recommandations"
+          icon={Quote}
+        >
+          <ProfileRecommendations key={profile.id} profile={profile} />
+        </AboutDetails>
       </View>
     </ProfileInfoProvider>
   );
@@ -350,8 +365,58 @@ function EditAction({
       onPress={onPress}
       style={styles.edit}
     >
-      <Edit3 size={19} color={colors.blue} />
+      <Edit3 size={16} color={colors.blue} />
+      <Text style={styles.editLabel}>Modifier</Text>
     </Pressable>
+  );
+}
+
+function AboutDetails({
+  title,
+  icon: Icon,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const styles = useThemedStyles(createStyles);
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(defaultOpen);
+  const [focused, setFocused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  return (
+    <View style={styles.details}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen((value) => !value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onHoverIn={() => setHovered(true)}
+        onHoverOut={() => setHovered(false)}
+        style={({ pressed }) => [
+          styles.disclosure,
+          {
+            borderColor: focused ? colors.blue : "transparent",
+            backgroundColor:
+              pressed || hovered ? colors.accentSoft : colors.surface,
+          },
+        ]}
+      >
+        <Icon size={18} color={colors.muted} />
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <ChevronDown
+          size={18}
+          color={colors.muted}
+          style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }}
+        />
+      </Pressable>
+      {open && <View style={styles.detailsBody}>{children}</View>}
+    </View>
   );
 }
 
@@ -381,10 +446,10 @@ function SectionHeading({
 
 const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    container: { padding: 14, gap: 12 },
+    container: { padding: 14, gap: 10 },
     heading: { flexDirection: "row", alignItems: "center", gap: 12 },
     headingText: { flex: 1, gap: 6 },
-    title: { color: colors.ink, fontSize: 20, fontFamily: "Inter-SemiBold" },
+    title: { color: colors.muted, fontSize: 14, fontFamily: "Inter-Medium" },
     subtitle: {
       color: colors.muted,
       fontSize: 14,
@@ -419,6 +484,24 @@ const createStyles = (colors: ThemeColors) =>
       borderRadius: 10,
       backgroundColor: colors.accentSoft,
     },
+    details: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      overflow: "hidden",
+      backgroundColor: colors.surface,
+    },
+    disclosure: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      minHeight: 56,
+      padding: 14,
+      borderWidth: 1,
+      borderRadius: 15,
+    },
+    detailsBody: { paddingHorizontal: 14, paddingBottom: 14, gap: 12 },
+    sectionActions: { alignItems: "flex-end" },
     fields: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     field: {
       width: "100%",
@@ -426,8 +509,9 @@ const createStyles = (colors: ThemeColors) =>
       minWidth: 0,
       paddingHorizontal: 10,
       paddingVertical: 10,
-      backgroundColor: colors.surfaceRaised,
-      borderRadius: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+      borderRadius: 0,
     },
     halfField: { width: "47%", flexGrow: 1 },
     label: {
@@ -444,18 +528,25 @@ const createStyles = (colors: ThemeColors) =>
     },
     missing: { color: colors.muted, fontFamily: "Inter-Regular" },
     edit: {
-      width: 44,
-      height: 44,
+      minHeight: 44,
+      paddingHorizontal: 10,
+      flexDirection: "row",
+      gap: 7,
       alignItems: "center",
       justifyContent: "center",
       borderRadius: 14,
       backgroundColor: colors.surfaceRaised,
     },
-    highlight: { borderLeftWidth: 4, borderLeftColor: colors.blue },
+    editLabel: {
+      color: colors.blue,
+      fontSize: 13,
+      fontFamily: "Inter-SemiBold",
+    },
+    highlight: { borderLeftWidth: 2, borderLeftColor: colors.blue },
     level: {
       color: colors.blue,
-      fontSize: 22,
-      lineHeight: 28,
+      fontSize: 18,
+      lineHeight: 24,
       fontFamily: "Inter-Bold",
     },
     experience: { flexDirection: "row", gap: 12 },

@@ -23,7 +23,7 @@ export function BirthdateField({
   const date =
     validBirthdate(value) && new Date(`${value}T12:00:00`) <= maximumDate
       ? new Date(`${value}T12:00:00`)
-      : latestAllowedBirthdateDate(new Date(), Math.max(minAge, 18));
+      : latestAllowedBirthdateDate(new Date(), minAge);
   return (
     <View style={{ gap: 8 }}>
       <Text style={s.label}>{label}</Text>

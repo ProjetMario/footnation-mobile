@@ -541,6 +541,41 @@ final class FootNationCaptureTests: XCTestCase {
         requireVideoProgress()
     }
 
+    func testProfileShortGrid() throws {
+        requireProfile()
+        let profileTabDeadline = Date().addingTimeInterval(45)
+        var profileShortsTab: XCUIElement?
+        repeat {
+            let predicate = NSPredicate(format: "label == 'Shorts'")
+            let candidates = [app.buttons, app.otherElements]
+                .flatMap { $0.matching(predicate).allElementsBoundByIndex }
+                .filter {
+                    $0.exists && $0.isHittable &&
+                    $0.frame.midY < app.frame.minY + app.frame.height * 0.82
+                }
+            if let candidate = candidates.max(by: { $0.frame.midY < $1.frame.midY }) {
+                profileShortsTab = candidate
+                break
+            }
+            app.swipeUp()
+            wait(1)
+        } while Date() < profileTabDeadline
+        guard let profileShortsTab else {
+            XCTFail("The profile Shorts tab was not reachable")
+            return
+        }
+        profileShortsTab.tap()
+        let tile = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH 'Ouvrir le Short'")
+        ).firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 45), "No playable Short thumbnail appeared on the profile")
+        XCTAssertTrue(tile.isHittable, "The first profile Short thumbnail cannot be opened")
+        tile.tap()
+        XCTAssertTrue(app.buttons["Retour"].firstMatch.waitForExistence(timeout: 20), "The profile Short viewer did not open")
+        requireVideoProgress()
+        requireTap("Retour")
+    }
+
     func testReleaseAudit() throws {
         // One UI-test session avoids repeatedly interrupting the native app
         // between related checks. Every check still uses real touch input.
@@ -558,6 +593,7 @@ final class FootNationCaptureTests: XCTestCase {
         try testMatchControls(); try record("matches")
         try testPublicationControls(); try record("publication")
         try testVideoPlayback(); try record("video")
+        try testProfileShortGrid(); try record("profile-shorts")
         try testCapture(); try record("captures")
     }
 

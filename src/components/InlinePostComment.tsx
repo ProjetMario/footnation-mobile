@@ -69,6 +69,14 @@ function CommentComposer({
   const recovery =
     send.error instanceof PostCommentError ? send.error.recovery : null;
   const submit = () => {
+    if (!userId) {
+      onNavigate?.();
+      router.push({
+        pathname: "/login",
+        params: { next: `/posts/${postId}?comments=1` },
+      });
+      return;
+    }
     if (submitting.current || !draft.trim()) return;
     submitting.current = true;
     setSent(false);
@@ -114,6 +122,15 @@ function CommentComposer({
           placeholder="Ajouter un commentaire…"
           placeholderTextColor="rgba(255,255,255,0.72)"
           value={draft}
+          onFocus={() => {
+            if (!userId) {
+              onNavigate?.();
+              router.push({
+                pathname: "/login",
+                params: { next: `/posts/${postId}?comments=1` },
+              });
+            }
+          }}
           onChangeText={(value) => {
             setDraft(value);
             if (send.isError) send.reset();

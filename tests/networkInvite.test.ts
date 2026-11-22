@@ -152,6 +152,10 @@ describe("post-authentication invitation", () => {
     expect(state.pathname).toBe("/talent/alex");
   });
 
+  it("can present the deferred invitation on the actual home route", () => {
+    expect(canPresentNetworkInvite(presentation({ pathname: "/home" }))).toBe(true);
+  });
+
   it.each([
     { request: null },
     { userId: undefined },
@@ -266,7 +270,8 @@ describe("invitation after registration completion", () => {
       },
       true,
     ],
-    [{ account_type: "club", club_official_name: "FC Paris", bio: " " }, false],
+    [{ account_type: "club", club_official_name: "FC Paris", bio: " " }, true],
+    [{ account_type: "club", club_official_name: " ", full_name: " " }, false],
     [{ account_type: "business", business_name: "Équipement Football" }, true],
     [{ account_type: "business", business_name: " " }, false],
     [{ account_type: "institution", institution_name: "Ligue" }, true],

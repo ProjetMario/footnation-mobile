@@ -1,7 +1,7 @@
+import { SafeAreaModal as Modal } from "../SafeAreaModal";
 import React, { createContext, useContext, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthGate } from "../AuthGate";
 import {
   Button,
@@ -189,7 +189,6 @@ export function AdminModal({
   const { width } = useWindowDimensions();
   const { colors } = useTheme();
   const s = useUIStyles();
-  const insets = useSafeAreaInsets();
   return (
     <Modal
       visible={visible}
@@ -199,54 +198,55 @@ export function AdminModal({
         if (!busy) onClose();
       }}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{
-          flex: 1,
-          justifyContent: width < 768 ? "flex-end" : "center",
-          alignItems: "center",
-          backgroundColor: "rgba(0,0,0,0.48)",
-          padding: width < 768 ? 0 : 24,
-        }}
-      >
-        <View
-          accessibilityViewIsModal
+      <SafeAreaView style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.48)" }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={{
-            width: "100%",
-            maxWidth: 700,
-            maxHeight: "90%",
-            backgroundColor: colors.surface,
-            borderRadius: 20,
-            overflow: "hidden",
-            paddingBottom: Math.max(24, insets.bottom),
+            flex: 1,
+            justifyContent: width < 768 ? "flex-end" : "center",
+            alignItems: "center",
+            padding: width < 768 ? 0 : 24,
           }}
         >
-          <View style={[s.between, { padding: 20 }]}>
-            <Text accessibilityRole="header" style={[s.h2, { flex: 1 }]}>
-              {title}
-            </Text>
-            <IconButton
-              label="Fermer"
-              onPress={() => {
-                if (!busy) onClose();
-              }}
-            >
-              <X color={colors.ink} size={22} />
-            </IconButton>
-          </View>
-          <ScrollView
-            automaticallyAdjustKeyboardInsets
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{
-              paddingHorizontal: 20,
-              paddingBottom: 16,
-              gap: 12,
+          <View
+            accessibilityViewIsModal
+            style={{
+              width: "100%",
+              maxWidth: 700,
+              maxHeight: "90%",
+              backgroundColor: colors.surface,
+              borderRadius: 20,
+              overflow: "hidden",
+              paddingBottom: 24,
             }}
           >
-            {children}
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+            <View style={[s.between, { padding: 20 }]}>
+              <Text accessibilityRole="header" style={[s.h2, { flex: 1 }]}>
+                {title}
+              </Text>
+              <IconButton
+                label="Fermer"
+                onPress={() => {
+                  if (!busy) onClose();
+                }}
+              >
+                <X color={colors.ink} size={22} />
+              </IconButton>
+            </View>
+            <ScrollView
+              automaticallyAdjustKeyboardInsets
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                paddingBottom: 16,
+                gap: 12,
+              }}
+            >
+              {children}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -259,6 +259,7 @@ export function AdminConfirm({
   busy,
   error,
   destructive = false,
+  onReauthenticate,
 }: {
   title: string;
   detail: string;
@@ -268,6 +269,7 @@ export function AdminConfirm({
   busy: boolean;
   error?: unknown;
   destructive?: boolean;
+  onReauthenticate?: () => void;
 }) {
   const [reason, setReason] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -275,6 +277,21 @@ export function AdminConfirm({
   return (
     <AdminModal title={title} visible={visible} onClose={onCancel} busy={busy}>
       <Text style={s.text}>{detail}</Text>
+      {onReauthenticate ? (
+        <View accessibilityRole="alert" style={{ gap: 10 }}>
+          <Text style={s.text}>
+            Reconnectez-vous avec votre compte superadmin, puis confirmez à
+            nouveau l’action. Votre motif et votre confirmation ne seront pas
+            conservés.
+          </Text>
+          <Button
+            title="Me reconnecter"
+            secondary
+            disabled={busy}
+            onPress={onReauthenticate}
+          />
+        </View>
+      ) : <>
       <Field
         label="Motif de l’action"
         value={reason}
@@ -302,6 +319,7 @@ export function AdminConfirm({
         }
         onPress={() => onConfirm(reason)}
       />
+      </>}
       <Button title="Annuler" secondary disabled={busy} onPress={onCancel} />
     </AdminModal>
   );

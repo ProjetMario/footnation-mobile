@@ -21,7 +21,7 @@ export default function Layout() {
     (targets.current[key] ??= React.createRef<View>());
   return (
     <Tabs
-      initialRouteName="index"
+      initialRouteName="home"
       backBehavior="history"
       tabBar={(props) => (
         <FloatingTabBar
@@ -37,7 +37,7 @@ export default function Layout() {
             flex: 1,
             paddingBottom:
               // Other tab roots use Screen, which already consumes bottom safe area.
-              route.name === "index" ||
+              route.name === "home" ||
               route.name === "shorts" ||
               keyboardVisible
                 ? 0
@@ -53,7 +53,8 @@ export default function Layout() {
         tabBarStyle: { position: "absolute" },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: t("nav.home") }} />
+      <Tabs.Screen name="index" options={{ href: null }} />
+      <Tabs.Screen name="home" options={{ title: t("nav.home") }} />
       <Tabs.Screen name="shorts" options={{ title: t("nav.shorts") }} />
       <Tabs.Screen
         name="messages"

@@ -116,7 +116,7 @@ function Request() {
           const upload = await supabase.storage
             .from("verification-documents")
             .upload(path, body, { contentType: file.mimeType, upsert: true });
-          if (upload.error) throw upload.error;
+          if (upload.error) throw new Error(upload.error.message || "Upload failed");
           attempt.current.paths[kind] = path;
         }
         const insert = await supabase.from("verification_requests").insert({
@@ -128,7 +128,7 @@ function Request() {
           notability_description: description.trim() || null,
           status: "pending",
         });
-        if (insert.error) throw insert.error;
+        if (insert.error) throw new Error(insert.error.message || "Verification request failed");
       }
       return "Votre demande de vérification a été reçue.";
     },

@@ -1,5 +1,6 @@
+import { SafeAreaModal as Modal } from "../components/SafeAreaModal";
 import React, { useEffect, useRef, useState } from "react";
-import { Modal, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { router } from "expo-router";
 import { randomUUID } from "expo-crypto";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";

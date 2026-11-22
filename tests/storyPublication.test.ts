@@ -304,6 +304,25 @@ describe("durable story publication", () => {
 });
 
 describe("story journal isolation and photo validation", () => {
+  it("restores and reconciles a legacy photo journal without mediaKind while preserving its raw bytes until cleanup", async () => {
+    const local = memory(),
+      legacy = storyDraft();
+    delete legacy.mediaKind;
+    const key = `story-publication.${storyUserId}`,
+      raw = JSON.stringify(legacy);
+    local.data.set(key, raw);
+    const restored = await local.journal.load(storyUserId);
+    expect(restored).toEqual(storyDraft());
+    expect(restored?.mediaKind).toBe("image");
+    await local.journal.save(restored!);
+    expect(local.data.get(key)).toBe(raw);
+    const port = services({ find: vi.fn().mockResolvedValue(legacy.record) });
+    await createStoryPublication(restored!, local.journal).publish(port);
+    expect(port.upload).not.toHaveBeenCalled();
+    expect(port.insert).not.toHaveBeenCalled();
+    expect(local.store.remove).toHaveBeenCalledWith(key, raw);
+    expect(await local.journal.load(storyUserId)).toBeNull();
+  });
   it("allows only one attempt per account and leaves another account untouched on cleanup", async () => {
     const local = memory(),
       a = storyDraft(),
@@ -398,18 +417,22 @@ describe("story journal isolation and photo validation", () => {
   });
   it("identifies photo bytes, including a JPEG returned for a HEIC picker asset", () => {
     expect(storyPhoto(storyDraft().base64)).toEqual({
+      kind: "image",
       mime: "image/jpeg",
       ext: "jpg",
     });
     expect(storyPhoto(btoa("\x89PNG\r\n\x1a\n"))).toEqual({
+      kind: "image",
       mime: "image/png",
       ext: "png",
     });
     expect(storyPhoto(btoa("RIFF0000WEBP"))).toEqual({
+      kind: "image",
       mime: "image/webp",
       ext: "webp",
     });
     expect(storyPhoto(btoa("0000ftypheic"))).toEqual({
+      kind: "image",
       mime: "image/heic",
       ext: "heic",
     });

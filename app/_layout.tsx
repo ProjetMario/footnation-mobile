@@ -1,10 +1,15 @@
 import "../src/lib/monitoring";
 import React from "react";
-import { Stack } from "expo-router";
+import {
+  Redirect,
+  Stack,
+  useGlobalSearchParams,
+  usePathname,
+} from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { ActivityIndicator, View } from "react-native";
-import { useFonts } from "expo-font";
+import { ActivityIndicator, Platform, View } from "react-native";
+import { FontDisplay, useFonts } from "expo-font";
 import * as SystemUI from "expo-system-ui";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { CallProvider } from "../src/components/CallProvider";
@@ -20,6 +25,7 @@ import { FirstLoginOnboarding } from "../src/components/FirstLoginOnboarding";
 import { AuthProvider } from "../src/lib/auth";
 import { useAuth } from "../src/lib/auth";
 import { MemberAccessBoundary } from "../src/components/MemberAccessBoundary";
+import { authGateReturnPath } from "../src/lib/authReturn";
 import { memberAccessRoutePath } from "../src/lib/memberAccess";
 import { GrowthActivityBridge } from "../src/components/GrowthActivityBridge";
 import { ProfilePresenceBridge } from "../src/components/ProfilePresenceBridge";
@@ -31,12 +37,38 @@ export default function Layout() {
   // AuthProvider so account changes continue to invalidate cached data.
   const [client] = React.useState(createAppQueryClient);
   const [fontsLoaded, fontError] = useFonts({
-    "Inter-Regular": require("../assets/fonts/Inter-Regular.ttf"),
-    "Inter-Medium": require("../assets/fonts/Inter-Medium.ttf"),
-    "Inter-SemiBold": require("../assets/fonts/Inter-SemiBold.ttf"),
-    "Inter-Bold": require("../assets/fonts/Inter-Bold.ttf"),
+    "Inter-Regular": {
+      uri:
+        Platform.OS === "web"
+          ? require("../assets/fonts/Inter-Regular.woff2")
+          : require("../assets/fonts/Inter-Regular.ttf"),
+      display: FontDisplay.SWAP,
+    },
+    "Inter-Medium": {
+      uri:
+        Platform.OS === "web"
+          ? require("../assets/fonts/Inter-Medium.woff2")
+          : require("../assets/fonts/Inter-Medium.ttf"),
+      display: FontDisplay.SWAP,
+    },
+    "Inter-SemiBold": {
+      uri:
+        Platform.OS === "web"
+          ? require("../assets/fonts/Inter-SemiBold.woff2")
+          : require("../assets/fonts/Inter-SemiBold.ttf"),
+      display: FontDisplay.SWAP,
+    },
+    "Inter-Bold": {
+      uri:
+        Platform.OS === "web"
+          ? require("../assets/fonts/Inter-Bold.woff2")
+          : require("../assets/fonts/Inter-Bold.ttf"),
+      display: FontDisplay.SWAP,
+    },
   });
-  if (!fontsLoaded && !fontError)
+  // Web can paint with a fallback font while feed/auth requests start. Keeping
+  // the native gate avoids rendering an unregistered font on iOS/Android.
+  if (Platform.OS !== "web" && !fontsLoaded && !fontError)
     return (
       <View
         style={{
@@ -73,13 +105,14 @@ export default function Layout() {
   );
 }
 function MemberServices({ children }: { children: React.ReactNode }) {
-  const { memberAccess } = useAuth();
+  const { memberAccess, profile } = useAuth();
+  const profileReady = !!memberAccess?.allowed && !!profile;
   return (
-    <CallProvider enabled={!!memberAccess?.allowed}>
-      {!!memberAccess?.allowed && <GrowthActivityBridge />}
-      {!!memberAccess?.allowed && <ProfilePresenceBridge />}
-      {!!memberAccess?.allowed && <PushResponseBridge />}
-      {!!memberAccess?.allowed && <AnniversaryNotifications />}
+    <CallProvider enabled={profileReady}>
+      {profileReady && <GrowthActivityBridge />}
+      {profileReady && <ProfilePresenceBridge />}
+      {profileReady && <PushResponseBridge />}
+      {profileReady && <AnniversaryNotifications />}
       {children}
     </CallProvider>
   );
@@ -91,6 +124,9 @@ function ProtectedScreen({
   children: React.ReactNode;
   route: { name: string; params?: Readonly<object> };
 }) {
+  // The Supporters stack protects each child scene so onboarding retains its
+  // exact destination and club filters instead of the parent directory route.
+  if (route.name === "supporters") return <>{children}</>;
   return (
     <MemberAccessBoundary path={memberAccessRoutePath(route)}>
       {children}
@@ -107,6 +143,7 @@ function ThemedRoot() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={mode === "dark" ? "light" : "dark"} />
       <MonitoringRoute />
+      <OnboardingRedirect />
       <Stack
         screenLayout={ProtectedScreen}
         screenOptions={{
@@ -121,5 +158,40 @@ function ThemedRoot() {
       {!!memberAccess?.allowed && <NetworkInvitePrompt />}
       <OfflineBanner />
     </View>
+  );
+}
+
+const socialSignupPublicPaths = new Set([
+  "/auth/callback",
+  "/contact",
+  "/help",
+  "/login",
+  "/onboarding",
+  "/signup",
+  "/social-signup",
+  "/suppression-compte",
+]);
+
+function OnboardingRedirect() {
+  const { session, profileStatus, loading } = useAuth();
+  const pathname = usePathname();
+  // This redirect lives in the root layout, outside the active child scene.
+  // Local params there may omit the child's query (e.g. attendance=1).
+  const params = useGlobalSearchParams();
+  if (
+    loading ||
+    !session ||
+    profileStatus !== "unverified" ||
+    socialSignupPublicPaths.has(pathname)
+  )
+    return null;
+  const next = authGateReturnPath(pathname, params);
+  return (
+    <Redirect
+      href={{
+        pathname: "/onboarding",
+        params: next ? { next } : {},
+      }}
+    />
   );
 }

@@ -8,7 +8,7 @@ export function clubSearchFilter(search: string, type: ClubSearchType) {
       `%${search.trim().replace(/[%_\\]/g, "\\$&")}%`,
     );
     clauses.push(
-      `or(${["name", "short_name", "city"].map((key) => `${key}.ilike.${value}`).join(",")})`,
+      `or(${["name", "short_name", "city", "metadata->>country", "metadata->>country_code"].map((key) => `${key}.ilike.${value}`).join(",")})`,
     );
   }
   if (type !== "all") {

@@ -1,4 +1,5 @@
 import { feedPageIndex, feedPageOffset } from "./feedPaging";
+import { FEED_MEDIA_VISIBLE_PERCENT } from "./mediaFeed";
 
 export type HomeFeedLayout = {
   scope: string;
@@ -108,6 +109,11 @@ export function homeHeaderPostVisible({
   );
   // Fully visible short cards qualify, as do tall cards filling the viewport.
   return (
-    visible >= Math.min(contentEnd - contentStart, viewportHeight * 0.65) - 0.5
+    visible >=
+    Math.min(
+      contentEnd - contentStart,
+      (viewportHeight * FEED_MEDIA_VISIBLE_PERCENT) / 100,
+    ) -
+      0.5
   );
 }

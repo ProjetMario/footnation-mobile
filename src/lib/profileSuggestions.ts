@@ -1,9 +1,11 @@
 import { departmentOptions } from "./networkOptions";
 import { clubSearchFilter } from "./clubSearch";
 import { supabase } from "./supabase";
+import { clubLocationLabel } from "./clubLocation";
 export type ProfileSuggestion = {
   id: string;
   name: string;
+  username?: string | null;
   detail: string;
   department?: string;
   logo?: string | null;
@@ -34,12 +36,12 @@ export function parseCitySuggestions(data: {
   return [...new Map(rows.map((row) => [row.id, row])).values()].slice(0, 8);
 }
 export async function searchProfileSuggestions(
-  kind: "city" | "club",
+  kind: "city" | "club" | "profile",
   term: string,
   signal?: AbortSignal,
 ): Promise<ProfileSuggestion[]> {
   const text = term.trim();
-  if (text.length < 2) return [];
+  if (text.length < (kind === "club" || kind === "profile" ? 3 : 2)) return [];
   if (kind === "city") {
     const params = new URLSearchParams({
       q: text,
@@ -56,19 +58,47 @@ export async function searchProfileSuggestions(
       );
     return parseCitySuggestions(await response.json());
   }
-  const { data, error } = await supabase
-    .from("fff_clubs")
-    .select("id,name,city,department_code,logo_url")
-    .or(clubSearchFilter(text, "all")!)
-    .order("name")
-    .order("id")
-    .limit(8)
-    .abortSignal(signal!);
-  if (error) throw error;
+  if (kind === "profile") {
+    const pattern = `%${text.replace(/[%_\\]/g, "\\$&")}%`;
+    const result = await supabase
+      .from("profiles")
+      .select("id,full_name,username,avatar_url")
+      .or(`full_name.ilike.${pattern},username.ilike.${pattern}`)
+      .order("full_name")
+      .limit(8);
+    if (result.error) throw result.error;
+    return (result.data || []).map((profile) => ({
+      id: profile.id,
+      name: profile.full_name || profile.username || "Profil FootNation",
+      username: profile.username,
+      detail: profile.username ? `@${profile.username}` : "Profil FootNation",
+      logo: profile.avatar_url,
+    }));
+  }
+  const search = () =>
+    supabase
+      .from("fff_clubs")
+      .select("id,name,city,department_code,metadata,logo_url")
+      .order("name")
+      .order("id")
+      .limit(8);
+  // Match the site's club selector first: search the official club name.
+  // Only broaden to city, short name or country when that lookup has no matches.
+  const pattern = `%${text.replace(/[%_\\]/g, "\\$&")}%`;
+  const byName = search().ilike("name", pattern);
+  const first = await (signal ? byName.abortSignal(signal) : byName);
+  if (first.error) throw first.error;
+  let data = first.data;
+  if (!data?.length) {
+    const broader = search().or(clubSearchFilter(text, "all")!);
+    const fallback = await (signal ? broader.abortSignal(signal) : broader);
+    if (fallback.error) throw fallback.error;
+    data = fallback.data;
+  }
   return (data || []).map((club) => ({
     id: club.id,
     name: club.name,
-    detail: [club.city, club.department_code].filter(Boolean).join(" · "),
+    detail: clubLocationLabel(club),
     logo: club.logo_url,
   }));
 }

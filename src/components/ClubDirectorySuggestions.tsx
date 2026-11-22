@@ -15,6 +15,7 @@ import {
   uniqueDirectoryClubs,
 } from "../lib/clubDiscovery";
 import type { Club } from "../lib/models";
+import { clubLocationLabel } from "../lib/clubLocation";
 import { Avatar, useUIStyles } from "./ui";
 import { useTheme } from "../theme";
 
@@ -98,7 +99,7 @@ export function ClubDirectorySuggestions({
     <Pressable
       key={club.id}
       accessibilityRole="button"
-      accessibilityLabel={`${club.name}, ${label}`}
+      accessibilityLabel={`${club.name}, ${label}, ${clubLocationLabel(club)}`}
       onPress={() => router.push(`/club/${club.id}`)}
       style={[
         s.card,
@@ -111,7 +112,7 @@ export function ClubDirectorySuggestions({
           {club.short_name || club.name}
         </Text>
         <Text style={s.small}>
-          {[club.city, club.department_code].filter(Boolean).join(" · ")}
+          {clubLocationLabel(club)}
         </Text>
       </View>
       <ChevronRight size={18} color={colors.blue} />

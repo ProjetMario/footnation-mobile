@@ -388,6 +388,7 @@ export type TranslationKey =
   | "nav.createPost"
   | "nav.createHint"
   | "nav.messages"
+  | "home.discover"
   | "home.forYou"
   | "home.network"
   | "home.opportunities"
@@ -518,6 +519,9 @@ export type TranslationKey =
   | "messages.startTitle"
   | "messages.startDescription"
   | "messages.loadOlder"
+  | "messages.noUnread"
+  | "messages.noUnreadLoaded"
+  | "messages.moreUnreadHint"
   | "messages.unreadCount"
   | "opportunities.profileDepartment"
   | "opportunities.profileWanted"
@@ -554,6 +558,7 @@ const FR_TRANSLATIONS: TranslationDictionary = {
   "nav.createHint":
     "Ouvre l’éditeur pour partager une publication, une photo ou une vidéo.",
   "nav.messages": "Messagerie",
+  "home.discover": "Découvrir",
   "home.forYou": "Pour vous",
   "home.network": "Mon réseau",
   "home.opportunities": "Opportunités",
@@ -701,6 +706,9 @@ const FR_TRANSLATIONS: TranslationDictionary = {
   "messages.startDescription":
     "Ouvrez le profil d’une relation pour lui écrire.",
   "messages.loadOlder": "Charger les échanges plus anciens",
+  "messages.noUnread": "Aucune conversation non lue",
+  "messages.noUnreadLoaded": "Aucune conversation non lue parmi les échanges chargés",
+  "messages.moreUnreadHint": "Chargez d’autres échanges pour poursuivre la recherche.",
   "messages.unreadCount": "messages non lus",
   "opportunities.profileDepartment": "Profil recherché et département",
   "opportunities.profileWanted": "Profil recherché",
@@ -741,6 +749,7 @@ const TRANSLATIONS: Partial<
     "nav.createPost": "Create a post",
     "nav.createHint": "Open the editor to share a post, photo or video.",
     "nav.messages": "Messages",
+    "home.discover": "Discover",
     "home.forYou": "For you",
     "home.network": "My network",
     "home.opportunities": "Opportunities",
@@ -885,6 +894,9 @@ const TRANSLATIONS: Partial<
     "messages.startTitle": "Your conversations start here",
     "messages.startDescription": "Open a connection profile to message them.",
     "messages.loadOlder": "Load older conversations",
+    "messages.noUnread": "No unread conversations",
+    "messages.noUnreadLoaded": "No unread conversations in the loaded messages",
+    "messages.moreUnreadHint": "Load more conversations to continue searching.",
     "messages.unreadCount": "unread messages",
     "opportunities.profileDepartment": "Target profile and department",
     "opportunities.profileWanted": "Target profile",
@@ -921,6 +933,7 @@ const TRANSLATIONS: Partial<
     "nav.createHint":
       "Abre el editor para compartir una publicación, foto o vídeo.",
     "nav.messages": "Mensajes",
+    "home.discover": "Descubrir",
     "home.forYou": "Para ti",
     "home.network": "Mi red",
     "home.opportunities": "Oportunidades",
@@ -1031,6 +1044,9 @@ const TRANSLATIONS: Partial<
     "messages.startDescription":
       "Abre el perfil de un contacto para escribirle.",
     "messages.loadOlder": "Cargar conversaciones anteriores",
+    "messages.noUnread": "No hay conversaciones sin leer",
+    "messages.noUnreadLoaded": "No hay conversaciones sin leer entre las cargadas",
+    "messages.moreUnreadHint": "Carga más conversaciones para seguir buscando.",
     "messages.unreadCount": "mensajes no leídos",
     "notifications.subtitle": "Actividad reciente de FootNation",
     "notifications.readAll": "Marcar todo leído",
@@ -1151,6 +1167,9 @@ const TRANSLATIONS: Partial<
     "messages.noResults": "Nenhuma conversa encontrada",
     "messages.startTitle": "As tuas conversas começam aqui",
     "messages.loadOlder": "Carregar conversas anteriores",
+    "messages.noUnread": "Não há conversas por ler",
+    "messages.noUnreadLoaded": "Não há conversas por ler nas conversas carregadas",
+    "messages.moreUnreadHint": "Carrega mais conversas para continuar a pesquisa.",
     "messages.unreadCount": "mensagens não lidas",
     "notifications.subtitle": "Atividade recente FootNation",
     "notifications.readAll": "Marcar tudo como lido",
@@ -1300,8 +1319,10 @@ const TRANSLATIONS: Partial<
   },
 };
 
-export function useTranslation() {
-  const { language } = useLanguage();
+export function useTranslation(overrideLanguage?: string | null) {
+  const { language: preferredLanguage } = useLanguage();
+  const candidate = overrideLanguage || null;
+  const language = isAppLanguage(candidate) ? candidate : preferredLanguage;
   return React.useCallback(
     (key: TranslationKey, params?: Record<string, string | number>) => {
       const template =

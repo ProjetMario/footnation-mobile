@@ -1,5 +1,7 @@
+import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, { useRef, useState } from "react";
-import { Modal, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -82,7 +84,7 @@ export function ProfileCoverEditor({
         if (!busy) onClose();
       }}
     >
-      <View
+      <SafeAreaView
         style={{
           flex: 1,
           justifyContent: "center",
@@ -198,7 +200,7 @@ export function ProfileCoverEditor({
             />
           </ScrollView>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }

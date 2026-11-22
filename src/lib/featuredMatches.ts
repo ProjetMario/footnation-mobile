@@ -1,5 +1,7 @@
 import { calendarDate, validCalendarDate } from "./calendarDate";
 import type { MatchDTO, MatchesApiResponse } from "../types/matches";
+import { isNationalMatch } from "./nationalMatches";
+import { projectProviderScoreboardLogos } from "./clubLogoPolicy.mjs";
 
 export type FeaturedMatch = {
   match: MatchDTO;
@@ -204,7 +206,7 @@ export function parseMatchesResponse(
               : "SCHEDULED",
       } as MatchDTO;
     });
-  return {
+  return projectProviderScoreboardLogos({
     ...data,
     date,
     matches,
@@ -212,7 +214,7 @@ export function parseMatchesResponse(
     source: data.source || "unknown",
     teams: data.teams || [],
     tournaments: data.tournaments || [],
-  };
+  }, isNationalMatch);
 }
 
 export function previousMatchDay(today: string, offset: number) {

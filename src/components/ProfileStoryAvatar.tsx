@@ -9,20 +9,35 @@ import { supabase } from "../lib/supabase";
 import { supportRpc } from "../lib/support";
 import { publicProfileName } from "../lib/publicTalent";
 import type { Profile } from "../lib/models";
+import { ProfilePhotoViewer } from "./ProfilePhotoViewer";
 
-export function ProfileStoryAvatar({ profile }: { profile: Profile }) {
-  const uid = useAuth().session?.user.id;
+export function ProfileStoryAvatar({
+  profile,
+  compact = false,
+}: {
+  profile: Profile;
+  compact?: boolean;
+}) {
+  const { session, profileStatus } = useAuth();
+  const uid = session?.user.id;
+  const ready = profileStatus === "ready";
   const [focused, setFocused] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const photo = profile.avatar_url?.trim();
+  const name = publicProfileName(profile);
   const storySpin = useRef(new Animated.Value(0)).current;
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
-      return () => setFocused(false);
+      return () => {
+        setFocused(false);
+        setPhotoOpen(false);
+      };
     }, []),
   );
   const stories = useQuery({
     queryKey: ["profile-active-stories", uid, profile.id],
-    enabled: !!uid && focused,
+    enabled: !!uid && focused && ready,
     refetchInterval: 15000,
     queryFn: async () => {
       const blocks = await supabase
@@ -61,7 +76,7 @@ export function ProfileStoryAvatar({ profile }: { profile: Profile }) {
   });
   const presence = useQuery({
     queryKey: ["profile-presence", uid, profile.id],
-    enabled: !!uid && focused,
+    enabled: !!uid && focused && ready,
     queryFn: () =>
       supportRpc<boolean>(uid!, "read_profile_presence", {
         p_profile_id: profile.id,
@@ -82,11 +97,7 @@ export function ProfileStoryAvatar({ profile }: { profile: Profile }) {
     presence.data === true &&
     Date.now() - presence.dataUpdatedAt < 30000;
   const avatar = (
-    <Avatar
-      uri={profile.avatar_url}
-      name={publicProfileName(profile)}
-      size={82}
-    />
+    <Avatar uri={profile.avatar_url} name={name} size={compact ? 64 : 82} />
   );
   useEffect(() => {
     if (!story?.unseen) {
@@ -112,14 +123,19 @@ export function ProfileStoryAvatar({ profile }: { profile: Profile }) {
   return (
     <View style={{ alignItems: "center", gap: 8 }}>
       <View>
-        {story ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              story.unseen ? "Voir la nouvelle story" : "Revoir la story"
-            }
-            onPress={() => router.push(`/stories/${story.id}`)}
-          >
+        <Pressable
+          disabled={!photo}
+          accessibilityRole={photo ? "button" : undefined}
+          accessibilityLabel={
+            photo ? `Agrandir la photo de profil de ${name}` : name
+          }
+          accessibilityHint={
+            photo ? "Afficher la photo entière en plein écran" : undefined
+          }
+          onPress={() => setPhotoOpen(true)}
+          style={({ pressed }) => ({ opacity: pressed && photo ? 0.8 : 1 })}
+        >
+          {story ? (
             <View style={{ padding: 4, borderRadius: 60 }}>
               <Animated.View
                 pointerEvents="none"
@@ -150,20 +166,21 @@ export function ProfileStoryAvatar({ profile }: { profile: Profile }) {
                 {avatar}
               </View>
             </View>
-          </Pressable>
-        ) : (
-          <View
-            style={{
-              padding: 7,
-              borderRadius: 60,
-              backgroundColor: "rgba(255,255,255,.18)",
-            }}
-          >
-            {avatar}
-          </View>
-        )}
+          ) : (
+            <View
+              style={{
+                padding: 7,
+                borderRadius: 60,
+                backgroundColor: "rgba(255,255,255,.18)",
+              }}
+            >
+              {avatar}
+            </View>
+          )}
+        </Pressable>
         {online && (
           <View
+            pointerEvents="none"
             accessibilityRole="text"
             accessibilityLabel="En ligne en ce moment"
             style={{
@@ -180,13 +197,41 @@ export function ProfileStoryAvatar({ profile }: { profile: Profile }) {
           />
         )}
       </View>
-      {online && (
+      {!!story && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            story.unseen ? "Voir la nouvelle story" : "Revoir la story"
+          }
+          onPress={() => router.push(`/stories/${story.id}`)}
+          style={({ pressed }) => ({
+            paddingHorizontal: 12,
+            minHeight: 44,
+            borderRadius: 22,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: pressed ? "#1957B6" : "#087CFF",
+          })}
+        >
+          <Text style={{ color: "white", fontSize: 12, fontWeight: "700" }}>
+            {story.unseen ? "Voir la story" : "Revoir la story"}
+          </Text>
+        </Pressable>
+      )}
+      {online && !compact && (
         <Text
           accessibilityLiveRegion="polite"
           style={{ color: "#8AF3B4", fontSize: 11 }}
         >
           En ligne
         </Text>
+      )}
+      {photoOpen && !!photo && (
+        <ProfilePhotoViewer
+          uri={photo}
+          name={name}
+          onClose={() => setPhotoOpen(false)}
+        />
       )}
     </View>
   );

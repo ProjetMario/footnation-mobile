@@ -58,7 +58,7 @@ export default function Network() {
   const profiles = [...new Map(profileRows.map((p) => [p.id, p])).values()];
   const query = tab === "discover" ? people : connections;
   return (
-    <Screen title="Mon réseau" back={false} scroll={false}>
+    <Screen title="Mon réseau" back scroll={false}>
       <AuthGate>
         <FlatList
           data={profiles}

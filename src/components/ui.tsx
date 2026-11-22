@@ -13,6 +13,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { Image } from "expo-image";
+import { brandIcon } from "../lib/brandAssets";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   ArrowLeft,
@@ -230,7 +231,7 @@ export function Avatar({
     />
   ) : (
     <Image
-      source={require("../../assets/brand/app-icon.png")}
+      source={brandIcon}
       style={{
         width: size,
         height: size,
@@ -268,7 +269,7 @@ export function Brand({ showLogo = true }: { showLogo?: boolean } = {}) {
           }}
         >
           <Image
-            source={require("../../assets/brand/app-icon.png")}
+            source={brandIcon}
             contentFit="contain"
             accessibilityLabel="Logo FootNation avec le drapeau de la Bosnie"
             style={{ width: 30, height: 30, flexShrink: 0 }}
@@ -284,11 +285,13 @@ export function Header({
   titleNode,
   back = false,
   right,
+  onBack,
 }: {
   title?: string;
   titleNode?: React.ReactNode;
   back?: boolean;
   right?: React.ReactNode;
+  onBack?: () => void;
 }) {
   const { colors, mode } = useTheme();
   const s = useUIStyles();
@@ -312,8 +315,9 @@ export function Header({
         {!!back && (
           <IconButton
             label="Retour"
-            onPress={() =>
-              router.canGoBack() ? router.back() : router.replace("/")
+            onPress={
+              onBack ||
+              (() => (router.canGoBack() ? router.back() : router.replace("/")))
             }
           >
             <ArrowLeft size={20} color={colors.navy} />
@@ -342,6 +346,7 @@ export function Screen({
   right,
   scroll = true,
   scrollRef,
+  onBack,
 }: {
   title: string;
   titleNode?: React.ReactNode;
@@ -351,20 +356,33 @@ export function Screen({
   right?: React.ReactNode;
   scroll?: boolean;
   scrollRef?: React.Ref<ScrollView>;
+  onBack?: () => void;
 }) {
   const { colors, mode } = useTheme();
   const s = useUIStyles();
   return (
     <SafeAreaView edges={["top", "left", "right", "bottom"]} style={s.screen}>
       {header && (
-        <Header title={title} titleNode={titleNode} back={back} right={right} />
+        <Header
+          title={title}
+          titleNode={titleNode}
+          back={back}
+          right={right}
+          onBack={onBack}
+        />
       )}
       {scroll ? (
         <ScrollView
           ref={scrollRef}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={
-            Platform.OS === "ios" ? "interactive" : "on-drag"
+            // React Native Web's on-drag handler blurs the input on every
+            // scroll event, including browser scrolling that reveals a field.
+            Platform.OS === "web"
+              ? "none"
+              : Platform.OS === "ios"
+                ? "interactive"
+                : "on-drag"
           }
           automaticallyAdjustKeyboardInsets
           indicatorStyle={mode === "dark" ? "white" : "black"}
@@ -519,9 +537,11 @@ export function Empty({
 export function ErrorState({
   error,
   retry,
+  title = "Chargement impossible",
 }: {
   error: unknown;
   retry?: () => void;
+  title?: string;
 }) {
   const { colors, mode } = useTheme();
   const s = useUIStyles();
@@ -532,7 +552,7 @@ export function ErrorState({
       style={[s.card, { borderColor: "#E6B5BD" }]}
     >
       <AlertCircle color={colors.danger} size={23} />
-      <Text style={s.h2}>Chargement impossible</Text>
+      <Text style={s.h2}>{title}</Text>
       <Text style={s.subtitle}>
         {error instanceof Error ? error.message : "Veuillez réessayer."}
       </Text>

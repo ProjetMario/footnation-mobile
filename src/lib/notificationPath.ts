@@ -15,28 +15,39 @@ export function notificationPath(
   try {
     const url = new URL(value, "https://www.foot-nation.com");
     if (!origins.has(url.origin) || url.username || url.password) return null;
-    const decodedPath = decodeURIComponent(url.pathname);
+    // The production Expo Web app lives below /app. Installed native apps use
+    // the same routes without this hosting prefix, including shared invitations.
+    const pathname = url.pathname.replace(/^\/app(?=\/|$)/, "") || "/";
+    const decodedPath = decodeURIComponent(pathname);
     if (
       decodedPath.startsWith("//") ||
       /[\\\u0000-\u001f\u007f]/.test(decodedPath)
     )
       return null;
+    if (
+      pathname === "/opportunities" &&
+      recordId.test(url.searchParams.get("application") || "")
+    ) {
+      return url.searchParams.get("view") === "received"
+        ? "/my-applications?mode=received"
+        : "/my-applications";
+    }
     // Both formats are produced by the web app (sharing and new-short notifications).
     const sharedShort = [
       url.searchParams.get("shortId"),
       url.searchParams.get("id"),
     ].find((id) => id && recordId.test(id));
-    if (url.pathname === "/shorts" && sharedShort)
-      return `/shorts/${sharedShort}`;
+    if (pathname === "/shorts" && sharedShort) return `/shorts/${sharedShort}`;
     // Web notifications and matching links select a recipient with a query;
     // the native inbox itself does not consume these parameters.
     const recipient = [
       url.searchParams.get("user"),
       url.searchParams.get("to"),
     ].find((id) => id && recordId.test(id));
-    if (url.pathname === "/messages" && recipient)
+    if (pathname === "/messages" && recipient)
       return `/conversation/${recipient}`;
-    const path = url.pathname
+    const path = pathname
+      .replace(/^\/clubs?\/([0-9a-f-]{36})\/admin$/i, "/club-admin/$1")
       .replace(/^\/clubs-ville-([^/]+)$/, "/clubs-ville/$1")
       .replace(/^\/clubs-departement-([^/]+)$/, "/clubs-departement/$1")
       .replace(/^\/clubs\//, "/club/")

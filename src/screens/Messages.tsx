@@ -362,6 +362,11 @@ export default function Messages() {
                 error={query.error}
                 retry={() => void query.refetch()}
               />
+            ) : filter === "unread" ? (
+              <Empty
+                title={t(query.hasNextPage ? "messages.noUnreadLoaded" : "messages.noUnread")}
+                description={query.hasNextPage ? t("messages.moreUnreadHint") : undefined}
+              />
             ) : (
               <Empty
                 title={

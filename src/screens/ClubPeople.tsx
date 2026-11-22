@@ -22,7 +22,7 @@ import {
   useUIStyles,
 } from "../components/ui";
 import { supabase } from "../lib/supabase";
-import { requireClubAdmin } from "../lib/clubAccess";
+import { loadClubAdminAccess, requireClubAdmin } from "../lib/clubAccess";
 import { useAuth } from "../lib/auth";
 import { teamInvitationMaxUses } from "../lib/teamInvitationInput";
 export const peopleSections: Record<string, { title: string }> = {
@@ -32,16 +32,20 @@ export const peopleSections: Record<string, { title: string }> = {
 export default function ClubPeople({
   id,
   section,
+  initialMode,
 }: {
   id: string;
   section: string;
+  initialMode?: string;
 }) {
   const s = useUIStyles();
 
   const { session } = useAuth();
   const uid = session!.user.id;
   const cache = useQueryClient();
-  const [mode, setMode] = useState("list");
+  const [mode, setMode] = useState(
+    section === "members" && initialMode === "team-link" ? "team-link" : "list",
+  );
   const [search, setSearch] = useState("");
   const term = useDebounced(search);
   const [role, setRole] = useState("Joueur amateur");
@@ -50,8 +54,9 @@ export default function ClubPeople({
   const [inviteUrl, setInviteUrl] = useState("");
   const [notice, setNotice] = useState("");
   const [confirm, setConfirm] = useState<any>(null);
-  async function requirePeopleAccess() {
-    await requireClubAdmin(id, uid);
+  async function requirePeopleAccess(teamLinks = false) {
+    if (teamLinks && section !== "admins") await loadClubAdminAccess(id, uid);
+    else await requireClubAdmin(id, uid);
     if (section === "admins") {
       const r = await supabase.rpc("is_fff_club_admin", { p_club_id: id });
       if (r.error) throw r.error;
@@ -63,15 +68,13 @@ export default function ClubPeople({
   }
   const teamsQuery = useQuery({
     queryKey: ["club-invite-teams", id, uid],
-    enabled: section !== "admins",
+    enabled: section !== "admins" && mode === "team-link",
     queryFn: async () => {
-      await requirePeopleAccess();
-      const { data, error } = await supabase
-        .from("teams")
-        .select("id,name,category,season")
-        .eq("club_id", id)
-        .eq("is_active", true)
-        .order("name");
+      await requirePeopleAccess(true);
+      const { data, error } = await supabase.rpc(
+        "get_native_team_invitation_editor_teams",
+        { p_club_id: id },
+      );
       if (error) throw error;
       return data as any[];
     },
@@ -80,7 +83,7 @@ export default function ClubPeople({
     queryKey: ["team-invitation-links", id, uid],
     enabled: section !== "admins" && mode === "team-link",
     queryFn: async () => {
-      await requirePeopleAccess();
+      await requirePeopleAccess(true);
       const { data, error } = await supabase
         .from("team_invitation_links")
         .select(
@@ -141,8 +144,10 @@ export default function ClubPeople({
   const teamInviteMutation = useMutation({
     mutationFn: async () => {
       if (!teamId) throw new Error("Choisissez l’équipe à rejoindre.");
+      if (!teamsQuery.data?.some((team) => team.id === teamId))
+        throw new Error("Cette équipe n’est plus disponible pour vos invitations.");
       const uses = teamInvitationMaxUses(maxUses);
-      await requirePeopleAccess();
+      await requirePeopleAccess(true);
       const { data, error } = await supabase.rpc(
         "create_native_team_invitation_link",
         {

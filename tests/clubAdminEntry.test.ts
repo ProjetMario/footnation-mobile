@@ -18,11 +18,11 @@ it("distinguishes a club administrator from staff limited to their team", async 
   expect(client.rpc).toHaveBeenCalledTimes(1);
   client.rpc
     .mockResolvedValueOnce({ data: false, error: null })
-    .mockResolvedValueOnce({ data: true, error: null });
+    .mockResolvedValueOnce({ data: [{ id: "team-a", is_active: true }], error: null });
   await expect(loadClubAdminAccess("club-a", "owner")).resolves.toEqual({
     clubAdmin: false,
   });
-  expect(client.rpc).toHaveBeenLastCalledWith("is_native_club_or_team_staff", {
+  expect(client.rpc).toHaveBeenLastCalledWith("get_native_calendar_editor_teams", {
     p_club_id: "club-a",
   });
 });
@@ -47,7 +47,7 @@ it("does not fall back to staff when authentication is unavailable", async () =>
   );
   expect(client.rpc).not.toHaveBeenCalled();
 });
-it.each([false, null, "true"])(
+it.each([[[]], [[{ id: "team-a", is_active: false }]], [null], ["true"]])(
   "denies a user without an explicit staff grant (%s)",
   async (data) => {
     client.rpc
@@ -62,7 +62,5 @@ it("denies a failed staff check", async () => {
   client.rpc
     .mockResolvedValueOnce({ data: false, error: null })
     .mockResolvedValueOnce({ data: true, error: new Error("Indisponible") });
-  await expect(loadClubAdminAccess("club-a", "owner")).rejects.toThrow(
-    "réservé",
-  );
+  await expect(loadClubAdminAccess("club-a", "owner")).rejects.toThrow("Indisponible");
 });

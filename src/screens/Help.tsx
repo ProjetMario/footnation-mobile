@@ -58,7 +58,7 @@ const questions = [
     question: "Comment supprimer mon compte ?",
     answer:
       "Ouvrez Supprimer mon compte dans Mon espace ou dans Compte et confidentialité. Vérifiez votre compte, reconnectez-vous si nécessaire puis confirmez la suppression définitive. Si le service ne peut pas traiter votre compte automatiquement, un accès à l’équipe reste proposé. Une demande à l’équipe ne supprime pas immédiatement le compte.",
-    label: "Demander la suppression",
+    label: "Supprimer mon compte",
     path: "/suppression-compte",
   },
 ];

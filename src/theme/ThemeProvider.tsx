@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useColorScheme } from "react-native";
+import { Platform, useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   darkColors,
@@ -33,7 +33,11 @@ const ThemeContext = createContext<ThemeContextValue>({
 });
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const system = useColorScheme();
-  const [preference, updatePreference] = useState<ThemePreference>("system");
+  // The public website stays in the light palette for readability and
+  // consistent branding. Native apps continue to follow the device setting.
+  const [preference, updatePreference] = useState<ThemePreference>(
+    Platform.OS === "web" ? "light" : "system",
+  );
   const edited = useRef(false);
   const writes = useRef<Promise<unknown>>(Promise.resolve());
   useEffect(() => {
@@ -41,7 +45,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     void AsyncStorage.getItem(themeStorageKey)
       .then((saved) => {
         if (active && !edited.current)
-          updatePreference(parseThemePreference(saved));
+          updatePreference(
+            Platform.OS === "web" ? "light" : parseThemePreference(saved),
+          );
       })
       .catch(() => {});
     return () => {

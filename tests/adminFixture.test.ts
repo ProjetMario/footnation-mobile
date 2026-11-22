@@ -56,6 +56,11 @@ it("scopes the club owner to red and the coach to Seniors A, and reflects revoke
     expect((await owner.rpc(name, { p_club_id: blue })).data).toBe(false);
     expect((await coach.rpc(name, { p_club_id: red })).data).toBe(false);
   }
+  const ownerInviteTeams = await owner.rpc("get_native_team_invitation_editor_teams", { p_club_id: red });
+  const coachInviteTeams = await coach.rpc("get_native_team_invitation_editor_teams", { p_club_id: red });
+  expect(ownerInviteTeams.data).toHaveLength(2);
+  expect(coachInviteTeams.data).toHaveLength(1);
+  expect(coachInviteTeams.data?.[0]).toMatchObject({ id: team });
   expect(
     (await owner.rpc("get_native_calendar_editor_teams", { p_club_id: red }))
       .data,
@@ -523,6 +528,24 @@ it("changes primary assignments with a concurrency guard and validates a local t
         .select("id,team:teams(name,category)")
     ).data,
   ).toHaveLength(1);
+});
+
+it("requires a fresh coach invitation instead of restoring a rejected assignment", async () => {
+  const owner = await sign(), coach = await sign("coach");
+  const coachId = (await coach.auth.getUser()).data.user!.id;
+  const disabled = await owner.from("team_members").update({
+    status: "rejected", is_active: false, is_primary: false,
+  }).eq("id", "e0000000-0000-4000-8000-000000000001");
+  expect(disabled.error).toBeNull();
+  const result = await owner.rpc("set_native_primary_team", {
+    p_club_id: red, p_profile_id: coachId, p_team_id: team, p_expected_team_id: null,
+  });
+  expect(result.error).toMatchObject({
+    code: "42501",
+    message: "Envoyez une nouvelle invitation de coach et faites-la accepter avant de choisir cette équipe principale.",
+  });
+  const rows = await owner.from("team_members").select("status,is_active,is_primary").eq("id", "e0000000-0000-4000-8000-000000000001");
+  expect(rows.data?.[0]).toMatchObject({status: "rejected", is_active: false, is_primary: false});
 });
 it("shows the created calendar session only to members of its actual team", async () => {
   const owner = await sign(),

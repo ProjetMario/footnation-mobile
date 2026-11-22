@@ -40,6 +40,7 @@ import {
 } from "../components/ui";
 import { AuthGate } from "../components/AuthGate";
 import { visibleMessageReads } from "../lib/visibleMessageReads";
+import { confirmMessageReads } from "../lib/messageReadReceipt";
 import { useTheme } from "../theme";
 import { MessageMediaComposer } from "../components/MessageMediaComposer";
 import { MessageAttachmentView } from "../components/MessageAttachmentView";
@@ -110,6 +111,8 @@ export default function Conversation() {
 function ConversationContent({ id }: { id: string }) {
   const { colors, mode: themeMode } = useTheme();
   const s = useUIStyles();
+  const [showOptions, setShowOptions] = useState(false);
+  const [showEmojis, setShowEmojis] = useState(false);
 
   const { session, profile } = useAuth();
   const peer = useProfile(id);
@@ -287,17 +290,7 @@ function ConversationContent({ id }: { id: string }) {
         !context.current.active
       )
         return [];
-      const result = await supabase
-        .from("messages")
-        .update({ read_at: new Date().toISOString() })
-        .eq("receiver_id", uid)
-        .eq("sender_id", id)
-        .in("id", ids)
-        .is("read_at", null)
-        .or("is_blocked.is.null,is_blocked.eq.false")
-        .select("id");
-      if (result.error) throw result.error;
-      return ids;
+      return confirmMessageReads(supabase, uid, id, ids);
     },
     onSuccess: (ids) => {
       ids.forEach((messageId) => completed.current.add(messageId));
@@ -620,9 +613,16 @@ function ConversationContent({ id }: { id: string }) {
           </View>
         </View>
       }
+      right={
+        <Pressable accessibilityRole="button" accessibilityLabel="Options de la conversation" accessibilityState={{ expanded: showOptions }} onPress={() => setShowOptions(value => !value)} style={{ padding: 12, minWidth: 44, alignItems: "center" }}>
+          <Text style={{ color: colors.ink, fontSize: 22 }}>•••</Text>
+        </Pressable>
+      }
       scroll={false}
     >
       <AuthGate>
+        <View style={{ flex: 1, minHeight: 0, width: "100%", maxWidth: 860, alignSelf: "center" }}>
+        {!!showOptions && <View>
         <View
           style={[
             s.row,
@@ -674,25 +674,28 @@ function ConversationContent({ id }: { id: string }) {
             />
           </View>
         )}
+        </View>}
         <KeyboardAvoidingView
-          style={{ flex: 1 }}
+          style={{ flex: 1, minHeight: 0 }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <FlatList
+            style={{ flex: 1, minHeight: 0 }}
+            keyboardShouldPersistTaps="handled"
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={viewabilityConfig}
             inverted
             data={threadMessages}
             keyExtractor={(m) => m.id}
-            contentContainerStyle={{ padding: 20, gap: 10 }}
+            contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1 }}
             renderItem={({ item }) => {
               const own = item.sender_id === session?.user.id;
               return (
                 <View
                   style={{
                     alignSelf: own ? "flex-end" : "flex-start",
-                    maxWidth: "85%",
-                    padding: 14,
+                    maxWidth: "88%",
+                    padding: 16,
                     borderRadius: 18,
                     backgroundColor: own ? "#0064D8" : colors.surfaceRaised,
                     borderWidth: own ? 0 : 1,
@@ -780,11 +783,16 @@ function ConversationContent({ id }: { id: string }) {
             }
           />
           {!!markRead.error && (
-            <ErrorState error={markRead.error} retry={() => markRead.reset()} />
+            <View accessibilityLiveRegion="polite" style={{ paddingHorizontal: 16, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <Text style={s.small}>Confirmation de lecture en attente.</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Réessayer la confirmation de lecture" onPress={() => markRead.reset()} style={{ padding: 6 }}>
+                <Text style={[s.small, { color: colors.blue }]}>Réessayer</Text>
+              </Pressable>
+            </View>
           )}
           <View
             style={{
-              padding: 16,
+              padding: 12,
               borderTopWidth: 1,
               borderColor: colors.border,
               backgroundColor: colors.surface,
@@ -796,11 +804,9 @@ function ConversationContent({ id }: { id: string }) {
                 <Text style={s.small}>
                   Ajoutez ce membre à votre réseau pour lui écrire.
                 </Text>
-                <Button
-                  title="Voir le profil et l’inviter"
-                  secondary
-                  onPress={() => router.push(`/profile/${id}`)}
-                />
+                <Pressable accessibilityRole="button" accessibilityLabel="Voir le profil et l’inviter" onPress={() => router.push(`/profile/${id}`)} style={{ paddingVertical: 6 }}>
+                  <Text style={{ color: colors.blue, fontFamily: "Inter-Bold" }}>Voir le profil et l’inviter →</Text>
+                </Pressable>
                 {!!relations.error && (
                   <ErrorState
                     error={relations.error}
@@ -819,13 +825,9 @@ function ConversationContent({ id }: { id: string }) {
             {!outboxReady && !outboxError ? (
               <Text style={s.small}>Récupération des envois en attente…</Text>
             ) : null}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                flexWrap: "wrap",
-              }}
+            {!!allowed && <View style={{ gap: 8 }}>
+            {!!showEmojis && <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}
             >
               {quickEmojis.map((emoji) => (
                 <Pressable
@@ -854,7 +856,11 @@ function ConversationContent({ id }: { id: string }) {
                   <Text style={{ fontSize: 20 }}>{emoji}</Text>
                 </Pressable>
               ))}
-            </View>
+            </View>}
+            <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8 }}>
+            <Pressable accessibilityRole="button" accessibilityLabel={showEmojis ? "Masquer les emojis" : "Afficher les emojis"} accessibilityState={{ expanded: showEmojis }} onPress={() => setShowEmojis(value => !value)} style={{ padding: 10, minHeight: 44 }}>
+              <Text style={{ color: colors.muted, fontSize: 22 }}>☺</Text>
+            </Pressable>
             <TextInput
               accessibilityLabel="Votre message"
               placeholder="Votre message…"
@@ -864,7 +870,7 @@ function ConversationContent({ id }: { id: string }) {
               onChangeText={setDraft}
               multiline
               maxLength={10000}
-              style={[s.input, { maxHeight: 120 }]}
+              style={[s.input, { flex: 1, minWidth: 0, minHeight: 44, maxHeight: 104, fontSize: 16, lineHeight: 23, textAlignVertical: "top", paddingVertical: 10 }]}
               editable={
                 outboxReady &&
                 allowed &&
@@ -874,8 +880,10 @@ function ConversationContent({ id }: { id: string }) {
                 !abandoning
               }
             />
+            <View style={{ width: proposal ? 110 : 48 }}>
             <Button
-              title={proposal ? "Vérifier et réessayer l’envoi" : "Envoyer"}
+              accessibilityLabel={proposal ? "Vérifier et réessayer l’envoi" : "Envoyer"}
+              title={proposal ? "Réessayer" : "↑"}
               onPress={() => void submit()}
               busy={preparing || send.isPending}
               disabled={
@@ -886,6 +894,8 @@ function ConversationContent({ id }: { id: string }) {
                 (!proposal && !allowed)
               }
             />
+            </View>
+            </View>
             {!!(session && attachments.data) && (
               <MessageMediaComposer
                 uid={session.user.id}
@@ -922,8 +932,10 @@ function ConversationContent({ id }: { id: string }) {
                 </Text>
               </View>
             )}
+            </View>}
           </View>
         </KeyboardAvoidingView>
+        </View>
       </AuthGate>
     </Screen>
   );

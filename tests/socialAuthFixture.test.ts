@@ -90,3 +90,51 @@ it("does not fabricate successful signup for anonymous or incomplete requests", 
     true,
   );
 });
+
+it.each(["google", "apple"] as const)(
+  "exchanges a real SDK PKCE flow for the synthetic %s provider only once",
+  async (provider) => {
+    const client = createClient(base, "fixture-only", {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        flowType: "pkce",
+      },
+    });
+    clients.push(client);
+    const { data, error } = await client.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: "http://localhost:8082/auth/callback",
+        skipBrowserRedirect: true,
+      },
+    });
+    expect(error).toBeNull();
+    const authorize = new URL(data.url!);
+    authorize.searchParams.set("fixture_role", "new");
+    const response = await fetch(authorize, { redirect: "manual" });
+    expect(response.status).toBe(302);
+    const callback = new URL(response.headers.get("location")!);
+    expect(callback.pathname).toBe("/auth/callback");
+    expect(callback.searchParams.has("social")).toBe(false);
+    const code = callback.searchParams.get("code")!;
+    const signedIn = await client.auth.exchangeCodeForSession(code);
+    expect(signedIn.error).toBeNull();
+    expect((await client.rpc("get_social_signup_status")).data.required).toBe(
+      true,
+    );
+    if (provider === "apple") {
+      const saved = await client.functions.invoke("apple-auth-credentials", {
+        body: {
+          providerRefreshToken: signedIn.data.session!.provider_refresh_token,
+        },
+      });
+      expect(saved.error).toBeNull();
+      expect(saved.data).toEqual({ stored: true });
+    }
+    expect(
+      (await client.auth.exchangeCodeForSession(code)).error,
+    ).not.toBeNull();
+  },
+);

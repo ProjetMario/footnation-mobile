@@ -27,11 +27,13 @@ for (const item of [
   "app",
   "src",
   "assets",
+  "shared",
   "app.json",
   "app.config.js",
   "tsconfig.json",
 ])
   cpSync(join(root, item), join(directory, item), { recursive: true });
+// Shared editorial modules use the same self-contained imports as store builds.
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 writeFileSync(
   join(directory, "package.json"),
@@ -50,6 +52,7 @@ writeFileSync(
   join(directory, "metro.config.js"),
   `const { getDefaultConfig } = require('expo/metro-config');
 const config = getDefaultConfig(__dirname);
+if (!config.resolver.assetExts.includes('woff2')) config.resolver.assetExts.push('woff2');
 // Asset modules contain paths relative to this disposable project. Never reuse
 // their transforms from a previous copy whose directory may have been removed.
 config.cacheVersion = __dirname;
@@ -58,12 +61,17 @@ config.resolver.nodeModulesPaths = [${JSON.stringify(join(root, "node_modules"))
 module.exports = config;\n`,
 );
 // Distinct sessions ensure a real stored session can never be refreshed against the mock.
-const clientFile = join(directory, "src/lib/supabase.ts");
+const storageFile = join(directory, "src/lib/sessionStorage.ts");
+const storageSource = readFileSync(storageFile, "utf8");
+if (!storageSource.includes('sessionStorageKey = "footnation-auth"'))
+  throw new Error(
+    "Le stockage de session a changé : isolation à adapter avant la recette.",
+  );
 writeFileSync(
-  clientFile,
-  readFileSync(clientFile, "utf8").replace(
-    '"footnation-native-auth"',
-    '"footnation-recipe-auth"',
+  storageFile,
+  storageSource.replace(
+    'sessionStorageKey = "footnation-auth"',
+    'sessionStorageKey = "footnation-recipe-auth"',
   ),
 );
 const env = Object.fromEntries(
@@ -108,6 +116,8 @@ server.listen(apiPort, "127.0.0.1", () => {
       "--localhost",
       "--port",
       String(webPort),
+      "--max-workers",
+      "2",
     ],
     { cwd: directory, env, stdio: "inherit" },
   );

@@ -53,6 +53,19 @@ function adapter() {
   return { values, store };
 }
 describe("durable post publication", () => {
+  it("publishes text without media or any storage upload, and rejects an empty post", async () => {
+    const draft = newPostDraft(userId, postId);
+    expect(() => freezePostDraft(draft, vi.fn())).toThrow("Ajoutez du texte");
+    const publicUrl = vi.fn();
+    const frozen = freezePostDraft({ ...draft, content: "  Une nouvelle idée football  " }, publicUrl);
+    const { api, rows } = services();
+    expect(await createPostPublication(frozen).publish(api)).toBe(postId);
+    expect(rows.get(postId)).toMatchObject({ content: "Une nouvelle idée football", image_url: null, video_url: null });
+    expect(api.upload).not.toHaveBeenCalled();
+    expect(publicUrl).not.toHaveBeenCalled();
+    expect(api.insert).toHaveBeenCalledOnce();
+  });
+
   it("reconciles a lost insertion response without creating a duplicate", async () => {
     const { api, rows } = services();
     api.insert = vi.fn(async (record) => {

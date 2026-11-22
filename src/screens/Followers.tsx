@@ -1,5 +1,7 @@
 import React, { useCallback, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { FlatList, Pressable, Text, View, StyleSheet } from "react-native";
+import { ChevronRight } from "lucide-react-native";
+import { useTheme } from "../theme";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
@@ -8,7 +10,6 @@ import { AuthGate } from "../components/AuthGate";
 import {
   Avatar,
   Button,
-  Chip,
   Empty,
   ErrorState,
   Loading,
@@ -53,6 +54,8 @@ function FollowerContent({
   initialDirection: "followers" | "following";
 }) {
   const s = useUIStyles();
+  const { colors } = useTheme();
+  const [activeControl, setActiveControl] = useState<string | null>(null);
 
   const { session } = useAuth();
   const uid = session?.user.id;
@@ -105,36 +108,75 @@ function FollowerContent({
   ];
   const total = query.data?.pages[0]?.total;
   return (
-    <Screen title="FootLovers et abonnements" scroll={false}>
+    <Screen title="Réseau" scroll={false}>
       <AuthGate>
         <FlatList
           data={rows}
           keyExtractor={(row) => row.id}
-          contentContainerStyle={s.content}
+          contentContainerStyle={[s.content, { gap: 0 }]}
           ListHeaderComponent={
-            <View style={{ gap: 12 }}>
-              <View style={s.row}>
-                <Chip
-                  label="FootLovers"
-                  selected={direction === "followers"}
-                  onPress={() => setDirection("followers")}
-                />
-                <Chip
-                  label="Abonnements"
-                  selected={direction === "following"}
-                  onPress={() => setDirection("following")}
-                />
+            <View style={{ gap: 12, marginBottom: 14 }}>
+              <View
+                style={[
+                  styles.tabs,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                {(
+                  [
+                    ["followers", "FootLovers"],
+                    ["following", "Abonnements"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <Pressable
+                    key={value}
+                    accessibilityRole="tab"
+                      aria-selected={direction === value}
+                    accessibilityLabel={label}
+                    accessibilityState={{ selected: direction === value }}
+                    onPress={() => setDirection(value)}
+                    onFocus={() => setActiveControl(value)}
+                    onBlur={() => setActiveControl(null)}
+                    style={({ pressed }) => [
+                      styles.tab,
+                      {
+                        backgroundColor:
+                          direction === value
+                            ? colors.accentSoft
+                            : "transparent",
+                        borderColor:
+                          activeControl === value ? colors.blue : "transparent",
+                        opacity: pressed ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          direction === value ? colors.deepBlue : colors.muted,
+                        fontWeight: "700",
+                        fontSize: 13,
+                      }}
+                    >
+                      {label}
+                    </Text>
+                    {direction === value && typeof total === "number" && (
+                      <Text
+                        style={{
+                          color: colors.deepBlue,
+                          fontSize: 12,
+                          fontWeight: "700",
+                        }}
+                      >
+                        {total}
+                      </Text>
+                    )}
+                  </Pressable>
+                ))}
               </View>
-              {typeof total === "number" && (
-                <Text style={s.subtitle}>
-                  {total}{" "}
-                  {direction === "followers" ? "FootLovers" : "abonnement(s)"}
-                </Text>
-              )}
-              <Text style={s.small}>
-                Ouvrez un profil pour consulter ses informations ou gérer votre
-                suivi.
-              </Text>
               {!!(query.error && rows.length) && (
                 <ErrorState
                   error={query.error}
@@ -149,20 +191,53 @@ function FollowerContent({
               profile?.full_name || profile?.username || "Compte indisponible";
             return (
               <Pressable
-                style={s.card}
+                style={({ pressed }) => [
+                  styles.person,
+                  {
+                    borderBottomColor: colors.border,
+                    backgroundColor:
+                      activeControl === item.id
+                        ? colors.accentSoft
+                        : "transparent",
+                    opacity: !profile ? 0.55 : pressed ? 0.7 : 1,
+                  },
+                ]}
+                onHoverIn={() => setActiveControl(item.id)}
+                onHoverOut={() => setActiveControl(null)}
+                onFocus={() => setActiveControl(item.id)}
+                onBlur={() => setActiveControl(null)}
                 accessibilityRole="button"
-                accessibilityLabel={name}
+                accessibilityLabel={
+                  profile ? `Voir le profil de ${name}` : name
+                }
+                accessibilityState={{ disabled: !profile }}
                 disabled={!profile}
                 onPress={() => {
                   if (profile) router.push(`/profile/${profile.id}`);
                 }}
               >
                 <View style={s.row}>
-                  <Avatar uri={profile?.avatar_url} name={name} size={48} />
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={s.h2}>{name}</Text>
+                  <Avatar uri={profile?.avatar_url} name={name} size={44} />
+                  <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: colors.ink,
+                        fontSize: 15,
+                        fontWeight: "700",
+                      }}
+                    >
+                      {name}
+                    </Text>
                     {!!profile && (
-                      <Text style={s.subtitle}>
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: colors.muted,
+                          fontSize: 12,
+                          lineHeight: 18,
+                        }}
+                      >
                         {[profile.primary_role, profile.club]
                           .filter(Boolean)
                           .join(" · ") || "Membre FootNation"}
@@ -174,13 +249,8 @@ function FollowerContent({
                       </Text>
                     )}
                   </View>
+                  {!!profile && <ChevronRight size={17} color={colors.muted} />}
                 </View>
-                {Number.isFinite(Date.parse(item.created_at)) ? (
-                  <Text style={s.small}>
-                    Depuis le{" "}
-                    {new Date(item.created_at).toLocaleDateString("fr-FR")}
-                  </Text>
-                ) : null}
               </Pressable>
             );
           }}
@@ -219,3 +289,32 @@ function FollowerContent({
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  tabs: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 4,
+  },
+  tab: {
+    flex: 1,
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 7,
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  person: {
+    minHeight: 76,
+    paddingHorizontal: 8,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+  },
+});

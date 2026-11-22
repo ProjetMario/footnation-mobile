@@ -220,7 +220,10 @@ function CreateOrganization({
           },
           insert: async (row) => {
             const r = await supabase.from("organizations").insert(row);
-            if (r.error) throw r.error;
+            if (r.error)
+              throw new Error(
+                r.error.message || "La création de l’organisation a échoué.",
+              );
           },
         },
         { id, created_by: uid, ...payload },

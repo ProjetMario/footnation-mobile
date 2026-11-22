@@ -1,6 +1,9 @@
+import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, { useState } from "react";
 import {
-  Modal,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -100,145 +103,147 @@ function ShortCommentsContent({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(0,0,0,0.6)",
-          justifyContent: width < 600 ? "flex-end" : "center",
-          alignItems: "center",
-          padding: width < 600 ? 0 : 24,
-        }}
-      >
-        <View
-          style={[
-            s.card,
-            {
-              width: "100%",
-              maxWidth: 600,
-              maxHeight: "90%",
-              gap: 16,
-              borderRadius: 20,
-            },
-          ]}
+      <SafeAreaView style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)" }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{
+            flex: 1,
+            justifyContent: width < 600 ? "flex-end" : "center",
+            alignItems: "center",
+            padding: width < 600 ? 0 : 24,
+          }}
         >
           <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
+            style={[
+              s.card,
+              {
+                width: "100%",
+                maxWidth: 600,
+                maxHeight: "90%",
+                gap: 16,
+                borderRadius: 20,
+              },
+            ]}
           >
-            <Text style={s.h2}>Commentaires</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Fermer les commentaires"
-              onPress={onClose}
+            <View
               style={{
-                width: 44,
-                height: 44,
+                flexDirection: "row",
                 alignItems: "center",
-                justifyContent: "center",
+                justifyContent: "space-between",
+                gap: 12,
               }}
             >
-              <X color={colors.ink} size={24} />
-            </Pressable>
-          </View>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ gap: 16 }}
-          >
-            {comments.isPending ? (
-              <Loading />
-            ) : comments.isError ? (
-              <ErrorState
-                error={new Error("Impossible de charger les commentaires.")}
-                retry={() => void comments.refetch()}
-              />
-            ) : !comments.data?.length ? (
-              <Text style={s.small}>Soyez le premier à commenter.</Text>
-            ) : (
-              comments.data.slice(0, limit).map((comment) => (
-                <View key={comment.id} style={{ gap: 8 }}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Voir le profil de ${displayName(comment.author)}`}
-                    onPress={() => {
-                      onClose();
-                      router.push(`/profile/${comment.user_id}`);
-                    }}
-                    style={{
-                      minHeight: 44,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 10,
-                    }}
-                  >
-                    <Avatar
-                      uri={comment.author?.avatar_url}
-                      name={displayName(comment.author)}
-                      size={32}
-                    />
-                    <Text
-                      style={[
-                        s.text,
-                        { fontFamily: "Inter-SemiBold", flex: 1 },
-                      ]}
+              <Text style={s.h2}>Commentaires</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fermer les commentaires"
+                onPress={onClose}
+                style={{
+                  width: 44,
+                  height: 44,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <X color={colors.ink} size={24} />
+              </Pressable>
+            </View>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ gap: 16 }}
+            >
+              {comments.isPending ? (
+                <Loading />
+              ) : comments.isError ? (
+                <ErrorState
+                  error={new Error("Impossible de charger les commentaires.")}
+                  retry={() => void comments.refetch()}
+                />
+              ) : !comments.data?.length ? (
+                <Text style={s.small}>Soyez le premier à commenter.</Text>
+              ) : (
+                comments.data.slice(0, limit).map((comment) => (
+                  <View key={comment.id} style={{ gap: 8 }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Voir le profil de ${displayName(comment.author)}`}
+                      onPress={() => {
+                        onClose();
+                        router.push(`/profile/${comment.user_id}`);
+                      }}
+                      style={{
+                        minHeight: 44,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
                     >
-                      {displayName(comment.author)}
+                      <Avatar
+                        uri={comment.author?.avatar_url}
+                        name={displayName(comment.author)}
+                        size={32}
+                      />
+                      <Text
+                        style={[
+                          s.text,
+                          { fontFamily: "Inter-SemiBold", flex: 1 },
+                        ]}
+                      >
+                        {displayName(comment.author)}
+                      </Text>
+                    </Pressable>
+                    <Text selectable style={[s.text, { paddingLeft: 42 }]}>
+                      {comment.content}
                     </Text>
-                  </Pressable>
-                  <Text selectable style={[s.text, { paddingLeft: 42 }]}>
-                    {comment.content}
-                  </Text>
-                </View>
-              ))
-            )}
-            {!!(comments.data && comments.data.length > limit) && (
-              <Button
-                title="Voir plus de commentaires"
-                secondary
-                onPress={() => setLimit((value) => value + 30)}
+                  </View>
+                ))
+              )}
+              {!!(comments.data && comments.data.length > limit) && (
+                <Button
+                  title="Voir plus de commentaires"
+                  secondary
+                  onPress={() => setLimit((value) => value + 30)}
+                />
+              )}
+              <Field
+                label="Votre commentaire"
+                value={content}
+                onChangeText={(value) => {
+                  setContent(value);
+                  send.reset();
+                }}
+                multiline
+                maxLength={SHORT_COMMENT_LIMIT}
+                editable={!send.isPending}
               />
-            )}
-          </ScrollView>
-          <Field
-            label="Votre commentaire"
-            value={content}
-            onChangeText={(value) => {
-              setContent(value);
-              send.reset();
-            }}
-            multiline
-            maxLength={SHORT_COMMENT_LIMIT}
-            editable={!send.isPending}
-          />
-          {!!send.isError && (
-            <Text accessibilityRole="alert" style={s.small}>
-              {send.error.message}
-            </Text>
-          )}
-          {profileStatus === "missing" ? (
-            <Button
-              title="Enregistrer mon profil"
-              onPress={() => {
-                onClose();
-                router.push({
-                  pathname: "/profile-setup",
-                  params: { next: `/shorts/${shortId}` },
-                });
-              }}
-            />
-          ) : (
-            <Button
-              title="Publier le commentaire"
-              busy={send.isPending}
-              disabled={!content.trim()}
-              onPress={() => send.mutate()}
-            />
-          )}
-        </View>
-      </View>
+              {!!send.isError && (
+                <Text accessibilityRole="alert" style={s.small}>
+                  {send.error.message}
+                </Text>
+              )}
+              {profileStatus === "missing" ? (
+                <Button
+                  title="Enregistrer mon profil"
+                  onPress={() => {
+                    onClose();
+                    router.push({
+                      pathname: "/profile-setup",
+                      params: { next: `/shorts/${shortId}` },
+                    });
+                  }}
+                />
+              ) : (
+                <Button
+                  title="Publier le commentaire"
+                  busy={send.isPending}
+                  disabled={!content.trim()}
+                  onPress={() => send.mutate()}
+                />
+              )}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </Modal>
   );
 }

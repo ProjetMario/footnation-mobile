@@ -11,6 +11,7 @@ import {
   useAdminLayout,
 } from "../components/admin/AdminUI";
 import { AdminRecords } from "../components/admin/AdminRecords";
+import { AdminDecisions } from "../components/admin/AdminDecisions";
 import {
   AdminOverview,
   AdminPerformance,
@@ -155,6 +156,7 @@ function Dashboard() {
           </View>
         )}
         {section === "moderation" && <Moderation />}
+        {section === "decisions" && <AdminDecisions />}
         {section === "posthog" && <AdminPosthog />}
       </View>
       <View style={styles.card}>

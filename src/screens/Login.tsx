@@ -7,9 +7,12 @@ import { Screen, Brand, Field, Button, useUIStyles } from "../components/ui";
 import { normalizeReferral } from "../lib/referral";
 import { useTheme } from "../theme";
 import { useAuth } from "../lib/auth";
+import { authUnavailableMessage, isTransientAuthFailure, recoverAuthRead } from "../lib/authServiceRecovery";
 
 import { SocialAuthButtons } from "../components/SocialAuthButtons";
 import { socialAuthAttempts } from "../lib/socialAuthAttempt";
+import { socialProvider } from "../lib/socialAuthPolicy";
+import { postSocialCallbackRoute } from "../lib/socialOnboarding";
 export default function Login() {
   const { colors } = useTheme();
   const s = useUIStyles();
@@ -17,6 +20,9 @@ export default function Login() {
   const { requestNetworkInvite, session } = useAuth();
   const params = useLocalSearchParams<{
     mode?: string;
+    signup?: string;
+    redirect?: string;
+    returnTo?: string;
     ref?: string;
     next?: string;
     teamInvite?: string;
@@ -44,18 +50,21 @@ export default function Login() {
         password,
       });
       if (error) throw error;
-      const current = await supabase.auth.getSession();
+      const current = await recoverAuthRead(() => supabase.auth.getSession());
       if (current.error) throw current.error;
       if (
         !data.session ||
         current.data.session?.user.id !== data.session.user.id
       )
         return;
-      if (data.session && next !== "/suppression-compte")
-        requestNetworkInvite(data.session);
-      router.replace(next || "/");
+      const destination = await postSocialCallbackRoute(data.session, {
+        next,
+        referral,
+      });
+      if (destination.inviteNetwork) requestNetworkInvite(data.session);
+      router.replace(destination.route);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Connexion impossible.");
+      setError(isTransientAuthFailure(e) ? authUnavailableMessage : e instanceof Error ? e.message : "Connexion impossible.");
     } finally {
       pending.current = false;
       setBusy(null);
@@ -74,7 +83,7 @@ export default function Login() {
         />
       </Screen>
     );
-  if (params.mode === "signup")
+  if (params.mode === "signup" || params.signup === "1")
     return (
       <Redirect
         href={{
@@ -98,8 +107,54 @@ export default function Login() {
             Retrouvez toute la communauté FootNation.
           </Text>
         </View>
+        <View
+          style={{
+            gap: 14,
+            padding: 18,
+            borderRadius: 22,
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <View style={{ gap: 4 }}>
+            <Text
+              style={{ color: colors.ink, fontSize: 22, fontWeight: "800" }}
+            >
+              Connexion rapide
+            </Text>
+            <Text style={{ color: colors.muted, fontSize: 15 }}>
+              Rejoignez FootNation avec Google ou Apple.
+            </Text>
+          </View>
+          <SocialAuthButtons
+            next={next}
+            referral={referral}
+            autoStartProvider={socialProvider(params.retrySocial) || undefined}
+            disabled={busy === "password"}
+            onBusyChange={(value) => {
+              pending.current = value;
+              setBusy(value ? "social" : null);
+            }}
+          />
+        </View>
+        <View
+          accessibilityElementsHidden
+          style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+        >
+          <View
+            style={{ flex: 1, height: 1, backgroundColor: colors.border }}
+          />
+          <Text style={{ color: colors.muted, fontWeight: "700" }}>
+            ou avec votre e-mail
+          </Text>
+          <View
+            style={{ flex: 1, height: 1, backgroundColor: colors.border }}
+          />
+        </View>
         <Field
           label="Adresse e-mail"
+          placeholder="joueur@example.com"
           value={email}
           onChangeText={setEmail}
           editable={!busy}
@@ -160,16 +215,6 @@ export default function Login() {
           onPress={() => void login()}
           busy={busy === "password"}
           disabled={!!busy || !email.trim() || !password}
-        />
-        <SocialAuthButtons
-          next={next}
-          referral={referral}
-          autoStartProvider={params.retrySocial === "google" ? "google" : undefined}
-          disabled={busy === "password"}
-          onBusyChange={(value) => {
-            pending.current = value;
-            setBusy(value ? "social" : null);
-          }}
         />
         <Button
           title="Créer mon profil gratuitement"

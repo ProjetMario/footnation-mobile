@@ -3,6 +3,7 @@ const state = vi.hoisted(() => ({
   uid: "viewer",
   tables: {} as Record<string, Record<string, unknown>[]>,
   failures: {} as Record<string, Error>,
+  personalizedError: { code: "PGRST202", message: "Could not find the function public.get_social_feed_candidates in the schema cache" } as unknown,
 }));
 vi.mock("react", () => ({
   useCallback: (fn: unknown) => fn,
@@ -19,9 +20,23 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("../src/lib/auth", () => ({
   useAuth: () => ({ session: { user: { id: state.uid } } }),
 }));
+vi.mock("../src/lib/hiddenPostStorage", () => ({
+  hiddenPostStore: { list: async () => [] },
+}));
+vi.mock("../src/lib/personalizedPosts", async (original) => ({
+  ...(await original<typeof import("../src/lib/personalizedPosts")>()),
+  readPersonalizedPosts: async () => { throw state.personalizedError; },
+}));
 vi.mock("../src/lib/supabase", () => ({
   requireBackend: () => {},
-  supabase: { from: (table: string) => memoryQuery(table) },
+  supabase: {
+    from: (table: string) => memoryQuery(table),
+    // Exercise the documented fallback when the optional RPC is unavailable.
+    rpc: () => {
+      const result = Promise.resolve({ data: null, error: { code: "PGRST202" } });
+      return Object.assign(result, { abortSignal: () => result });
+    },
+  },
 }));
 import { useOpportunities, usePosts } from "../src/lib/data";
 import {
@@ -95,6 +110,7 @@ beforeEach(() => {
   state.uid = "viewer";
   state.tables = {};
   state.failures = {};
+  state.personalizedError = { code: "PGRST202", message: "Could not find the function public.get_social_feed_candidates in the schema cache" };
 });
 
 it("finds an old request behind twenty recent offers on the first Requests page", async () => {
@@ -122,9 +138,15 @@ it("loads an older video even when the twenty newest posts contain no video", as
     })),
     { id: "video", user_id: "author", video_url: "video.mp4" },
   ];
-  expect(await run(usePosts("all", "author", "video"))).toEqual([
+  expect((await run(usePosts("all", "author", "video"))).items).toEqual([
     { id: "video", user_id: "author", video_url: "video.mp4" },
   ]);
+});
+it("uses the existing feed when the personalized endpoint is missing, but not on authorization errors", async () => {
+  state.tables.posts = [{ id: "fixture-post", user_id: "author" }];
+  expect((await run(usePosts("all"))).items).toEqual(state.tables.posts);
+  state.personalizedError = { code: "42501", message: "permission denied" };
+  await expect(run(usePosts("all"))).rejects.toMatchObject({ code: "42501" });
 });
 it("counts all publications and the viewed profile's followers independently of the viewer", async () => {
   state.tables.posts = Array.from({ length: 45 }, (_, id) => ({

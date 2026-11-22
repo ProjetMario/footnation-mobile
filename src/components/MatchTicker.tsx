@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import Animated, {
   scrollTo,
@@ -22,14 +23,13 @@ import Animated, {
 } from "react-native-reanimated";
 import {
   ChevronRight,
-  Pause,
-  Play,
   Radio,
   RotateCcw,
 } from "lucide-react-native";
 import { useTheme, useThemedStyles, type ThemeColors } from "../theme";
 import { useFeaturedMatches } from "../lib/useMatches";
 import type { FeaturedMatch } from "../lib/featuredMatches";
+import { matchPreviewKey } from "../lib/matchPreview";
 
 function shortDate(date: string) {
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
@@ -117,13 +117,16 @@ function MatchPill({
   item,
   offline,
   duplicate = false,
+  onInteraction,
 }: {
   item: FeaturedMatch;
   offline: boolean;
   duplicate?: boolean;
+  onInteraction: () => void;
 }) {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const queryClient = useQueryClient();
   const { match } = item;
   const home = match.home.name.trim() || "Équipe domicile";
   const away = match.away.name.trim() || "Équipe extérieure";
@@ -140,18 +143,24 @@ function MatchPill({
       accessibilityRole="button"
       accessibilityLabel={`${home} contre ${away}. ${scoreDescription}. ${match.tournament.name || "Compétition non précisée"}. ${state}. ${freshness(item, offline)}`}
       accessibilityHint="Ouvre le détail du match."
-      onPress={() =>
+      onPressIn={onInteraction}
+      onPress={() => {
+        // Keep the selected score available while its detail refresh runs.
+        queryClient.setQueryData(
+          matchPreviewKey(item.date, match.external_match_id),
+          { ...item, stale: item.stale || offline },
+        );
         router.push(
           `/match/${encodeURIComponent(match.external_match_id)}?date=${encodeURIComponent(item.date)}`,
-        )
-      }
+        );
+      }}
       style={({ pressed }) => [
         styles.match,
         live ? styles.liveMatch : undefined,
         { opacity: pressed ? 0.65 : 1 },
       ]}
     >
-      <View style={styles.teams}>
+      <View style={styles.teams} pointerEvents="none">
         <TeamLogo
           uri={match.home.logo}
           abbreviation={
@@ -170,7 +179,7 @@ function MatchPill({
           }
         />
       </View>
-      <View style={styles.matchMeta}>
+      <View style={styles.matchMeta} pointerEvents="none">
         {!!live && <View style={styles.liveDot} />}
         <Text
           numberOfLines={1}
@@ -247,7 +256,6 @@ export function MatchTicker({ active = true }: { active?: boolean } = {}) {
   const autoDriving = useSharedValue(false);
   const [sequenceWidth, setSequenceWidth] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(0);
-  const [manualPause, setManualPause] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [keyboardFocus, setKeyboardFocus] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -305,14 +313,15 @@ export function MatchTicker({ active = true }: { active?: boolean } = {}) {
       });
     return () => {
       mounted = false;
-      motion.remove();
-      reader.remove();
+      motion?.remove();
+      reader?.remove();
       app.remove();
     };
   }, []);
-  const motionAllowed = preferencesReady && !reduceMotion && !screenReader;
   const canLoop =
-    motionAllowed &&
+    preferencesReady &&
+    !reduceMotion &&
+    !screenReader &&
     items.length > 1 &&
     sequenceWidth > viewportWidth + 1 &&
     viewportWidth > 0;
@@ -341,8 +350,10 @@ export function MatchTicker({ active = true }: { active?: boolean } = {}) {
       autoDriving.value = false;
     },
     onMomentumEnd: () => {
+      // iOS emits this for non-animated programmatic scrollTo calls too.
+      // Only an actual manual glide should restart the interaction cooldown.
+      if (momentum.value) cooldown.value = 5000;
       momentum.value = false;
-      cooldown.value = 5000;
     },
   });
   const frame = useFrameCallback(
@@ -393,13 +404,7 @@ export function MatchTicker({ active = true }: { active?: boolean } = {}) {
   }, [autoDriving, canLoop, offset, period, scrollRef, sequenceWidth]);
   useEffect(() => {
     const running =
-      canLoop &&
-      focused &&
-      active &&
-      foreground &&
-      !manualPause &&
-      !hovered &&
-      !keyboardFocus;
+      canLoop && focused && active && foreground && !hovered && !keyboardFocus;
     frame.setActive(running);
     if (!running) autoDriving.value = false;
     if (!focused || !active || !foreground) {
@@ -407,6 +412,8 @@ export function MatchTicker({ active = true }: { active?: boolean } = {}) {
       dragging.value = false;
       momentum.value = false;
       cooldown.value = 5000;
+      setHovered(false);
+      setKeyboardFocus(false);
     }
     return () => {
       frame.setActive(false);
@@ -423,7 +430,6 @@ export function MatchTicker({ active = true }: { active?: boolean } = {}) {
     frame,
     hovered,
     keyboardFocus,
-    manualPause,
     momentum,
     touching,
   ]);
@@ -434,42 +440,34 @@ export function MatchTicker({ active = true }: { active?: boolean } = {}) {
   };
   return (
     <View>
-      <View style={styles.ticker}>
+      <View
+        style={styles.ticker}
+        onTouchStart={() => {
+          touching.value = true;
+          hold();
+        }}
+        onTouchEnd={() => {
+          touching.value = false;
+          hold();
+        }}
+        onTouchCancel={() => {
+          touching.value = false;
+          hold();
+        }}
+      >
         <Pressable
           testID="match-ticker-toggle"
           accessibilityRole="button"
-          accessibilityLabel={
-            canLoop
-              ? manualPause
-                ? "Reprendre le défilement automatique des matchs"
-                : "Mettre en pause le défilement automatique des matchs"
-              : "Tous les matchs"
-          }
-          accessibilityHint={
-            canLoop
-              ? "Le bandeau reste défilable au doigt. Le bouton Tous ouvre la liste des matchs."
-              : undefined
-          }
-          onPress={() => {
-            if (canLoop) {
-              setManualPause((paused) => !paused);
-              cooldown.value = 0;
-            } else openMatches();
-          }}
+          accessibilityLabel="Tous les matchs"
+          accessibilityHint="Ouvre la liste des matchs."
+          onPressIn={hold}
+          onPress={openMatches}
           style={({ pressed }) => [
             styles.allMatches,
             { opacity: pressed ? 0.6 : 1 },
           ]}
         >
-          {canLoop ? (
-            manualPause ? (
-              <Play size={20} color={colors.blue} />
-            ) : (
-              <Pause size={20} color={colors.blue} />
-            )
-          ) : (
-            <Radio size={21} color={colors.blue} />
-          )}
+          <Radio size={21} color={colors.blue} />
           <Text style={styles.sectionName}>MATCHS</Text>
         </Pressable>
         <View
@@ -502,23 +500,14 @@ export function MatchTicker({ active = true }: { active?: boolean } = {}) {
             hold();
             setKeyboardFocus(false);
           }}
-          onTouchStart={() => {
-            touching.value = true;
-            hold();
-          }}
-          onTouchEnd={() => {
-            touching.value = false;
-            hold();
-          }}
-          onTouchCancel={() => {
-            touching.value = false;
-            hold();
-          }}
         >
           <Animated.ScrollView
             ref={scrollRef}
             testID="match-ticker-scroll"
             horizontal
+            // The UI-thread loop must not turn its synthetic momentum events
+            // into JS responder capture. Native drag/pan handling stays active.
+            disableScrollViewPanResponder={Platform.OS === "ios"}
             onLayout={(event) =>
               setViewportWidth(event.nativeEvent.layout.width)
             }
@@ -559,6 +548,7 @@ export function MatchTicker({ active = true }: { active?: boolean } = {}) {
                   key={`${item.date}:${item.match.external_match_id}`}
                   item={item}
                   offline={offline}
+                  onInteraction={hold}
                 />
               ))}
             </View>
@@ -577,6 +567,7 @@ export function MatchTicker({ active = true }: { active?: boolean } = {}) {
                     item={item}
                     offline={offline}
                     duplicate
+                    onInteraction={hold}
                   />
                 ))}
               </View>
@@ -586,6 +577,7 @@ export function MatchTicker({ active = true }: { active?: boolean } = {}) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Voir tous les matchs"
+          onPressIn={hold}
           onPress={openMatches}
           style={({ pressed }) => [styles.more, { opacity: pressed ? 0.6 : 1 }]}
         >
@@ -675,13 +667,13 @@ const createStyles = (colors: ThemeColors) =>
       textAlign: "center",
     },
     logoBox: {
-      width: 34,
-      height: 34,
+      width: 42,
+      height: 42,
       alignItems: "center",
       justifyContent: "center",
       flexShrink: 0,
     },
-    logo: { position: "absolute", width: 32, height: 32 },
+    logo: { position: "absolute", width: 42, height: 42 },
     score: {
       fontFamily: "Inter-Bold",
       color: colors.navy,

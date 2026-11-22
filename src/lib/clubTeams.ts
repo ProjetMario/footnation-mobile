@@ -3,6 +3,12 @@ export type ClubTeam = {
   name: string;
   category?: string | null;
   shortName?: string | null;
+  displayNumber?: number | null;
+  genderCode?: string | null;
+  discipline?: "football" | "futsal" | "loisir";
+  competitions?: string[];
+  sportsSummary?: { results: number; upcoming: number; rankings: number };
+  calendarComplete?: boolean;
   competition?: { name?: string | null } | null;
 };
 
@@ -45,7 +51,7 @@ export function presentClubTeam(team: ClubTeam): PresentedClubTeam {
   // Structured categories take priority over words in a club's display name.
   const nameText = normalize(team.name);
   const categoryGender = genderFrom(categoryText);
-  const gender =
+  const gender = team.genderCode === "M" ? "men" : team.genderCode === "F" ? "women" :
     categoryGender !== "unknown" ? categoryGender : genderFrom(nameText);
   const agesIn = (text: string) =>
     [...text.matchAll(/\bu\s*(\d{1,2})\b/g)]
@@ -57,7 +63,7 @@ export function presentClubTeam(team: ClubTeam): PresentedClubTeam {
   ].sort((a, b) => a - b);
   const text = categoryText || nameText;
   const numberMatch = categoryText.match(/\b[fm]\s*(\d+)\b|\bequipe\s*(\d+)\b/);
-  const number = numberMatch ? Number(numberMatch[1] || numberMatch[2]) : null;
+  const number = team.displayNumber ?? (numberMatch ? Number(numberMatch[1] || numberMatch[2]) : null);
   let section: TeamSection = "other";
   let category = team.category?.trim() || "Autres";
   let age = 0;
@@ -85,12 +91,14 @@ export function presentClubTeam(team: ClubTeam): PresentedClubTeam {
     } else if (/\bveterans?\b/.test(text)) category = "Vétérans";
     else if (/\bloisirs?\b/.test(text)) category = "Loisirs";
   }
-  const title =
+  let title =
     section === "seniors"
       ? `Séniors${number ? ` ${number}` : ""}`
       : section === "academy"
         ? `${category}${number ? ` · Équipe ${number}` : ""}`
         : team.name || category;
+  if (team.discipline === "futsal") title = `Futsal${number ? ` · Équipe ${number}` : ""}`;
+  if (team.discipline === "loisir") title = `Loisirs${number ? ` · Équipe ${number}` : ""}`;
   return { team, section, gender, category, age, number, title };
 }
 
@@ -102,6 +110,7 @@ export function sortClubTeams(teams: ClubTeam[]): PresentedClubTeam[] {
     .sort(
       (a, b) =>
         sections[a.section] - sections[b.section] ||
+        Number(a.team.discipline === "futsal") - Number(b.team.discipline === "futsal") ||
         b.age - a.age ||
         a.category.localeCompare(b.category, "fr", { numeric: true }) ||
         genders[a.gender] - genders[b.gender] ||

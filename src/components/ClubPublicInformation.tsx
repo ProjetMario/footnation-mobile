@@ -15,8 +15,10 @@ import {
   Shield,
 } from "lucide-react-native";
 import { useTheme } from "../theme";
+import { safeClubPublicInformation } from "../lib/clubIdentitySafety";
 
-export function ClubPublicInformation({ club }: { club: Record<string, any> }) {
+export function ClubPublicInformation({ club: rawClub }: { club: Record<string, any> }) {
+  const club = safeClubPublicInformation(rawClub);
   const { colors } = useTheme();
   const [cardWidth, setCardWidth] = useState(0);
   const enrichment = useMemo(

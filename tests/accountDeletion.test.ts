@@ -615,3 +615,44 @@ describe("Deletion of incomplete social accounts", () => {
     });
   });
 });
+
+describe("deployment without paid subscriptions", () => {
+  function setup(occupied = "", failed = false, stripeSecret = "", billingDisabled = true) {
+    const fetcher = vi.fn();
+    const admin = {
+      rpc: async () => ({ data: null, error: null }),
+      auth: { admin: { getUserById: async () => ({ data: { user: { id: uid } } }) } },
+      from: (table: string) => {
+        const read = { data: table === "profiles" ? { is_premium: false } : table === "subscriptions" ? null : [], error: null };
+        const query: any = {
+          ...read,
+          select: () => query,
+          eq: () => query,
+          maybeSingle: async () => read,
+          limit: async () => ({ data: table === occupied ? [{ id: "fixture" }] : [], error: failed ? { code: "offline" } : null }),
+        };
+        return query;
+      },
+    };
+    return { fetcher, services: createDeletionServices(admin as never, {
+      enabled: true, billingAudited: false, billingDisabled, stripeSecret, fetch: fetcher,
+    }) };
+  }
+  it("allows confirmed noncommercial deployment without calling Stripe", async () => {
+    const { services, fetcher } = setup();
+    expect(await services.inspect(uid)).toEqual({ subscriptionIds: [], checkoutIds: [] });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it.each(["subscriptions", "club_subscriptions", "native_account_deletion_checkouts", "profiles"])("refuses when %s contains billing evidence", async (table) => {
+    await expect(setup(table).services.inspect(uid)).rejects.toMatchObject({ code: "billing_unavailable" });
+  });
+  it("refuses unreadable billing state", async () => {
+    await expect(setup("", true).services.inspect(uid)).rejects.toMatchObject({ code: "billing_unavailable" });
+  });
+  it("does not bypass Stripe after a key is configured", async () => {
+    await expect(setup("", false, "test-key").services.inspect(uid)).rejects.toMatchObject({ code: "billing_unavailable" });
+  });
+  it("requires explicit noncommercial configuration", async () => {
+    await expect(setup("", false, "", false).services.inspect(uid)).rejects.toMatchObject({ code: "billing_unavailable" });
+  });
+});

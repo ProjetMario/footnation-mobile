@@ -56,7 +56,7 @@ export function hasInviteReadyProfile(profile: Profile | null): boolean {
   if (!profile) return false;
   switch (profile.account_type || "personal") {
     case "club":
-      return hasText(profile.club_official_name) && hasText(profile.bio);
+      return hasText(profile.club_official_name) || hasText(profile.full_name);
     case "business":
       return hasText(profile.business_name);
     case "institution":
@@ -106,6 +106,8 @@ export function canPresentNetworkInvite({
     ![
       "/login",
       "/signup",
+      "/onboarding",
+      "/social-signup",
       "/settings",
       "/profile-setup",
       "/reset-password",

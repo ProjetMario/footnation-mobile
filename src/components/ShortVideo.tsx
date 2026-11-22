@@ -15,6 +15,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import Slider from "@react-native-community/slider";
 import { useFocusEffect } from "expo-router";
 import { useSoundtrackPlayer } from "../lib/useSoundtrackPlayer";
 import { registerSoundActivation, setMediaMuted } from "../lib/mediaSound";
@@ -216,8 +217,11 @@ function ShortControl({
 }
 export function ShortVideo({
   uri,
+  fallbackUri,
   posterUri,
   visible = true,
+  preload = false,
+  onPlayingChange,
   autoplay = false,
   clip,
   musicUri,
@@ -229,8 +233,11 @@ export function ShortVideo({
   muted: controlledMuted,
 }: {
   uri: string;
+  fallbackUri?: string;
   posterUri?: string | null;
   visible?: boolean;
+  preload?: boolean;
+  onPlayingChange?: (playing: boolean) => void;
   autoplay?: boolean;
   clip?: ShortClip | null;
   musicUri?: string | null;
@@ -266,6 +273,8 @@ export function ShortVideo({
     play: boolean;
     request: number;
   }>();
+  const [scrubbing, setScrubbing] = useState<number | null>(null);
+  const resumeAfterScrub = useRef(false);
   const request = useRef(0),
     previousPlayRequest = useRef(playRequest);
   useFocusEffect(
@@ -281,6 +290,7 @@ export function ShortVideo({
     return () => subscription.remove();
   }, []);
   useEffect(() => {
+    setScrubbing(null);
     setWanted(autoplay);
     setOriginal(false);
     setSeek(undefined);
@@ -306,7 +316,13 @@ export function ShortVideo({
       });
     }
   }, [playRequest, clip?.start]);
-  const allowed = visible && focused && foreground && !calls.busy;
+  const available = focused && foreground && !calls.busy;
+  const allowed = visible && available;
+  const playingChange = useRef(onPlayingChange);
+  playingChange.current = onPlayingChange;
+  useEffect(() => {
+    playingChange.current?.(allowed && state.playing && state.ready);
+  }, [allowed, state.playing, state.ready]);
   useEffect(() => {
     if (!allowed)
       setState((value) =>
@@ -315,6 +331,20 @@ export function ShortVideo({
           : value,
       );
   }, [allowed]);
+  useEffect(() => {
+    if (!allowed) setScrubbing(null);
+  }, [allowed]);
+  const start = clip?.start ?? 0;
+  const length = Math.max(
+    0,
+    Math.min(clip?.duration ?? state.duration, state.duration - start),
+  );
+  const position = Math.max(
+    0,
+    Math.min(length, (scrubbing ?? state.seconds) - start),
+  );
+  const clock = (value: number) =>
+    `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, "0")}`;
   const music = !original && !!musicUri;
   const markers = (Array.isArray(goals) ? goals : []).filter(
     (value) =>
@@ -337,8 +367,10 @@ export function ShortVideo({
       <View style={style ? { flex: 1, minHeight: 80 } : { aspectRatio: 1 }}>
         <NativeVideo
           uri={uri}
+          fallbackUri={fallbackUri}
           posterUri={posterUri}
           visible={allowed}
+          preload={preload && available}
           active={wanted && allowed}
           clip={clip}
           seek={seek}
@@ -499,6 +531,53 @@ export function ShortVideo({
               ))}
             </ScrollView>
           )}
+        </View>
+      )}
+      {!controls && allowed && state.ready && length > 0 && (
+        <View
+          style={{
+            position: "absolute",
+            bottom: 84,
+            left: 16,
+            right: 16,
+            zIndex: 20,
+          }}
+        >
+          <View
+            style={{ flexDirection: "row", justifyContent: "space-between" }}
+          >
+            <Text style={{ color: "white", fontSize: 11 }}>
+              {clock(position)}
+            </Text>
+            <Text style={{ color: "white", fontSize: 11 }}>
+              {clock(length)}
+            </Text>
+          </View>
+          <Slider
+            accessibilityLabel="Position de la vidéo"
+            minimumValue={0}
+            maximumValue={length}
+            value={position}
+            minimumTrackTintColor="#FFFFFF"
+            maximumTrackTintColor="rgba(255,255,255,0.35)"
+            thumbTintColor="#FFFFFF"
+            style={{ width: "100%", height: 32 }}
+            onSlidingStart={() => {
+              resumeAfterScrub.current = wanted;
+              setScrubbing(state.seconds);
+              setWanted(false);
+            }}
+            onValueChange={(value) => setScrubbing(start + value)}
+            onSlidingComplete={(value) => {
+              setSeek({
+                seconds: start + Math.min(value, Math.max(0, length - 0.1)),
+                play: resumeAfterScrub.current,
+                request: ++request.current,
+              });
+              setWanted(resumeAfterScrub.current);
+              setScrubbing(null);
+            }}
+          />
         </View>
       )}
       {!!(music && allowed) && (

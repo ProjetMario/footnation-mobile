@@ -11,6 +11,7 @@ import type { Session } from "@supabase/supabase-js";
 import { onlineManager, useQueryClient } from "@tanstack/react-query";
 import { backendConfigured, supabase } from "./supabase";
 import sessionStorage from "./sessionStorage";
+import { readVerifiedWebSession } from "./verifiedWebSession";
 import { storyPublicationJournal } from "./storyPublicationStorage";
 import { postDraftJournal } from "./postDraftStorage";
 import { forgetMessageOutboxForAccount } from "./messageOutboxStorage";
@@ -31,11 +32,6 @@ import {
   type AuthProfileStatus,
 } from "./authProfileMemory";
 
-const fallbackMemberAccess: MemberAccess = {
-  state: "eligible",
-  allowed: true,
-  resend_available_at: null,
-};
 const Context = createContext<{
   session: Session | null;
   profile: Profile | null;
@@ -163,7 +159,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         showProfile(memory.current.read(sessionRef.current.user.id));
         return;
       }
-      const { data, error: sessionError } = await supabase.auth.getSession();
+      const { data, error: sessionError } =
+        Platform.OS === "web"
+          ? {
+              data: { session: await readVerifiedWebSession(supabase.auth) },
+              error: null,
+            }
+          : await supabase.auth.getSession();
       if (!current()) return;
       if (sessionError) throw sessionError;
       if (adoptSession(data.session)) generation = memory.current.begin();
@@ -179,14 +181,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .rpc("get_member_access_status")
         .setHeader("Authorization", "Bearer " + data.session.access_token);
       if (!current()) return;
-      let nextAccess: MemberAccess;
-      try {
-        if (admission.error) throw admission.error;
-        nextAccess = parseMemberAccess(admission.data);
-      } catch (reason) {
-        nextAccess = fallbackMemberAccess;
-        reportError(reason, "member-access");
-      }
+      if (admission.error) throw admission.error;
+      const nextAccess = parseMemberAccess(admission.data);
       setMemberAccess(nextAccess);
       if (!nextAccess.allowed) {
         setProfile(null);
@@ -253,7 +249,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, next) => {
       if (!mounted.current) return;
-      adoptSession(next);
+      if (Platform.OS === "web") {
+        // Broadcasts and INITIAL_SESSION read browser storage; validate them
+        // server-side before displaying a member or loading their profile.
+        memory.current.invalidate();
+        if (!next || sessionRef.current?.user.id !== next.user.id) {
+          adoptSession(null);
+          if (next) setLoading(true);
+        }
+      } else adoptSession(next);
       if (event === "PASSWORD_RECOVERY") {
         setNetworkInviteRequest(inviteQueue.current.cancel());
       }

@@ -34,6 +34,57 @@ function setup() {
   };
 }
 describe("OAuth attempt account binding", () => {
+  it("restores a fixed callback's provider and safe signup context after a reload", async () => {
+    const test = setup();
+    const attempt = await test.attempts.begin("apple", {
+      next: "/my-invitations?teamInvite=ABCDEFGHJK",
+      referral: "ABC123",
+    });
+    expect(await test.reload().resolve({})).toEqual({
+      id: attempt.id,
+      provider: "apple",
+      context: {
+        next: "/member/invitations?teamInvite=ABCDEFGHJK",
+        referral: "ABC123",
+      },
+    });
+  });
+  it("does not trust callback context over the locally initiated signup", async () => {
+    const test = setup();
+    const attempt = await test.attempts.begin("google", {
+      next: "/clubs",
+      referral: "ABC123",
+    });
+    expect(
+      await test.attempts.resolve({
+        social: "google",
+        attempt: attempt.id,
+        next: "/suppression-compte",
+        ref: "DEF456",
+      }),
+    ).toMatchObject({ context: { next: "/clubs", referral: "ABC123" } });
+    await expect(
+      test.attempts.resolve({ social: "apple", attempt: attempt.id }),
+    ).rejects.toThrow("incomplète");
+  });
+  it("rejects stripped parameters for older attempts but allows a clean e-mail flow", async () => {
+    const test = setup();
+    expect(await test.attempts.resolve({})).toBeNull();
+    await test.attempts.begin("google");
+    await expect(test.attempts.resolve({})).rejects.toThrow("incomplète");
+    await test.attempts.beginEmail();
+    expect(await test.attempts.resolve({})).toBeNull();
+  });
+  it("rejects an expired fixed callback and excludes unsafe destinations", async () => {
+    const test = setup();
+    await test.attempts.begin("google", {
+      next: "https://other.example",
+      referral: "invalid",
+    });
+    expect(await test.attempts.resolve({})).toMatchObject({ context: {} });
+    test.advance(600001);
+    await expect(test.attempts.resolve({})).rejects.toThrow("expiré");
+  });
   it("rejects a callback missing its OAuth parameters while a social attempt exists", async () => {
     const test = setup();
     await test.attempts.begin("google");

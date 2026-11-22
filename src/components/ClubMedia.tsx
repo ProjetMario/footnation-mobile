@@ -1,3 +1,5 @@
+import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import { PagedMediaViewer } from "./PagedMediaViewer";
 import { LinearGradient } from "expo-linear-gradient";
 import { MediaGrid } from "./MediaGrid";
@@ -15,7 +17,7 @@ import {
   ClubSectionHeading,
 } from "./ClubDesign";
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
@@ -442,7 +444,7 @@ export function ClubMedia({
           setPlaying(null);
         }}
       >
-        <View
+        <SafeAreaView
           style={{
             flex: 1,
             backgroundColor: "rgba(0,0,0,0.72)",
@@ -492,7 +494,7 @@ export function ClubMedia({
               {selected ? renderDetail(selected) : null}
             </ScrollView>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
       {!!(
         query.data && !query.data.pages.some((page) => page.items.length)

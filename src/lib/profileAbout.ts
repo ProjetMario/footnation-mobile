@@ -2,6 +2,7 @@ import { countryLabel } from "./profileSelectionOptions";
 import type { Profile } from "./models";
 import { validBirthdate, frenchCalendarDate } from "./calendarDate";
 import { formatAchievement } from "./profileFormatting";
+import { visibleJerseyNumber } from "./profileJersey";
 import {
   businessSectorOptions,
   institutionLevelOptions,
@@ -169,6 +170,7 @@ export function profileAboutSections(
       ...(player
         ? ([
             ["Poste principal", profile.position],
+            ["Numéro de maillot", visibleJerseyNumber(profile.jersey_number)],
             ["Postes secondaires", profile.secondary_positions],
             ["Pied fort", profile.strong_foot],
             ["Pied faible", profile.weak_foot],

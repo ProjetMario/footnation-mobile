@@ -1,13 +1,7 @@
+import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, { useState } from "react";
-import {
-  Linking,
-  Modal,
-  Platform,
-  ScrollView,
-  Share,
-  Text,
-  View,
-} from "react-native";
+import { Linking, Platform, ScrollView, Share, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { X } from "lucide-react-native";
 import { Button, IconButton, useUIStyles } from "./ui";
@@ -69,7 +63,7 @@ export function ShareCVSheet({
   ];
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose}>
-      <View
+      <SafeAreaView
         style={{
           flex: 1,
           backgroundColor: "rgba(2,6,23,0.55)",
@@ -150,7 +144,7 @@ export function ShareCVSheet({
             )}
           </ScrollView>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }

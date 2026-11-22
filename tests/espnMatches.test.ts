@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ESPN_LEAGUES,
+  clearEspnScoreboardCache,
+  fetchUpcomingFeaturedScoreboard,
   espnLeagueFromId,
   fetchEspnMatchDay,
   fetchFeaturedScoreboard,
@@ -88,6 +90,7 @@ function leagueFromUrl(input: unknown) {
 }
 
 afterEach(() => {
+  clearEspnScoreboardCache();
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -136,7 +139,7 @@ describe("ESPN normalization", () => {
       }),
     );
     const result = await fetchNationalMatchDay("2026-09-09");
-    expect(peak).toBeLessThanOrEqual(3);
+    expect(peak).toBeLessThanOrEqual(6);
     expect(result.matches).toHaveLength(NATIONAL_LEAGUES.length);
     expect(result.incomplete).toBe(false);
     expect(urls.every((url) => /dates=2026090[89]&/.test(url))).toBe(true);
@@ -153,6 +156,7 @@ describe("ESPN normalization", () => {
       }),
     );
     expect((await fetchNationalMatchDay("2026-09-09")).incomplete).toBe(true);
+    clearEspnScoreboardCache();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -284,6 +288,16 @@ describe("ESPN normalization", () => {
     }
   });
 
+  it("retains provider logos for club matches and national teams", () => {
+    const clubs = parseEspnScoreboard(payload("fra.1", [event()]), "fra.1", fetchedAt);
+    expect(clubs[0].matches[0].home.logo).toBe("https://a.espncdn.com/team-a.png");
+    expect(clubs[0].matches[0].away.logo).toBe("https://a.espncdn.com/team-b.png");
+    expect(clubs[0].teams.map(team => team.logo)).toEqual(expect.arrayContaining(["https://a.espncdn.com/team-a.png", "https://a.espncdn.com/team-b.png"]));
+    const nations = parseEspnScoreboard(payload("fifa.world", [event()]), "fifa.world", fetchedAt);
+    expect(nations[0].matches[0].home.logo).toBe("https://a.espncdn.com/team-a.png");
+    expect(nations[0].matches[0].away.logo).toBe("https://a.espncdn.com/team-b.png");
+  });
+
   it("rejects broken service envelopes but accepts successful empty coverage", () => {
     for (const invalid of [
       null,
@@ -324,7 +338,7 @@ describe("ESPN normalization", () => {
 });
 
 describe("bounded ESPN requests", () => {
-  it("loads daily results when the provider rejects date ranges", async () => {
+  it("only requests supported single dates, without failing range probes", async () => {
     const urls: string[] = [];
     vi.stubGlobal(
       "fetch",
@@ -339,6 +353,9 @@ describe("bounded ESPN requests", () => {
     const result = await fetchFeaturedScoreboard("2026-09-09", undefined, 0);
     expect(result.incomplete).toBe(false);
     expect(result.days.flatMap((day) => day.matches)).toHaveLength(6);
+    expect(
+      urls.some((url) => new URL(url).searchParams.get("dates")!.includes("-")),
+    ).toBe(false);
     expect(urls.filter((url) => /dates=2026090[89]&/.test(url))).toHaveLength(
       12,
     );
@@ -347,7 +364,7 @@ describe("bounded ESPN requests", () => {
     );
   });
 
-  it("requests six leagues in batches of at most three and merges their days", async () => {
+  it("bounds concurrent daily requests and merges the complete two-week window", async () => {
     let active = 0;
     let peak = 0;
     const urls: string[] = [];
@@ -363,10 +380,10 @@ describe("bounded ESPN requests", () => {
       }),
     );
     const result = await fetchFeaturedScoreboard("2026-09-09");
-    expect(peak).toBe(3);
-    expect(urls).toHaveLength(6);
+    expect(peak).toBe(6);
+    expect(urls).toHaveLength(6 * 17);
     expect(
-      urls.every((url) => url.endsWith("?dates=20260825-20260910&limit=100")),
+      urls.every((url) => /dates=2026(08|09)\d{2}&limit=100$/.test(url)),
     ).toBe(true);
     expect(result.incomplete).toBe(false);
     expect(result.days.flatMap((day) => day.matches)).toHaveLength(6);
@@ -389,7 +406,7 @@ describe("bounded ESPN requests", () => {
     );
     const result = await fetchFeaturedScoreboard("2026-09-09", undefined, 0);
     expect(
-      calls.every((url) => url.endsWith("?dates=20260908-20260910&limit=100")),
+      calls.every((url) => /dates=202609(08|09|10)&limit=100$/.test(url)),
     ).toBe(true);
     expect(result.days.map((day) => day.date)).toEqual(["2026-09-09"]);
     expect(result.days[0].matches).toHaveLength(6);
@@ -426,6 +443,7 @@ describe("bounded ESPN requests", () => {
     const partial = await fetchFeaturedScoreboard("2026-09-09");
     expect(partial.incomplete).toBe(true);
     expect(partial.days[0].matches).toHaveLength(5);
+    clearEspnScoreboardCache();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -462,7 +480,7 @@ describe("bounded ESPN requests", () => {
     });
     controller.abort();
     await assertion;
-    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(fetch).toHaveBeenCalledTimes(6);
     expect(signals.every((signal) => signal.aborted)).toBe(true);
   });
 
@@ -480,8 +498,7 @@ describe("bounded ESPN requests", () => {
     );
     await vi.advanceTimersByTimeAsync(10_000);
     expect(fetch).toHaveBeenCalledTimes(6);
-    expect(signals.slice(0, 3).every((signal) => signal.aborted)).toBe(true);
-    await vi.advanceTimersByTimeAsync(10_000);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
     await assertion;
     expect(signals.every((signal) => signal.aborted)).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
@@ -515,11 +532,114 @@ describe("bounded ESPN requests", () => {
     expect(result.date).toBe("2026-09-09");
     expect(result.matches).toHaveLength(2);
     expect(fetch.mock.calls[0][0]).toBe(
-      "https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates=20260908-20260910&limit=100",
+      "https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates=20260909&limit=100",
     );
     await expect(
       fetchEspnMatchDay("fra.1/evil", "2026-09-09"),
     ).rejects.toThrow();
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("progressive match loading", () => {
+  function calendarPayload(league: string, requested: string) {
+    const scheduled = ["2026-09-08", "2026-09-10", "2026-09-23"];
+    const events = scheduled.includes(requested)
+      ? [
+          event({
+            id: requested.replace(/-/g, ""),
+            date: `${requested}T19:00:00Z`,
+          }),
+        ]
+      : [];
+    const data = payload(league, events);
+    Object.assign(data.leagues[0], {
+      calendarType: "day",
+      calendarIsWhitelist: true,
+      calendarStartDate: "2026-06-01T04:00Z",
+      calendarEndDate: "2027-06-01T03:59Z",
+      calendar: scheduled.map((date) => `${date}T07:00Z`),
+    });
+    return data;
+  }
+  function requestedDay(input: unknown) {
+    return new URL(String(input)).searchParams
+      .get("dates")!
+      .replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3");
+  }
+
+  it("uses a fresh exhaustive calendar without losing fixtures at either end of the window", async () => {
+    const fetch = vi.fn(async (input: unknown) => ({
+      ok: true,
+      json: async () =>
+        calendarPayload(leagueFromUrl(input), requestedDay(input)),
+    }));
+    vi.stubGlobal("fetch", fetch);
+    const [past, future] = await Promise.all([
+      fetchFeaturedScoreboard("2026-09-09"),
+      fetchUpcomingFeaturedScoreboard("2026-09-09"),
+    ]);
+    expect(past.days.map((day) => day.date)).toEqual(["2026-09-08"]);
+    expect(future.days.map((day) => day.date)).toEqual([
+      "2026-09-10",
+      "2026-09-23",
+    ]);
+    expect(past.incomplete || future.incomplete).toBe(false);
+    const urls = fetch.mock.calls.map((call) => String(call[0]));
+    expect(new Set(urls).size).toBe(urls.length);
+    expect(urls).toHaveLength(4 * ESPN_LEAGUES.length);
+  });
+
+  it.each(["missing", "stage", "not-exhaustive", "other-season"])(
+    "does not skip dates based on a %s calendar",
+    async (kind) => {
+      const fetch = vi.fn(async (input: unknown) => {
+        const data = calendarPayload(leagueFromUrl(input), requestedDay(input));
+        if (kind === "missing")
+          Reflect.deleteProperty(data.leagues[0], "calendar");
+        if (kind === "stage")
+          Object.assign(data.leagues[0], { calendarType: "list" });
+        if (kind === "not-exhaustive")
+          Object.assign(data.leagues[0], { calendarIsWhitelist: false });
+        if (kind === "other-season")
+          Object.assign(data.leagues[0], {
+            calendarEndDate: "2025-06-01T04:00Z",
+          });
+        return { ok: true, json: async () => data };
+      });
+      vi.stubGlobal("fetch", fetch);
+      await fetchFeaturedScoreboard("2026-09-09", undefined, 1);
+      expect(fetch).toHaveBeenCalledTimes(4 * ESPN_LEAGUES.length);
+    },
+  );
+
+  it("shows real results before a slow league finishes and keeps the other results when it times out", async () => {
+    vi.useFakeTimers();
+    const snapshots: { days: unknown[]; incomplete: boolean }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: unknown) =>
+        leagueFromUrl(input) === "ger.1"
+          ? new Promise(() => {})
+          : Promise.resolve(response(leagueFromUrl(input))),
+      ),
+    );
+    let completed = false;
+    const request = fetchFeaturedScoreboard(
+      "2026-09-09",
+      undefined,
+      0,
+      (value) => snapshots.push(value),
+    ).then((value) => {
+      completed = true;
+      return value;
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(completed).toBe(false);
+    expect(snapshots.some((snapshot) => snapshot.days.length > 0)).toBe(true);
+    await vi.advanceTimersByTimeAsync(10_000);
+    const result = await request;
+    expect(result.days[0].matches).toHaveLength(5);
+    expect(result.incomplete).toBe(true);
   });
 });

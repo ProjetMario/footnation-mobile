@@ -1,4 +1,10 @@
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import { PostCommentError, publishPostComment } from "../lib/postComments";
+import {
+  readPostCommentLikes,
+  setPostCommentLike,
+  type PostCommentLike,
+} from "../lib/postCommentLikes";
 import { formatPublicationDate } from "../lib/publicationDate";
 import { usePostCommentDraft } from "../lib/usePostCommentDraft";
 import { contentReportPath } from "../lib/contentReport";
@@ -12,7 +18,6 @@ import React, { memo, useEffect, useMemo, useState } from "react";
 import {
   AppState,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -32,6 +37,7 @@ import { useMediaSound, registerSoundActivation } from "../lib/mediaSound";
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import {
@@ -54,15 +60,20 @@ import { Avatar, Button, Chip, useUIStyles } from "./ui";
 import { useTheme, useThemedStyles, type ThemeColors } from "../theme";
 import { Post, Profile, displayName } from "../lib/models";
 import { useAuth } from "../lib/auth";
+import { authenticatedInteraction } from "../lib/authenticatedInteraction";
 import { supabase } from "../lib/supabase";
 import { SavePost } from "./SavePost";
 import { UnfollowPostAuthor } from "./UnfollowPostAuthor";
 import { FollowAuthor } from "./FollowAuthor";
 import { useHiddenPosts } from "../lib/hiddenPosts";
 import { NativeVideo } from "./Video";
+import { resolveVideoSource } from "../lib/videoSource";
 import type { MediaPlaybackMemory } from "../lib/mediaFeed";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getDefaultMusic } from "../data/shortMusicLibrary";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { getMusicForPublication } from "../data/shortMusicLibrary";
 
 export const PostCard = memo(function PostCard({
   post,
@@ -84,12 +95,23 @@ export const PostCard = memo(function PostCard({
   const s = useUIStyles();
   const { session } = useAuth();
   const cache = useQueryClient();
+  const runAction = (action: () => void) =>
+    authenticatedInteraction(
+      session?.user.id,
+      `/posts/${post.id}`,
+      action,
+      (next) =>
+        router.push({ pathname: "/login", params: next ? { next } : {} }),
+    );
+  const reactTo = (type: string) => runAction(() => react.mutate(type));
   const { fontScale } = useWindowDimensions();
   const [expanded, setExpanded] = useState(false);
   const [picker, setPicker] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(initialCommentsOpen);
+  const [commentsOpen, setCommentsOpen] = useState(
+    initialCommentsOpen && !!session,
+  );
   const [likeBurst, setLikeBurst] = useState(0);
   const [shareOpen, setShareOpen] = useState(false);
   const playbackMemory = useMemo(
@@ -157,13 +179,13 @@ export const PostCard = memo(function PostCard({
     !menuOpen &&
     !commentsOpen &&
     !shareOpen;
-  const fallbackTrack = useMemo(() => getDefaultMusic(), []);
   const postMusic = post as Post & {
     music?: string | null;
     artist?: string | null;
     music_url?: string | null;
   };
-  const musicUri = postMusic.music_url || fallbackTrack.audioUrl;
+  const musicUri =
+    postMusic.music_url || getMusicForPublication(post.id).audioUrl;
   const reactionCount = post.post_reactions?.length || 0;
   const commentCount = post.post_comments?.[0]?.count || 0;
   const canEdit = session?.user.id === post.user_id;
@@ -230,7 +252,7 @@ export const PostCard = memo(function PostCard({
                 fontScale={fontScale}
                 canEdit={canEdit}
                 onBackToFeed={onBackToFeed}
-                onOpenMenu={() => setMenuOpen(true)}
+                onOpenMenu={() => runAction(() => setMenuOpen(true))}
                 overlay
               />
             </View>
@@ -262,10 +284,14 @@ export const PostCard = memo(function PostCard({
                         reactionCount={reactionCount}
                         commentCount={commentCount}
                         onReact={() =>
-                          react.mutate(reaction?.reaction_type || "love")
+                          reactTo(reaction?.reaction_type || "love")
                         }
-                        onChooseReaction={() => setPicker(true)}
-                        onOpenComments={() => setCommentsOpen(true)}
+                        onChooseReaction={() =>
+                          runAction(() => setPicker(true))
+                        }
+                        onOpenComments={() =>
+                          runAction(() => setCommentsOpen(true))
+                        }
                       />
                     </View>
                     <PostSoundtrack
@@ -290,8 +316,12 @@ export const PostCard = memo(function PostCard({
                         reactionCount={reactionCount}
                         commentCount={commentCount}
                         postId={post.id}
-                        onOpenComments={() => setCommentsOpen(true)}
-                        onChooseReaction={() => setPicker(true)}
+                        onOpenComments={() =>
+                          runAction(() => setCommentsOpen(true))
+                        }
+                        onChooseReaction={() =>
+                          runAction(() => setPicker(true))
+                        }
                       />
                     </>
                   )}
@@ -319,10 +349,8 @@ export const PostCard = memo(function PostCard({
                   <ReelsAction
                     label={`J’aime. ${reactionCount} réactions.`}
                     count={formatShortCount(reactionCount)}
-                    onPress={() =>
-                      react.mutate(reaction?.reaction_type || "love")
-                    }
-                    onLongPress={() => setPicker(true)}
+                    onPress={() => reactTo(reaction?.reaction_type || "love")}
+                    onLongPress={() => runAction(() => setPicker(true))}
                     disabled={react.isPending}
                   >
                     <Heart
@@ -335,7 +363,7 @@ export const PostCard = memo(function PostCard({
                   <ReelsAction
                     label={`${commentCount} commentaires. Ouvrir les commentaires.`}
                     count={formatShortCount(commentCount)}
-                    onPress={() => setCommentsOpen(true)}
+                    onPress={() => runAction(() => setCommentsOpen(true))}
                   >
                     <MessageCircle
                       size={34}
@@ -409,7 +437,7 @@ export const PostCard = memo(function PostCard({
               fontScale={fontScale}
               canEdit={canEdit}
               onBackToFeed={fullScreen ? onBackToFeed : undefined}
-              onOpenMenu={() => setMenuOpen(true)}
+              onOpenMenu={() => runAction(() => setMenuOpen(true))}
             />
             {!!hasMedia ? (
               <PostMedia
@@ -453,15 +481,22 @@ export const PostCard = memo(function PostCard({
                     compact={compact}
                     reactionCount={reactionCount}
                     commentCount={commentCount}
-                    onReact={() =>
-                      react.mutate(reaction?.reaction_type || "love")
+                    onReact={() => reactTo(reaction?.reaction_type || "love")}
+                    onChooseReaction={() => runAction(() => setPicker(true))}
+                    onOpenComments={() =>
+                      runAction(() => setCommentsOpen(true))
                     }
-                    onChooseReaction={() => setPicker(true)}
-                    onOpenComments={() => setCommentsOpen(true)}
                   />
                 </View>
                 {!!hasMedia && (
-                  <PostSoundtrack uri={musicUri} active={false} compact />
+                  <PostSoundtrack
+                    uri={musicUri}
+                    // Only the publication selected by the feed visibility
+                    // tracker may start its soundtrack. This keeps one item
+                    // audible at a time while scrolling through the feed.
+                    active={mediaVisible}
+                    compact
+                  />
                 )}
                 {!!(compact && !hasMedia) && (
                   <Pressable
@@ -480,8 +515,10 @@ export const PostCard = memo(function PostCard({
                     reactionCount={reactionCount}
                     commentCount={commentCount}
                     postId={post.id}
-                    onChooseReaction={() => setPicker(true)}
-                    onOpenComments={() => setCommentsOpen(true)}
+                    onChooseReaction={() => runAction(() => setPicker(true))}
+                    onOpenComments={() =>
+                      runAction(() => setCommentsOpen(true))
+                    }
                   />
                 </>
               )}
@@ -539,13 +576,13 @@ export const PostCard = memo(function PostCard({
             commentCount={commentCount}
             musicUri={musicUri}
             onClose={() => setDetailsOpen(false)}
-            onOpenMenu={() => setMenuOpen(true)}
-            onOpenComments={() => setCommentsOpen(true)}
-            onReact={() => react.mutate(reaction?.reaction_type || "love")}
-            onChooseReaction={() => setPicker(true)}
+            onOpenMenu={() => runAction(() => setMenuOpen(true))}
+            onOpenComments={() => runAction(() => setCommentsOpen(true))}
+            onReact={() => reactTo(reaction?.reaction_type || "love")}
+            onChooseReaction={() => runAction(() => setPicker(true))}
           />
         ) : (
-          <View style={styles.sheetBackdrop}>
+          <SafeAreaView style={styles.sheetBackdrop}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Fermer la publication"
@@ -619,7 +656,7 @@ export const PostCard = memo(function PostCard({
                 />
               </ScrollView>
             </View>
-          </View>
+          </SafeAreaView>
         )}
       </Modal>
 
@@ -644,7 +681,7 @@ export const PostCard = memo(function PostCard({
         animationType="slide"
         onRequestClose={() => setMenuOpen(false)}
       >
-        <View style={styles.sheetBackdrop}>
+        <SafeAreaView style={styles.sheetBackdrop}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Fermer le menu contextuel"
@@ -722,7 +759,7 @@ export const PostCard = memo(function PostCard({
               </Text>
             )}
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
       <Modal
         visible={picker}
@@ -730,7 +767,7 @@ export const PostCard = memo(function PostCard({
         animationType="slide"
         onRequestClose={() => setPicker(false)}
       >
-        <View style={styles.sheetBackdrop}>
+        <SafeAreaView style={styles.sheetBackdrop}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Fermer les réactions"
@@ -762,7 +799,7 @@ export const PostCard = memo(function PostCard({
                   selected={reaction?.reaction_type === type}
                   disabled={react.isPending}
                   onPress={() => {
-                    if (!react.isPending) react.mutate(type);
+                    if (!react.isPending) reactTo(type);
                   }}
                 />
               ))}
@@ -774,7 +811,7 @@ export const PostCard = memo(function PostCard({
             )}
             <Button title="Fermer" secondary onPress={() => setPicker(false)} />
           </ScrollView>
-        </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );
@@ -792,9 +829,20 @@ export function PostReelsDetail({
   const s = useUIStyles();
   const { session } = useAuth();
   const cache = useQueryClient();
+  const runAction = (action: () => void) =>
+    authenticatedInteraction(
+      session?.user.id,
+      `/posts/${post.id}`,
+      action,
+      (next) =>
+        router.push({ pathname: "/login", params: next ? { next } : {} }),
+    );
+  const reactTo = (type: string) => runAction(() => react.mutate(type));
   const [picker, setPicker] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(initialCommentsOpen);
+  const [commentsOpen, setCommentsOpen] = useState(
+    initialCommentsOpen && !!session,
+  );
   const [likeBurst, setLikeBurst] = useState(0);
   const [shareOpen, setShareOpen] = useState(false);
   const playbackMemory = useMemo(
@@ -806,7 +854,6 @@ export function PostReelsDetail({
   const [menuError, setMenuError] = useState(false);
   const [hideError, setHideError] = useState(false);
   const hiddenPosts = useHiddenPosts();
-  const fallbackTrack = useMemo(() => getDefaultMusic(), []);
   const postMusic = post as Post & {
     music?: string | null;
     artist?: string | null;
@@ -854,7 +901,8 @@ export function PostReelsDetail({
   const reactionCount = post.post_reactions?.length || 0;
   const commentCount = post.post_comments?.[0]?.count || 0;
   const canEdit = session?.user.id === post.user_id;
-  const musicUri = postMusic.music_url || fallbackTrack.audioUrl;
+  const musicUri =
+    postMusic.music_url || getMusicForPublication(post.id).audioUrl;
   if (hiddenPosts.ids.includes(post.id)) return null;
   return (
     <View style={styles.reelsDetailPage}>
@@ -872,10 +920,10 @@ export function PostReelsDetail({
         commentCount={commentCount}
         musicUri={musicUri}
         onClose={() => router.back()}
-        onOpenMenu={() => setMenuOpen(true)}
-        onOpenComments={() => setCommentsOpen(true)}
-        onReact={() => react.mutate(reaction?.reaction_type || "love")}
-        onChooseReaction={() => setPicker(true)}
+        onOpenMenu={() => runAction(() => setMenuOpen(true))}
+        onOpenComments={() => runAction(() => setCommentsOpen(true))}
+        onReact={() => reactTo(reaction?.reaction_type || "love")}
+        onChooseReaction={() => runAction(() => setPicker(true))}
       />
       <PostCommentsSheet
         key={`${session?.user.id ?? "guest"}:${post.id}`}
@@ -890,7 +938,7 @@ export function PostReelsDetail({
         animationType="slide"
         onRequestClose={() => setMenuOpen(false)}
       >
-        <View style={styles.sheetBackdrop}>
+        <SafeAreaView style={styles.sheetBackdrop}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Fermer le menu contextuel"
@@ -968,7 +1016,7 @@ export function PostReelsDetail({
               </Text>
             )}
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
       <Modal
         visible={picker}
@@ -976,7 +1024,7 @@ export function PostReelsDetail({
         animationType="slide"
         onRequestClose={() => setPicker(false)}
       >
-        <View style={styles.sheetBackdrop}>
+        <SafeAreaView style={styles.sheetBackdrop}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Fermer les réactions"
@@ -1008,7 +1056,7 @@ export function PostReelsDetail({
                   selected={reaction?.reaction_type === type}
                   disabled={react.isPending}
                   onPress={() => {
-                    if (!react.isPending) react.mutate(type);
+                    if (!react.isPending) reactTo(type);
                   }}
                 />
               ))}
@@ -1020,7 +1068,7 @@ export function PostReelsDetail({
             )}
             <Button title="Fermer" secondary onPress={() => setPicker(false)} />
           </ScrollView>
-        </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );
@@ -1087,7 +1135,7 @@ function ReelsPostDetail({
         compact
         immersive
       />
-      <View style={styles.reelsTopBar}>
+      <SafeAreaView edges={["top", "left", "right"]} style={styles.reelsTopBar}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Fermer la publication"
@@ -1100,7 +1148,7 @@ function ReelsPostDetail({
           Reels
         </Text>
         <Text style={styles.reelsFriends}>Ami(e)s</Text>
-      </View>
+      </SafeAreaView>
       <View style={styles.reelsActionRail}>
         <ReelsAction
           label={`J’aime. ${reactionCount} réactions.`}
@@ -1258,7 +1306,7 @@ function ReelsAction({
     </Pressable>
   );
 }
-function PostSoundtrack({
+export function PostSoundtrack({
   uri,
   active,
   compact,
@@ -1562,6 +1610,11 @@ function PostAuthor({
               ↻ Republié par {post.repost.name}
             </Text>
           )}
+          {!!post.feedRecommendation && (
+            <Text numberOfLines={1} style={[s.small, styles.metadata, overlay && styles.overlayMutedText, overlay && styles.authorTextShadow]}>
+              {post.feedRecommendation}
+            </Text>
+          )}
         </Pressable>
       </View>
       <Pressable
@@ -1715,6 +1768,7 @@ function PostMedia({
   const [imageFailed, setImageFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const showImage = !!post.image_url && (!fullScreen || !post.video_url);
+  const videoSource = resolveVideoSource(post, post.image_url);
   return (
     <View
       style={[
@@ -1727,7 +1781,7 @@ function PostMedia({
         <Image
           key={`${post.image_url}:${attempt}`}
           source={{ uri: post.image_url! }}
-          contentFit={immersive ? "cover" : "contain"}
+          contentFit="contain"
           accessibilityLabel={`Photo publiée par ${displayName(post.author)}`}
           onError={() => setImageFailed(true)}
           onLoad={() => setImageFailed(false)}
@@ -1736,14 +1790,15 @@ function PostMedia({
       )}
       {!!post.video_url && (
         <NativeVideo
-          uri={post.video_url}
+          uri={videoSource.uri}
+          fallbackUri={videoSource.fallbackUri}
           playbackMemory={playbackMemory}
-          posterUri={post.image_url}
-          active={fullScreen ? visible : undefined}
+          posterUri={videoSource.posterUri}
+          active={visible}
           volume={fullScreen ? 0 : 1}
           visible={visible}
           style={fullScreen ? styles.mediaFill : styles.videoMedia}
-          contentFit={immersive ? "cover" : "contain"}
+          contentFit="contain"
           controls={!fullScreen}
         />
       )}
@@ -1773,6 +1828,41 @@ function PostMedia({
   );
 }
 
+function PostCommentLikeButton({
+  postId,
+  commentId,
+  reaction,
+  accessToken,
+}: {
+  postId: string;
+  commentId: string;
+  reaction: PostCommentLike;
+  accessToken: string;
+}) {
+  const styles = useThemedStyles(createStyles);
+  const cache = useQueryClient();
+  const change = useMutation({
+    mutationFn: (liked: boolean) => setPostCommentLike(supabase, commentId, liked, accessToken),
+    onSuccess: () => cache.invalidateQueries({ queryKey: ["post-comment-likes", postId] }),
+  });
+  return (
+    <View style={styles.commentLikeDark}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={reaction.liked ? "Retirer ma réaction au commentaire" : "Aimer ce commentaire"}
+        accessibilityState={{ selected: reaction.liked, disabled: change.isPending }}
+        disabled={change.isPending}
+        onPress={() => change.mutate(!reaction.liked)}
+        style={styles.commentLikeButton}
+      >
+        <Heart size={22} color={reaction.liked ? "#FF5269" : "#AEB6C2"} fill={reaction.liked ? "#FF5269" : "transparent"} strokeWidth={2} />
+        {reaction.count > 0 && <Text style={styles.commentLikeCount}>{reaction.count}</Text>}
+      </Pressable>
+      {!!change.error && <Text accessibilityRole="alert" style={styles.commentLikeError}>Échec, réessaie.</Text>}
+    </View>
+  );
+}
+
 function PostCommentsSheet({
   playbackMemory,
   post,
@@ -1790,10 +1880,9 @@ function PostCommentsSheet({
   const cache = useQueryClient();
   const [draft, setDraft] = usePostCommentDraft(session?.user.id, post.id);
   const [previewMuted, setPreviewMuted] = useState(true);
-  const insets = useSafeAreaInsets();
   const hasVideo = !!post.video_url;
   const comments = useInfiniteQuery({
-    queryKey: ["comments", post.id],
+    queryKey: ["comments", post.id, session?.user.id || "public"],
     enabled: open,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
@@ -1817,6 +1906,15 @@ function PostCommentsSheet({
     },
     getNextPageParam: (last, pages) =>
       last.length === 30 ? pages.length * 30 : undefined,
+  });
+  const allComments = useMemo(() => comments.data?.pages.flat() ?? [], [comments.data]);
+  const commentIds = useMemo(() => allComments.map((comment) => comment.id), [allComments]);
+  const commentLikes = useQuery({
+    queryKey: ["post-comment-likes", post.id, session?.user.id, commentIds],
+    enabled: open && !!session && commentIds.length > 0,
+    queryFn: () => readPostCommentLikes(supabase, commentIds, session!.access_token),
+    staleTime: 15_000,
+    retry: false,
   });
   const sendComment = useMutation({
     mutationFn: (content: string) =>
@@ -1852,7 +1950,6 @@ function PostCommentsSheet({
       params: { next: `/posts/${post.id}?comments=1` },
     });
   };
-  const allComments = comments.data?.pages.flat() ?? [];
   const emojiRow = ["❤️", "🙌", "🔥", "👏", "😢", "😍", "😮", "😂"];
   return (
     <Modal
@@ -1861,7 +1958,7 @@ function PostCommentsSheet({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.commentsOverlay}>
+      <SafeAreaView style={styles.commentsOverlay}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Fermer les commentaires"
@@ -1870,7 +1967,7 @@ function PostCommentsSheet({
         />
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={[styles.commentsKeyboard, { paddingTop: insets.top }]}
+          style={styles.commentsKeyboard}
         >
           {!!open && (
             <View style={styles.commentPreviewStage}>
@@ -1882,13 +1979,12 @@ function PostCommentsSheet({
               >
                 {hasVideo ? (
                   <NativeVideo
-                    uri={post.video_url!}
-                    posterUri={post.image_url}
+                    {...resolveVideoSource(post, post.image_url)}
                     playbackMemory={playbackMemory}
                     active
                     muted={previewMuted}
                     controls={false}
-                    contentFit="contain"
+                    contentFit="cover"
                     style={[
                       StyleSheet.absoluteFill,
                       { width: "100%", height: "100%", aspectRatio: undefined },
@@ -1897,7 +1993,7 @@ function PostCommentsSheet({
                 ) : post.image_url ? (
                   <Image
                     source={{ uri: post.image_url }}
-                    contentFit="contain"
+                    contentFit="cover"
                     accessibilityLabel={`Photo publiée par ${displayName(post.author)}`}
                     style={StyleSheet.absoluteFill}
                   />
@@ -1936,10 +2032,7 @@ function PostCommentsSheet({
               )}
             </View>
           )}
-          <View
-            accessibilityViewIsModal
-            style={[styles.commentsSheet, { paddingBottom: insets.bottom }]}
-          >
+          <View accessibilityViewIsModal style={styles.commentsSheet}>
             <View style={styles.commentsHandle} />
             <View style={styles.commentsHeaderRow}>
               <Pressable
@@ -1964,6 +2057,16 @@ function PostCommentsSheet({
               contentContainerStyle={styles.commentsListContent}
               keyboardShouldPersistTaps="handled"
             >
+              {!!commentLikes.isError && (
+                <View>
+                  <Text accessibilityRole="alert" style={styles.commentsMuted}>
+                    Les réactions aux commentaires sont temporairement indisponibles.
+                  </Text>
+                  <Pressable accessibilityRole="button" onPress={() => void commentLikes.refetch()} style={styles.commentsMoreButton}>
+                    <Text style={styles.commentsMoreText}>Réessayer</Text>
+                  </Pressable>
+                </View>
+              )}
               {comments.isPending ? (
                 <Text style={styles.commentsMuted}>
                   Chargement des commentaires…
@@ -2008,20 +2111,16 @@ function PostCommentsSheet({
                         postId={post.id}
                         dark
                       />
-                      <View style={styles.commentMetaRowDark}>
-                        <Text style={styles.commentMetaDark}>Répondre</Text>
-                        <Text style={styles.commentMetaDark}>
-                          Voir la traduction
-                        </Text>
-                      </View>
+                      <PostTranslation text={comment.content} overlay autoDetectUnknown />
                     </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Aimer ce commentaire"
-                      style={styles.commentLikeDark}
-                    >
-                      <Heart size={22} color="#AEB6C2" strokeWidth={2} />
-                    </Pressable>
+                    {!!(session && commentLikes.data?.[comment.id]) && (
+                      <PostCommentLikeButton
+                        postId={post.id}
+                        commentId={comment.id}
+                        reaction={commentLikes.data[comment.id]}
+                        accessToken={session.access_token}
+                      />
+                    )}
                   </View>
                 ))
               ) : (
@@ -2075,7 +2174,9 @@ function PostCommentsSheet({
                     accessibilityRole="button"
                     accessibilityLabel="Publier le commentaire"
                     disabled={!draft.trim() || sendComment.isPending}
-                    onPress={() => sendComment.mutate(draft)}
+                    onPress={() =>
+                      session ? sendComment.mutate(draft) : recover()
+                    }
                     style={({ pressed }) => [
                       styles.commentSendButtonDark,
                       {
@@ -2119,7 +2220,7 @@ function PostCommentsSheet({
             </View>
           </View>
         </KeyboardAvoidingView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -2586,17 +2687,19 @@ const createStyles = (colors: ThemeColors) =>
     },
     reelsTopBar: {
       position: "absolute",
-      top: 42,
-      left: 14,
-      right: 14,
+      top: 0,
+      left: 0,
+      right: 0,
+      paddingTop: 8,
+      paddingHorizontal: 14,
       zIndex: 8,
       flexDirection: "row",
       alignItems: "center",
       gap: 14,
     },
     reelsTopAction: {
-      width: 42,
-      height: 42,
+      width: 44,
+      height: 44,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -2860,24 +2963,19 @@ const createStyles = (colors: ThemeColors) =>
       fontSize: 17,
       lineHeight: 23,
     },
-    commentMetaRowDark: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 24,
-      paddingTop: 4,
-    },
-    commentMetaDark: {
-      color: "#AEB6C2",
-      fontFamily: "Inter-Bold",
-      fontSize: 15,
-      lineHeight: 20,
-    },
     commentLikeDark: {
-      width: 44,
+      minWidth: 44,
+      maxWidth: 75,
+      alignItems: "center",
+    },
+    commentLikeButton: {
+      minWidth: 44,
       minHeight: 44,
       alignItems: "center",
       justifyContent: "center",
     },
+    commentLikeCount: { color: "#AEB6C2", fontSize: 12, marginTop: 2 },
+    commentLikeError: { color: "#FF7D89", fontSize: 11, textAlign: "center" },
     commentsMoreButton: {
       alignSelf: "flex-start",
       minHeight: 44,

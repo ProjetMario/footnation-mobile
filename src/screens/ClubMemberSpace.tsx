@@ -1,4 +1,6 @@
 import { useDebounced } from "../lib/data";
+import { VisibleMatchLineup } from "../components/VisibleMatchLineup";
+import { CoachTeamRequests } from "./CoachTeamRequests";
 import ClubMemberSettings from "./ClubMemberSettings";
 import ClubMemberAttendance from "./ClubMemberAttendance";
 import { ClubGroupList } from "./ClubChat";
@@ -90,6 +92,7 @@ function Content({ id, uid }: { id: string; uid: string }) {
           title="Accès réservé"
           description="Cet espace est réservé aux membres approuvés ou rattachés au club."
         />
+        <CoachTeamRequests id={id} />
         <Button
           title="Retour à la fiche"
           onPress={() => router.replace(`/club/${id}`)}
@@ -145,6 +148,11 @@ function Content({ id, uid }: { id: string; uid: string }) {
           hasTeams={!!context.data.primaryTeam}
           clubName={context.data.club.short_name || context.data.club.name}
         />
+      ) : tab === "teams" ? (
+        <>
+          <CoachTeamRequests id={id} />
+          <MemberRows key={`${tab}:${context.data.primaryTeam?.id}`} id={id} uid={uid} tab={tab} />
+        </>
       ) : tab === "settings" ? (
         <ClubMemberSettings id={id} uid={uid} />
       ) : tab === "attendance" ? (
@@ -308,6 +316,7 @@ function MemberCalendar({
           styles={styles}
           upcoming={period === "future"}
           clubName={clubName}
+          clubId={id}
         />
       ))}
       {!!query.hasNextPage && (
@@ -324,6 +333,17 @@ function MemberCalendar({
       )}
     </View>
   );
+}
+
+/** Reuse the existing member-only roster, without exposing it in public provider data. */
+export function ClubMemberRoster({ id }: { id: string }) {
+  const uid = useAuth().session?.user.id;
+  const s = useUIStyles();
+  return <View style={{ gap: 12 }}>
+    <Text style={s.h2}>L’effectif FootNation du club</Text>
+    <Text style={s.small}>Membres approuvés et leur équipe. Cet effectif est réservé aux membres autorisés du club.</Text>
+    <AuthGate allowIncomplete={false}>{!!uid && <MemberRows key={`${id}:${uid}`} id={id} uid={uid} tab="roster" />}</AuthGate>
+  </View>;
 }
 
 function MemberRows({
@@ -499,11 +519,13 @@ function CalendarEventCard({
   styles,
   upcoming,
   clubName,
+  clubId,
 }: {
   row: any;
   styles: CalendarStyles;
   upcoming: boolean;
   clubName: string;
+  clubId: string;
 }) {
   const date = new Date(row.sort_date || row.match_date || row.session_date);
   const valid = Number.isFinite(date.getTime());
@@ -562,6 +584,7 @@ function CalendarEventCard({
             {row.home_score} - {row.away_score}
           </Text>
         )}
+        {row.kind === "match" && <VisibleMatchLineup clubId={clubId} matchId={row.id} />}
         {!!(upcoming && !isCancelled) && (
           <Pressable
             accessibilityRole="button"

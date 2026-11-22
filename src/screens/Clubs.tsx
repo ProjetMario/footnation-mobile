@@ -11,6 +11,7 @@ import { FlatList, Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 import { ChevronRight, MapPin, SlidersHorizontal } from "lucide-react-native";
 import { useClubs } from "../lib/data";
+import { clubLocationLabel } from "../lib/clubLocation";
 import {
   Avatar,
   Button,
@@ -75,14 +76,15 @@ export default function Clubs({
               <Text style={s.small}>
                 {fixedDepartment
                   ? `${fixedDepartment.region} · département ${fixedDepartment.code}`
-                  : "Recherche par nom, ville ou département."}
+                  : "Recherche par nom, ville ou pays. Filtre par département disponible."}
               </Text>
             </View>
             <SearchField
               value={search}
               onChangeText={setSearch}
-              placeholder="Nom du club ou ville"
+              placeholder="Nom du club, ville ou pays"
             />
+            {!centresOnly && <Button title="Discussions de la communauté" secondary onPress={() => router.push("/discussions" as any)} />}
             {!centresOnly && (
               <View style={[s.row, { flexWrap: "wrap", gap: 8 }]}>
                 {(
@@ -232,7 +234,7 @@ export default function Clubs({
               },
             ]}
             accessibilityRole="button"
-            accessibilityLabel={`${item.short_name || item.name}. ${[item.city, item.department_code].filter(Boolean).join(" · ")}`}
+            accessibilityLabel={`${item.short_name || item.name}. ${clubLocationLabel(item, true)}`}
             accessibilityHint="Ouvre la fiche du club."
           >
             <Avatar uri={item.logo_url} name={item.short_name || item.name} />
@@ -246,12 +248,11 @@ export default function Clubs({
                 <MapPin size={14} color={colors.muted} />
                 <Text style={s.small} numberOfLines={1}>
                   {[
-                    item.city,
-                    item.department_name || item.department_code,
+                    clubLocationLabel(item, true),
                     item.type === "five_center" ? "Indoor" : null,
                   ]
                     .filter(Boolean)
-                    .join(" · ") || "France"}
+                    .join(" · ") || "Localisation non renseignée"}
                 </Text>
               </View>
             </View>

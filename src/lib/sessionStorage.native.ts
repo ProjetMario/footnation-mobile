@@ -2,6 +2,7 @@ import * as SecureStore from "expo-secure-store";
 import { randomUUID } from "expo-crypto";
 import { createChunkedStorage } from "./chunkedStorage";
 import { createAccountSessionStorage } from "./accountSessionStorage";
+export const sessionStorageKey = "footnation-native-auth";
 export default createAccountSessionStorage(
   createChunkedStorage(
     {

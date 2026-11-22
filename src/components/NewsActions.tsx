@@ -1,6 +1,8 @@
+import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import { useTranslation } from "../lib/i18n";
 import React, { useCallback, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { router, useFocusEffect, usePathname } from "expo-router";
 import { Heart, MessageCircle, Send } from "lucide-react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -289,7 +291,7 @@ function AccountNewsActions({ item }: { item: NewsItem }) {
         animationType="slide"
         onRequestClose={() => setOpen(false)}
       >
-        <View
+        <SafeAreaView
           style={{
             flex: 1,
             justifyContent: "center",
@@ -373,7 +375,7 @@ function AccountNewsActions({ item }: { item: NewsItem }) {
             />
             <Button title="Fermer" secondary onPress={() => setOpen(false)} />
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );

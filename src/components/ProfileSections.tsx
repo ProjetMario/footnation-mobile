@@ -1,9 +1,14 @@
+import {
+  readPublicPreviewVideos,
+  type PublicVideoCursor,
+} from "../lib/publicPreviewVideos";
 import { PagedMediaViewer } from "./PagedMediaViewer";
 import { ShortReelsFrame, type Short } from "../screens/Shorts";
 import { ShortComments } from "./ShortComments";
 import { displayName } from "../lib/models";
-import { getDefaultMusic } from "../data/shortMusicLibrary";
+import { getMusicForPublication } from "../data/shortMusicLibrary";
 import { MediaGrid } from "./MediaGrid";
+import { videoGridSource } from "../lib/videoGrid";
 import { blockedSocialAuthors } from "../lib/socialVisibility";
 import {
   initialVideoCursor,
@@ -11,7 +16,7 @@ import {
   videoFeedKey,
 } from "../lib/videoFeed";
 import React, { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { supabase } from "../lib/supabase";
@@ -31,7 +36,7 @@ export function useProfileClubs(
   const uid = useAuth().session?.user.id;
   const own = uid === profileId;
   return useQuery({
-    enabled: !!uid && !!profileId,
+    enabled: (!!uid || Platform.OS === "web") && !!profileId,
     queryKey: ["profile-teams", uid, profileId, linkedClubId],
     queryFn: async ({ signal }) => {
       const memberships = own
@@ -151,11 +156,13 @@ export function ProfileShorts({ profileId }: { profileId: string }) {
   const [opened, setOpened] = useState<string | null>(null);
   const [comments, setComments] = useState<string | null>(null);
   const query = useInfiniteQuery({
-    queryKey: ["profile-videos-grid-v2", uid, profileId],
-    enabled: !!uid,
-    initialPageParam: initialVideoCursor,
+    queryKey: ["profile-videos-grid-v3", uid, profileId],
+    enabled: !!uid || Platform.OS === "web",
+    initialPageParam: initialVideoCursor as PublicVideoCursor,
     queryFn: async ({ pageParam, signal }) => {
-      if ((await blockedSocialAuthors(uid!)).includes(profileId))
+      if (!uid && Platform.OS === "web")
+        return readPublicPreviewVideos(supabase, pageParam, profileId);
+      if (uid && (await blockedSocialAuthors(uid)).includes(profileId))
         return { items: [] as Short[], next: undefined };
       const source = (
         table: "posts" | "shorts",
@@ -176,7 +183,7 @@ export function ProfileShorts({ profileId }: { profileId: string }) {
       const [posts, shorts] = await Promise.all([
         source(
           "posts",
-          "id,user_id,created_at,content,video_url,image_url,user:profiles!posts_user_id_fkey(id,full_name,username,avatar_url)",
+          "id,user_id,created_at,content,video_url,optimized_video_url,optimized_video_source_url,optimized_thumbnail_url,image_url,user:profiles!posts_user_id_fkey(id,full_name,username,avatar_url)",
           pageParam.posts,
         ),
         source(
@@ -196,7 +203,7 @@ export function ProfileShorts({ profileId }: { profileId: string }) {
         origin: "post" as const,
         description: post.content,
         thumbnail_url: post.image_url,
-        music_url: getDefaultMusic().audioUrl,
+        music_url: getMusicForPublication(`post:${post.id}`).audioUrl,
       }));
       return mergeVideoPage(
         postVideos as Short[],
@@ -253,12 +260,16 @@ export function ProfileShorts({ profileId }: { profileId: string }) {
         <ErrorState error={query.error} retry={() => void query.refetch()} />
       ) : videos.length ? (
         <MediaGrid
-          items={videos.map((video) => ({
-            id: videoFeedKey(video),
-            title: video.description,
-            image: video.thumbnail_url,
-            video: video.video_url,
-          }))}
+          items={videos.map((video) => {
+            const source = videoGridSource(video);
+            return {
+              id: videoFeedKey(video),
+              title: video.description,
+              image: source.posterUri,
+              video: source.uri,
+              fallbackVideo: source.fallbackUri,
+            };
+          })}
           onOpen={(item) => setOpened(item.id)}
         />
       ) : (

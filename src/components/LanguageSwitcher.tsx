@@ -1,14 +1,8 @@
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React from "react";
 import { Check, Globe2, RotateCw, X } from "lucide-react-native";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../lib/auth";
 import { useLanguage, useTranslation, type LanguageOption } from "../lib/i18n";
 import { useTheme } from "../theme";
@@ -25,7 +19,6 @@ export function LanguageSwitcher({
   const { language, options, setLanguage, refreshLanguageFromIp } =
     useLanguage();
   const t = useTranslation();
-  const insets = useSafeAreaInsets();
   const [open, setOpen] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -33,7 +26,6 @@ export function LanguageSwitcher({
 
   const selected =
     options.find((option) => option.code === language) || options[0];
-  const floatingBottom = Math.max(16, insets.bottom + 8);
 
   async function choose(option: LanguageOption) {
     await setLanguage(option.code);
@@ -86,75 +78,91 @@ export function LanguageSwitcher({
         animationType="fade"
         onRequestClose={() => setOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
+        <SafeAreaView
+          style={styles.safeBackdrop}
+          accessibilityViewIsModal
+          onAccessibilityEscape={() => setOpen(false)}
+        >
           <Pressable
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                bottom: floatingBottom + 30,
-                shadowColor: colors.ink,
-              },
-            ]}
+            accessible={false}
+            importantForAccessibility="no"
+            style={styles.backdrop}
+            onPress={() => setOpen(false)}
           >
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.ink }]}>
-                {t("language.title")}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("language.close")}
-                hitSlop={12}
-                onPress={() => setOpen(false)}
-              >
-                <X size={21} color={colors.muted} />
-              </Pressable>
-            </View>
-            <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-              {options.map((option) => {
-                const active = option.code === language;
-                return (
-                  <Pressable
-                    key={option.code}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    onPress={() => choose(option)}
-                    style={[
-                      styles.row,
-                      active && { backgroundColor: colors.accentSoft },
-                    ]}
-                  >
-                    <Text style={styles.rowFlag}>{option.flag}</Text>
-                    <Text
+            <Pressable
+              accessible={false}
+              importantForAccessibility="no"
+              style={[
+                styles.sheet,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  shadowColor: colors.ink,
+                },
+              ]}
+            >
+              <View style={styles.header}>
+                <Text style={[styles.title, { color: colors.ink }]}>
+                  {t("language.title")}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("language.close")}
+                  hitSlop={12}
+                  onPress={() => setOpen(false)}
+                >
+                  <X size={21} color={colors.muted} />
+                </Pressable>
+              </View>
+              <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                {options.map((option) => {
+                  const active = option.code === language;
+                  return (
+                    <Pressable
+                      key={option.code}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      onPress={() => choose(option)}
                       style={[
-                        styles.rowLabel,
-                        { color: active ? colors.blue : colors.ink },
+                        styles.row,
+                        active && { backgroundColor: colors.accentSoft },
                       ]}
                     >
-                      {option.nativeName}
-                    </Text>
-                    {active ? (
-                      <Check size={19} color={colors.blue} strokeWidth={2.4} />
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("language.detectIp")}
-              disabled={refreshing}
-              onPress={redetect}
-              style={[styles.detectButton, { borderColor: colors.border }]}
-            >
-              <RotateCw size={17} color={colors.blue} />
-              <Text style={[styles.detectText, { color: colors.blue }]}>
-                {t("language.detectIp")}
-              </Text>
+                      <Text style={styles.rowFlag}>{option.flag}</Text>
+                      <Text
+                        style={[
+                          styles.rowLabel,
+                          { color: active ? colors.blue : colors.ink },
+                        ]}
+                      >
+                        {option.nativeName}
+                      </Text>
+                      {active ? (
+                        <Check
+                          size={19}
+                          color={colors.blue}
+                          strokeWidth={2.4}
+                        />
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("language.detectIp")}
+                disabled={refreshing}
+                onPress={redetect}
+                style={[styles.detectButton, { borderColor: colors.border }]}
+              >
+                <RotateCw size={17} color={colors.blue} />
+                <Text style={[styles.detectText, { color: colors.blue }]}>
+                  {t("language.detectIp")}
+                </Text>
+              </Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
+        </SafeAreaView>
       </Modal>
     </>
   );
@@ -192,15 +200,19 @@ const styles = StyleSheet.create({
   flag: { fontSize: 23 },
   shortCode: { fontSize: 17, fontFamily: "Inter-Bold" },
   compactShortCode: { fontSize: 12, fontFamily: "Inter-Bold" },
+  safeBackdrop: { flex: 1, backgroundColor: "rgba(2,6,23,0.22)" },
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(2,6,23,0.22)",
+    minHeight: 0,
+    padding: 16,
+    paddingBottom: 30,
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
   },
   sheet: {
-    position: "absolute",
-    right: 16,
-    width: 326,
-    maxHeight: 430,
+    width: "100%",
+    maxWidth: 326,
+    maxHeight: "100%",
     overflow: "hidden",
     borderRadius: 20,
     borderWidth: 1,
@@ -211,6 +223,7 @@ const styles = StyleSheet.create({
   },
   header: {
     minHeight: 56,
+    flexShrink: 0,
     paddingHorizontal: 18,
     flexDirection: "row",
     alignItems: "center",

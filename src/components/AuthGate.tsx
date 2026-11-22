@@ -1,75 +1,89 @@
 import React from "react";
-import { router, usePathname, useLocalSearchParams } from "expo-router";
+import { Platform } from "react-native";
+import {
+  Redirect,
+  router,
+  usePathname,
+  useLocalSearchParams,
+} from "expo-router";
 import { authGateReturnPath } from "../lib/authReturn";
 import { useAuth } from "../lib/auth";
 import { Button, Empty, Loading, ErrorState } from "./ui";
-import { useConnectivity } from "./ConnectivityProvider";
+import { GuestPreviewBoundary } from "./GuestPreviewBoundary";
+import { authUnavailableMessage, isTransientAuthFailure } from "../lib/authServiceRecovery";
+import { discussionUi } from "../lib/discussionUi";
+
 export function AuthGate({
   children,
   allowIncomplete = true,
+  allowUnverified = false,
+  publicPreview = false,
 }: {
   children: React.ReactNode;
   allowIncomplete?: boolean;
+  allowUnverified?: boolean;
+  publicPreview?: boolean;
 }) {
   const { session, profile, profileStatus, loading, error, reload } = useAuth();
-  const { isOffline, checking, retry } = useConnectivity();
   const pathname = usePathname();
   const params = useLocalSearchParams();
+  const t = (text: string) => discussionUi(params.communityLocale, text);
   const next = authGateReturnPath(pathname, params);
   if (loading) return <Loading />;
   if (error)
-    return <ErrorState error={new Error(error)} retry={() => void reload()} />;
+    return <>
+      <ErrorState error={new Error(isTransientAuthFailure({ message: error }) ? authUnavailableMessage : error)} retry={() => void reload()} />
+      <Button title={t("Se reconnecter")} secondary onPress={() => router.push({ pathname: "/login", params: next ? { next } : {} })} />
+    </>;
+  if (!session && publicPreview && Platform.OS === "web")
+    return <GuestPreviewBoundary>{children}</GuestPreviewBoundary>;
   if (!session)
     return (
       <Empty
-        title="Connexion requise"
-        description="Connectez-vous pour accéder à cette section de FootNation."
+        title={t("Connexion requise")}
+        description={t("Connectez-vous pour accéder à cette section de FootNation.")}
         action={
           <>
             <Button
-              title="Se connecter"
+              title={t("Se connecter")}
               onPress={() =>
-                router.push({ pathname: "/login", params: next ? { next } : {} })
+                router.push({
+                  pathname: "/login",
+                  params: next ? { next } : {},
+                })
               }
             />
             <Button
-              title="S’inscrire"
+              title={t("S’inscrire")}
               secondary
               onPress={() =>
-                router.push({ pathname: "/signup", params: next ? { next } : {} })
+                router.push({
+                  pathname: "/signup",
+                  params: next ? { next } : {},
+                })
               }
             />
           </>
         }
       />
     );
-  if (profileStatus === "unverified")
+  if (!!session && profileStatus === "unverified" && !allowUnverified)
     return (
-      <Empty
-        title={
-          isOffline
-            ? "Profil indisponible hors ligne"
-            : "Votre profil reste à vérifier"
-        }
-        description="Retrouvez une connexion pour charger votre profil et accéder à cette section."
-        action={
-          <Button
-            title="Réessayer"
-            secondary
-            busy={checking}
-            onPress={() => void retry().then(() => reload())}
-          />
-        }
+      <Redirect
+        href={{
+          pathname: "/onboarding",
+          params: next ? { next } : {},
+        }}
       />
     );
   if (!profile && !allowIncomplete)
     return (
       <Empty
-        title="Complétez votre profil"
-        description="Créez votre profil FootNation pour rejoindre la communauté."
+        title={t("Complétez votre profil")}
+        description={t("Créez votre profil FootNation pour rejoindre la communauté.")}
         action={
           <Button
-            title="Compléter mon profil"
+            title={t("Compléter mon profil")}
             onPress={() =>
               router.push({
                 pathname: "/profile-setup",

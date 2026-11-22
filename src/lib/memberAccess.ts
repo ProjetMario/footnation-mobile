@@ -1,4 +1,9 @@
 import { validCalendarDate } from "./calendarDate";
+import { clubAdminGateReturnPath, clubRouteId } from "./clubAdminReturn";
+import {
+  supporterDiscoveryPath,
+  supporterClubSeed,
+} from "./supporterClubLinks";
 
 export type MemberAccessState =
   | "eligible"
@@ -80,6 +85,7 @@ export function memberAccessPublicPath(path: string): boolean {
     "/help",
     "/contact",
     "/auth/callback",
+    "/onboarding",
     "/social-signup",
     "/login",
     "/signup",
@@ -109,6 +115,33 @@ export function memberAccessRoutePath(route: {
   name: string;
   params?: Readonly<object>;
 }): string {
+  if (["club-admin/[id]", "club-admin/[id]/index", "club-admin/[id]/[section]", "club-admin/[id]/convocation/[convocation]", "club-admin/[id]/match/[matchId]", "club/[id]/admin"].includes(route.name)) {
+    const params = (route.params ?? {}) as Record<string, unknown>;
+    if (typeof params.id !== "string" || !clubRouteId.test(params.id)) return "/club-dashboard";
+    let path = route.name === "club/[id]/admin" ? `/club/${params.id}/admin` : `/club-admin/${params.id}`;
+    if (route.name === "club-admin/[id]/[section]") {
+      if (typeof params.section !== "string") return "/club-dashboard";
+      path += `/${params.section}`;
+    } else if (route.name === "club-admin/[id]/convocation/[convocation]" || route.name === "club-admin/[id]/match/[matchId]") {
+      const isMatch = route.name.includes("/match/");
+      const detail = params[isMatch ? "matchId" : "convocation"];
+      if (typeof detail !== "string" || !clubRouteId.test(detail)) return "/club-dashboard";
+      path += `/${isMatch ? "match" : "convocation"}/${detail}`;
+    }
+    return clubAdminGateReturnPath(path, params) || "/club-dashboard";
+  }
+  if (["supporters", "supporters/index", "supporters/new"].includes(route.name))
+    return supporterDiscoveryPath(
+      supporterClubSeed((route.params ?? {}) as Record<string, unknown>),
+      route.name === "supporters/new",
+    );
+  if (route.name === "supporters/[id]") {
+    const id = (route.params as { id?: unknown } | undefined)?.id;
+    return typeof id === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+      ? `/supporters/${id}`
+      : "/supporters";
+  }
   // Use each scene's route. Opening Help must not exempt a background scene.
   if (route.name === "documents/[slug]") {
     const slug = (route.params as { slug?: unknown } | undefined)?.slug;

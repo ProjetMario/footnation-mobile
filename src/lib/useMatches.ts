@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppState } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { supabase, requireBackend } from "./supabase";
 import { calendarDate, validCalendarDate } from "./calendarDate";
 import {
@@ -15,11 +15,31 @@ import {
   fetchEspnMatchDay,
   fetchUpcomingFeaturedScoreboard,
   fetchNationalMatchDay,
+  type ScoreboardSnapshot,
 } from "./espnMatches";
 import { useConnectivity } from "../components/ConnectivityProvider";
 import type { MatchesApiResponse } from "../types/matches";
 import { fetchEspnMatchDetails } from "./espnMatchDetails";
 import { isEspnMatchId } from "./espnMatches";
+import { cachedScoreboard, loadEuropeanScoreboard } from "./scoreboardFallback";
+
+function useProgressiveScores() {
+  const client = useQueryClient();
+  return <T>(
+    key: QueryKey,
+    signal: AbortSignal,
+    load: (publish: (data: T) => void) => Promise<T>,
+  ) => {
+    const previous = client.getQueryData<T>(key);
+    return load((data) => {
+      // Keep a complete cached result visible during refreshes. On first load,
+      // publish real fixtures as they arrive; an interrupted snapshot must stay
+      // stale so returning to the screen completes the request.
+      if (!signal.aborted && !previous)
+        client.setQueryData<T>(key, data, { updatedAt: 0 });
+    });
+  };
+}
 
 export function useEspnMatchDetails(id: string, live: boolean) {
   const { active } = useMatchClock();
@@ -93,32 +113,56 @@ export async function fetchMatches(date: string, signal?: AbortSignal) {
   return parseMatchesResponse(data, date);
 }
 
-export function useMatches(date: string, espnLeague?: string) {
+export function useMatches(date: string, espnLeague?: string, visible = true) {
   const { active } = useMatchClock();
+  const { isOffline } = useConnectivity();
+  const client = useQueryClient();
   return useQuery({
     queryKey: espnLeague
       ? ["espn-match-day", espnLeague, date]
       : ["matches", date],
-    enabled: active && validCalendarDate(date),
+    enabled: active && visible && !isOffline && validCalendarDate(date),
     queryFn: ({ signal }) =>
       espnLeague === "all"
-        ? fetchEuropeanMatches(date, signal)
+        ? loadEuropeanScoreboard(
+            () => fetchEuropeanMatches(date, signal),
+            () => fetchMatches(date, signal),
+            signal,
+          )
         : espnLeague
           ? fetchEspnMatchDay(espnLeague, date, signal)
           : fetchMatches(date, signal),
+    initialData: () => {
+      if (espnLeague !== "all") return undefined;
+      const snapshot = client.getQueryData<ScoreboardSnapshot>([
+        "featured-scoreboard",
+        date,
+        "current",
+      ]);
+      return cachedScoreboard(date, [
+        snapshot?.days.find((day) => day.date === date),
+        client.getQueryData<MatchesApiResponse>(["matches", date]),
+      ]);
+    },
+    // Cached data is an immediate preview, never a substitute for refresh.
+    initialDataUpdatedAt: 0,
     staleTime: 30_000,
-    refetchInterval: active ? 60_000 : false,
+    refetchInterval: active && visible && !isOffline ? 60_000 : false,
     refetchIntervalInBackground: false,
   });
 }
 
 export function useNationalMatches(date: string, visible = true) {
+  const progressive = useProgressiveScores();
   const { active } = useMatchClock();
   const { isOffline } = useConnectivity();
   return useQuery({
     queryKey: ["national-match-day", date],
     enabled: active && visible && !isOffline && validCalendarDate(date),
-    queryFn: ({ signal }) => fetchNationalMatchDay(date, signal),
+    queryFn: ({ signal, queryKey }) =>
+      progressive<MatchesApiResponse>(queryKey, signal, (publish) =>
+        fetchNationalMatchDay(date, signal, publish),
+      ),
     staleTime: 60_000,
     retry: false,
     refetchInterval: (query) =>
@@ -133,6 +177,7 @@ export function useNationalMatches(date: string, visible = true) {
 }
 
 export function useFeaturedMatches(visible = true, includeHistory = true) {
+  const progressive = useProgressiveScores();
   const { now, active: screenActive } = useMatchClock();
   const active = screenActive && visible;
   const { isOffline } = useConnectivity();
@@ -142,8 +187,11 @@ export function useFeaturedMatches(visible = true, includeHistory = true) {
   // polls; the two-week results snapshot is cached separately.
   const current = useQuery({
     queryKey: ["featured-scoreboard", today, "current"],
-    enabled: active,
-    queryFn: ({ signal }) => fetchFeaturedScoreboard(today, signal, 1),
+    enabled: active && !isOffline,
+    queryFn: ({ signal, queryKey }) =>
+      progressive<ScoreboardSnapshot>(queryKey, signal, (publish) =>
+        fetchFeaturedScoreboard(today, signal, 1, publish),
+      ),
     structuralSharing: preserveFinishedScoreboard,
     staleTime: 60_000,
     retry: false,
@@ -163,16 +211,20 @@ export function useFeaturedMatches(visible = true, includeHistory = true) {
   const needHistory =
     includeHistory &&
     currentItems.filter((item) => item.state !== "scheduled").length < 8;
-  const historyEnabled = active && current.isSuccess && needHistory;
+  const historyEnabled =
+    active && !isOffline && current.isSuccess && needHistory;
   const history = useQuery({
     queryKey: ["featured-scoreboard", today, "history"],
     enabled: historyEnabled,
-    queryFn: ({ signal }) => fetchFeaturedScoreboard(today, signal, 14),
+    queryFn: ({ signal, queryKey }) =>
+      progressive<ScoreboardSnapshot>(queryKey, signal, (publish) =>
+        fetchFeaturedScoreboard(today, signal, 14, publish),
+      ),
     structuralSharing: preserveFinishedScoreboard,
-    staleTime: 30 * 60_000,
+    staleTime: 10 * 60_000,
     retry: false,
   });
-  const fallbackEnabled = active && current.isError;
+  const fallbackEnabled = active && !isOffline && current.isError;
   const fallback = useQuery({
     queryKey: ["matches", today],
     enabled: fallbackEnabled,
@@ -234,6 +286,7 @@ export function useFeaturedMatches(visible = true, includeHistory = true) {
 }
 
 export function useUpcomingFeaturedMatches(visible = true) {
+  const progressive = useProgressiveScores();
   const { now, active: screenActive } = useMatchClock();
   const active = screenActive && visible;
   const { isOffline } = useConnectivity();
@@ -241,7 +294,10 @@ export function useUpcomingFeaturedMatches(visible = true) {
   const query = useQuery({
     queryKey: ["featured-scoreboard", today, "upcoming"],
     enabled: active && !isOffline,
-    queryFn: ({ signal }) => fetchUpcomingFeaturedScoreboard(today, signal, 14),
+    queryFn: ({ signal, queryKey }) =>
+      progressive<ScoreboardSnapshot>(queryKey, signal, (publish) =>
+        fetchUpcomingFeaturedScoreboard(today, signal, 14, publish),
+      ),
     staleTime: 10 * 60_000,
     retry: false,
   });
@@ -259,9 +315,9 @@ export function useUpcomingFeaturedMatches(visible = true) {
     }));
   return {
     items,
-    loading: !items.length && query.isPending,
+    loading: !items.length && (query.isPending || query.isFetching),
     refreshing: query.isFetching,
-    unavailable: query.isError,
+    unavailable: query.isError && !items.length,
     incomplete: !!query.data?.incomplete,
     offline: isOffline,
     retry: () => {
@@ -272,14 +328,18 @@ export function useUpcomingFeaturedMatches(visible = true) {
 }
 
 export function useRecentFinishedFeaturedMatches(visible = true) {
+  const progressive = useProgressiveScores();
   const { now, active: screenActive } = useMatchClock();
   const active = screenActive && visible;
   const { isOffline } = useConnectivity();
   const today = calendarDate(new Date(now));
   const query = useQuery({
-    queryKey: ["featured-scoreboard", today, "recent-finished"],
+    queryKey: ["featured-scoreboard", today, "history"],
     enabled: active && !isOffline,
-    queryFn: ({ signal }) => fetchFeaturedScoreboard(today, signal, 14),
+    queryFn: ({ signal, queryKey }) =>
+      progressive<ScoreboardSnapshot>(queryKey, signal, (publish) =>
+        fetchFeaturedScoreboard(today, signal, 14, publish),
+      ),
     structuralSharing: preserveFinishedScoreboard,
     staleTime: 10 * 60_000,
     retry: false,
@@ -293,9 +353,9 @@ export function useRecentFinishedFeaturedMatches(visible = true) {
     }));
   return {
     items,
-    loading: !items.length && query.isPending,
+    loading: !items.length && (query.isPending || query.isFetching),
     refreshing: query.isFetching,
-    unavailable: query.isError,
+    unavailable: query.isError && !items.length,
     incomplete: !!query.data?.incomplete,
     offline: isOffline,
     retry: () => {

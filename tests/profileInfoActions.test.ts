@@ -45,7 +45,7 @@ it("preserves the date-of-birth correction flow", () => {
       "1 janvier 2000",
       true,
     ),
-  ).toEqual([{ label: "Demander une correction", href: "/help" }]);
+  ).toEqual([{ label: "Modifier cette information", href: "/settings?section=content" }]);
 });
 it("links each skill to an individual matching filter", () => {
   const actions = profileInfoActions(

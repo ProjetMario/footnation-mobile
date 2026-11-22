@@ -1,6 +1,12 @@
 import { expect, it } from "vitest";
 import { notificationPath } from "../src/lib/notificationPath";
 
+it("opens approved club administration from both legacy and Expo notification links", () => {
+  const id = "aaaaaaaa-0000-4000-8000-000000000001";
+  for (const path of [`/club/${id}/admin`, `/app/club/${id}/admin`, `/club-admin/${id}`])
+    expect(notificationPath(path)).toBe(`/club-admin/${id}`);
+});
+
 it("maps legacy club, match and news paths while preserving context", () => {
   expect(notificationPath("/clubs/club-id?tab=news#item")).toBe(
     "/club/club-id?tab=news#item",
@@ -85,4 +91,10 @@ it("opens the recipient from web message notifications and matching links", () =
   expect(notificationPath("/messages?to=https://evil.test")).toBe(
     "/messages?to=https://evil.test",
   );
+});
+
+it("opens application follow-up notifications in the correct private inbox", () => {
+  const id = "20000000-0000-4000-8000-000000000001";
+  expect(notificationPath(`/opportunities?application=${id}&view=received`)).toBe("/my-applications?mode=received");
+  expect(notificationPath(`/opportunities?application=${id}&view=sent`)).toBe("/my-applications");
 });

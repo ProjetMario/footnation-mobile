@@ -1,14 +1,34 @@
 import {
+  readPublicPreviewVideos,
+  readPublicPreviewShort,
+  type PublicVideoCursor,
+} from "../lib/publicPreviewVideos";
+import {
   initialVideoCursor,
   mergeVideoPage,
   videoFeedKey,
 } from "../lib/videoFeed";
 import { PostTranslation } from "../components/PostTranslation";
 import { contentReportPath } from "../lib/contentReport";
-import { notifyNetworkNewContent, notifyPublicationPublished } from "../lib/notificationEvents";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  notifyNetworkNewContent,
+  notifyPublicationPublished,
+} from "../lib/notificationEvents";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  browserMediaNetwork,
+  conserveVideoData,
+  preparedVideoWindow,
+} from "../lib/videoPreload";
 import {
   FlatList,
+  Platform,
   Pressable,
   Share,
   StyleSheet,
@@ -16,6 +36,8 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as Clipboard from "expo-clipboard";
+import { sharePublicLink } from "../lib/sharePublicLink";
 import { LinearGradient } from "expo-linear-gradient";
 import { MediaActionShade } from "../components/MediaActionShade";
 import { randomUUID } from "expo-crypto";
@@ -41,6 +63,7 @@ import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
 import { fetchShortFriends } from "../lib/shortFriends";
 import { blockedSocialAuthors } from "../lib/socialVisibility";
+import { readFeedAccess } from "../lib/feedAccess";
 import {
   createShortPublication,
   MAX_SHORT_BYTES,
@@ -50,12 +73,14 @@ import { shortPublicationServices } from "../lib/shortPublicationServices";
 import { moderateText, MODERATION_ERROR_MESSAGE } from "../lib/moderation";
 import { Profile, displayName } from "../lib/models";
 import { AuthGate } from "../components/AuthGate";
+import { GuestPreviewBoundary } from "../components/GuestPreviewBoundary";
 import {
   Avatar,
   Button,
   Empty,
   ErrorState,
   Field,
+  Header,
   Loading,
   Chip,
   Screen,
@@ -69,7 +94,10 @@ import { ShortComments } from "../components/ShortComments";
 import { ShortMusicPicker } from "../components/ShortMusicPicker";
 import { Image } from "expo-image";
 import { useMediaSound } from "../lib/mediaSound";
-import { getDefaultMusic, musicLibrary } from "../data/shortMusicLibrary";
+import {
+  getMusicForPublication,
+  musicLibrary,
+} from "../data/shortMusicLibrary";
 import {
   shortClip,
   shortGoals,
@@ -79,8 +107,12 @@ import {
 } from "../lib/shortEditing";
 import { storyPhoto } from "../lib/storyPublication";
 import { useTheme } from "../theme";
-import { createPageRequestGate, visibleMediaId } from "../lib/mediaFeed";
-export interface Short {
+import { createPageRequestGate, feedMediaViewability, visibleMediaId } from "../lib/mediaFeed";
+import {
+  resolveVideoSource,
+  type OptimizedVideoFields,
+} from "../lib/videoSource";
+export interface Short extends OptimizedVideoFields {
   id: string;
   created_at: string;
   origin?: "post" | "short";
@@ -108,6 +140,7 @@ function formatShortCount(value: number) {
 
 function useShortEngagement(short: Short) {
   const [shareError, setShareError] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState("");
   const { session, profile } = useAuth();
   const uid = session?.user.id;
   const cache = useQueryClient();
@@ -175,20 +208,36 @@ function useShortEngagement(short: Short) {
   });
   const share = () => {
     setShareError(false);
-    void Share.share({
-      message: isPost
-        ? `https://www.foot-nation.com/posts/${short.id}`
-        : `https://www.foot-nation.com/shorts?shortId=${short.id}`,
-    }).catch(() => setShareError(true));
+    setShareFeedback("");
+    const url = isPost
+      ? `https://www.foot-nation.com/posts/${short.id}`
+      : `https://www.foot-nation.com/shorts?shortId=${short.id}`;
+    void sharePublicLink(url, {
+      platform: Platform.OS,
+      share: (message) => Share.share({ message }),
+      copy: (message) => Clipboard.setStringAsync(message),
+    })
+      .then((result) => {
+        if (result === "copied")
+          setShareFeedback("Lien copié. Collez-le pour partager ce short.");
+      })
+      .catch(() => setShareError(true));
   };
   return {
     liked: !!likes.data?.id,
     likeCount: likes.isError ? 0 : likes.data?.count || 0,
     commentCount: comments.isError ? 0 : comments.data || 0,
-    pending: likes.isPending || toggle.isPending,
-    toggleLike: () => toggle.mutate(),
+    pending: !!uid && (likes.isPending || toggle.isPending),
+    toggleLike: () =>
+      uid
+        ? toggle.mutate()
+        : router.push({
+            pathname: "/login",
+            params: { next: `/${isPost ? "posts" : "shorts"}/${short.id}` },
+          }),
     share,
     shareError,
+    shareFeedback,
     toggleError: toggle.isError,
   };
 }
@@ -226,6 +275,8 @@ function ShortReelsAction({
 export function ShortReelsFrame({
   short,
   visible,
+  preload = false,
+  onPlayingChange,
   showBack = false,
   onBack,
   profileName,
@@ -235,6 +286,8 @@ export function ShortReelsFrame({
 }: {
   short: Short;
   visible: boolean;
+  preload?: boolean;
+  onPlayingChange?: (key: string, playing: boolean) => void;
   showBack?: boolean;
   onBack?: () => void;
   profileName?: string;
@@ -247,22 +300,39 @@ export function ShortReelsFrame({
   const [muted, setMuted] = useMediaSound();
   const engagement = useShortEngagement(short);
   const author = displayName(short.user);
-  const goComments =
+  const musicUrl =
+    short.music_url || getMusicForPublication(videoFeedKey(short)).audioUrl;
+  const openComments =
     onOpenComments ||
     (() =>
       router.push({
         pathname: short.origin === "post" ? "/posts/[id]" : "/shorts/[id]",
         params: { id: short.id, comments: "1" },
       }));
+  const goComments = () => {
+    if (!session) {
+      router.push({
+        pathname: "/login",
+        params: {
+          next: `/${short.origin === "post" ? "posts" : "shorts"}/${short.id}?comments=1`,
+        },
+      });
+      return;
+    }
+    openComments();
+  };
   return (
     <View style={shortStyles.reel}>
       <ShortVideo
-        uri={short.video_url}
+        {...resolveVideoSource(short, short.thumbnail_url)}
         autoplay
-        musicUri={short.music_url}
+        musicUri={musicUrl}
         goals={short.goal_timestamps ?? []}
         visible={visible}
-        posterUri={short.thumbnail_url}
+        preload={preload}
+        onPlayingChange={(playing) =>
+          onPlayingChange?.(videoFeedKey(short), playing)
+        }
         controls={false}
         muted={muted}
         style={StyleSheet.absoluteFill}
@@ -438,6 +508,11 @@ export function ShortReelsFrame({
           </Pressable>
         )}
         <PostTranslation text={short.description} overlay />
+        {!!engagement.shareFeedback && (
+          <Text accessibilityLiveRegion="polite" style={shortStyles.caption}>
+            {engagement.shareFeedback}
+          </Text>
+        )}
         {!!engagement.shareError && (
           <Text accessibilityRole="alert" style={shortStyles.errorText}>
             Le partage n’est pas disponible.
@@ -454,6 +529,14 @@ export function ShortReelsFrame({
 }
 
 export default function Shorts() {
+  return (
+    <GuestPreviewBoundary>
+      <ShortsContent />
+    </GuestPreviewBoundary>
+  );
+}
+
+function ShortsContent() {
   const { shortId, mode: modeParam } = useLocalSearchParams<{
     shortId?: string;
     mode?: string;
@@ -471,10 +554,27 @@ export default function Shorts() {
   const { session } = useAuth();
   const [height, setHeight] = useState(660),
     [active, setActive] = useState<string | null>(null);
-  const viewability = useRef({
-    itemVisiblePercentThreshold: 70,
-    minimumViewTime: 150,
-  });
+  const discoverMode = session ? mode : "all";
+  const [playing, setPlaying] = useState<string | null>(null);
+  const [conserveData, setConserveData] = useState(() =>
+    conserveVideoData(browserMediaNetwork()),
+  );
+  useEffect(() => {
+    const network = browserMediaNetwork();
+    const changed = () => setConserveData(conserveVideoData(network));
+    network?.addEventListener?.("change", changed);
+    return () => network?.removeEventListener?.("change", changed);
+  }, []);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const onPlayingChange = useCallback((key: string, isPlaying: boolean) => {
+    // Late events from the previous card cannot start a third download.
+    if (key !== activeRef.current) return;
+    setPlaying((current) =>
+      isPlaying ? key : current === key ? null : current,
+    );
+  }, []);
+  const viewability = useRef(feedMediaViewability);
   const viewChanged = useRef(
     ({
       viewableItems,
@@ -492,38 +592,56 @@ export default function Shorts() {
       ),
   );
   const q = useInfiniteQuery({
-    queryKey: ["shorts-native", session?.user.id, mode, "all-user-videos"],
-    enabled: !!session,
-    initialPageParam: initialVideoCursor,
-    queryFn: async ({ pageParam }) => {
-      const blocked = await blockedSocialAuthors(session!.user.id);
-      const reposts = await supabase.rpc("get_video_repost_feed", {
-        p_mode: mode,
-        p_offset: pageParam.offset,
-        p_limit: 12,
-      });
+    queryKey: [
+      "shorts-native",
+      session?.user.id || "public",
+      discoverMode,
+      "all-user-videos-public-cursor-v1",
+    ],
+    initialPageParam: initialVideoCursor as PublicVideoCursor,
+    queryFn: async ({ pageParam, signal }) => {
+      if (!session && Platform.OS === "web")
+        return readPublicPreviewVideos(supabase, pageParam);
+      const { blocked, feed: reposts } = session
+        ? await readFeedAccess(
+            session.user.id,
+            supabase
+              .rpc("get_video_repost_feed", {
+                p_mode: discoverMode,
+                p_offset: pageParam.offset,
+                p_limit: 12,
+              })
+              .abortSignal(signal),
+            signal,
+          )
+        : { blocked: [] as string[], feed: null };
       const postSelection =
-        "id,user_id,created_at,video_url,image_url,content,user:profiles!posts_user_id_fkey(id,full_name,username,avatar_url)";
-      const toPostVideo = (post: {
-        id: string;
-        user_id: string;
-        created_at: string;
-        video_url: string;
-        image_url: string | null;
-        content: string | null;
-        user: Profile | Profile[] | null;
-      }): Short => ({
+        "id,user_id,created_at,video_url,optimized_video_url,optimized_video_source_url,optimized_thumbnail_url,image_url,content,user:profiles!posts_user_id_fkey(id,full_name,username,avatar_url)";
+      const toPostVideo = (
+        post: OptimizedVideoFields & {
+          id: string;
+          user_id: string;
+          created_at: string;
+          video_url: string;
+          image_url: string | null;
+          content: string | null;
+          user: Profile | Profile[] | null;
+        },
+      ): Short => ({
         id: post.id,
         user_id: post.user_id,
         created_at: post.created_at,
         video_url: post.video_url,
+        optimized_video_url: post.optimized_video_url,
+        optimized_video_source_url: post.optimized_video_source_url,
+        optimized_thumbnail_url: post.optimized_thumbnail_url,
         thumbnail_url: post.image_url,
         description: post.content,
         user: Array.isArray(post.user) ? post.user[0] || null : post.user,
         origin: "post",
-        music_url: getDefaultMusic().audioUrl,
+        music_url: getMusicForPublication(`post:${post.id}`).audioUrl,
       });
-      if (!reposts.error) {
+      if (reposts && !reposts.error && discoverMode === "friends") {
         const entries = reposts.data as {
           content_kind: "post" | "short";
           content_id: string;
@@ -538,10 +656,18 @@ export default function Shorts() {
           .map((entry) => entry.content_id);
         const [postRows, shortRows] = await Promise.all([
           postIds.length
-            ? supabase.from("posts").select(postSelection).in("id", postIds)
+            ? supabase
+                .from("posts")
+                .select(postSelection)
+                .in("id", postIds)
+                .abortSignal(signal)
             : { data: [], error: null },
           shortIds.length
-            ? supabase.from("shorts").select(selection).in("id", shortIds)
+            ? supabase
+                .from("shorts")
+                .select(selection)
+                .in("id", shortIds)
+                .abortSignal(signal)
             : { data: [], error: null },
         ]);
         if (postRows.error) throw postRows.error;
@@ -568,11 +694,12 @@ export default function Shorts() {
               : undefined,
         };
       }
-      if (!repostBackendMissing(reposts.error)) throw reposts.error;
+      if (reposts?.error && !repostBackendMissing(reposts.error))
+        throw reposts.error;
       // Before activation, merge the existing readable sources with independent cursors.
       const friends =
-        mode === "friends"
-          ? [session!.user.id, ...(await fetchShortFriends(session!.user.id))]
+        session && discoverMode === "friends"
+          ? [session.user.id, ...(await fetchShortFriends(session.user.id))]
           : null;
       if (friends && !friends.length)
         return { items: [] as Short[], next: undefined };
@@ -584,7 +711,8 @@ export default function Shorts() {
         .or("moderation_hidden.is.null,moderation_hidden.eq.false")
         .order("created_at", { ascending: false })
         .order("id")
-        .range(pageParam.posts, pageParam.posts + 12);
+        .range(pageParam.posts, pageParam.posts + 12)
+        .abortSignal(signal);
       let shortRequest = supabase
         .from("shorts")
         .select(selection)
@@ -593,7 +721,8 @@ export default function Shorts() {
         .or("moderation_hidden.is.null,moderation_hidden.eq.false")
         .order("created_at", { ascending: false })
         .order("id")
-        .range(pageParam.shorts, pageParam.shorts + 12);
+        .range(pageParam.shorts, pageParam.shorts + 12)
+        .abortSignal(signal);
       if (friends) {
         postRequest = postRequest.in("user_id", friends);
         shortRequest = shortRequest.in("user_id", friends);
@@ -635,12 +764,21 @@ export default function Shorts() {
       },
     );
   }, [q.data?.pages]);
+  const preparedWindow = useRef<readonly string[]>([]);
+  const preload = preparedVideoWindow(
+    shorts.map(videoFeedKey),
+    active,
+    playing,
+    conserveData,
+    preparedWindow.current,
+  );
+  preparedWindow.current = preload;
   const pageGate = useRef(createPageRequestGate());
   const loadMore = (retry = false) =>
     pageGate.current.run(
       {
-        key: `${session?.user.id}:${mode}:${shorts.length}:${shorts.at(-1)?.id || ""}`,
-        hasNextPage: !!session && q.hasNextPage,
+        key: `${session?.user.id || "public"}:${discoverMode}:${shorts.length}:${shorts.at(-1)?.id || ""}`,
+        hasNextPage: q.hasNextPage,
         isFetching: q.isFetching,
         isError: q.isError,
         retry,
@@ -652,107 +790,115 @@ export default function Shorts() {
       edges={["top", "bottom", "left", "right"]}
       style={shortStyles.screen}
     >
-      <AuthGate allowIncomplete>
-        <View
-          style={{ flex: 1 }}
-          onLayout={(e) => {
-            const next = e.nativeEvent.layout.height;
-            if (Number.isFinite(next) && next > 0) setHeight(next);
+      <View
+        style={{ flex: 1 }}
+        onLayout={(e) => {
+          const next = e.nativeEvent.layout.height;
+          if (Number.isFinite(next) && next > 0) setHeight(next);
+        }}
+      >
+        <FlatList
+          key={`${session?.user.id || "guest"}:${discoverMode}`}
+          data={shorts}
+          extraData={`${active}:${preload}`}
+          keyExtractor={videoFeedKey}
+          pagingEnabled
+          onViewableItemsChanged={viewChanged.current}
+          viewabilityConfig={viewability.current}
+          windowSize={3}
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
+          getItemLayout={(_data, index) => ({
+            length: height,
+            offset: height * index,
+            index,
+          })}
+          renderItem={({ item }) => (
+            <View style={{ height }}>
+              <ShortReelsFrame
+                short={item}
+                visible={active === videoFeedKey(item)}
+                preload={preload.includes(videoFeedKey(item))}
+                onPlayingChange={onPlayingChange}
+                mode={discoverMode}
+                onModeChange={changeMode}
+              />
+            </View>
+          )}
+          onEndReached={() => {
+            void loadMore();
           }}
-        >
-          <FlatList
-            key={`${session?.user.id || "guest"}:${mode}`}
-            data={shorts}
-            extraData={active}
-            keyExtractor={videoFeedKey}
-            pagingEnabled
-            onViewableItemsChanged={viewChanged.current}
-            viewabilityConfig={viewability.current}
-            windowSize={3}
-            initialNumToRender={2}
-            maxToRenderPerBatch={2}
-            getItemLayout={(_data, index) => ({
-              length: height,
-              offset: height * index,
-              index,
-            })}
-            renderItem={({ item }) => (
-              <View style={{ height }}>
-                <ShortReelsFrame
-                  short={item}
-                  visible={active === videoFeedKey(item)}
-                  mode={mode}
-                  onModeChange={changeMode}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            shorts.length ? (
+              <View style={shortStyles.footerOverlay}>
+                {q.isFetchingNextPage ? (
+                  <Loading />
+                ) : q.isError ? (
+                  <ErrorState
+                    error={q.error}
+                    retry={() => {
+                      if (q.isFetchNextPageError) void loadMore(true);
+                      else void q.refetch();
+                    }}
+                  />
+                ) : q.hasNextPage ? (
+                  <Button
+                    title="Afficher plus de Shorts"
+                    secondary
+                    onPress={() => void loadMore(true)}
+                  />
+                ) : null}
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            q.isPending ? (
+              <View style={shortStyles.centerEmpty}>
+                <Loading />
+              </View>
+            ) : q.isError ? (
+              <View style={shortStyles.centerEmpty}>
+                <ErrorState error={q.error} retry={() => void q.refetch()} />
+              </View>
+            ) : (
+              <View style={shortStyles.centerEmpty}>
+                <Empty
+                  title={
+                    mode === "friends"
+                      ? "Aucun short de vos amis pour le moment"
+                      : "Aucun short pour le moment"
+                  }
+                />
+                {mode === "friends" && (
+                  <Button
+                    title="Voir tous les Reels"
+                    onPress={() => changeMode("all")}
+                  />
+                )}
+                <Button
+                  title="Créer un short"
+                  onPress={() => router.push("/shorts/create")}
                 />
               </View>
-            )}
-            onEndReached={() => {
-              void loadMore();
-            }}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              shorts.length ? (
-                <View style={shortStyles.footerOverlay}>
-                  {q.isFetchingNextPage ? (
-                    <Loading />
-                  ) : q.isError ? (
-                    <ErrorState
-                      error={q.error}
-                      retry={() => {
-                        if (q.isFetchNextPageError) void loadMore(true);
-                        else void q.refetch();
-                      }}
-                    />
-                  ) : q.hasNextPage ? (
-                    <Button
-                      title="Afficher plus de Shorts"
-                      secondary
-                      onPress={() => void loadMore(true)}
-                    />
-                  ) : null}
-                </View>
-              ) : null
-            }
-            ListEmptyComponent={
-              q.isPending ? (
-                <View style={shortStyles.centerEmpty}>
-                  <Loading />
-                </View>
-              ) : q.isError ? (
-                <View style={shortStyles.centerEmpty}>
-                  <ErrorState error={q.error} retry={() => void q.refetch()} />
-                </View>
-              ) : (
-                <View style={shortStyles.centerEmpty}>
-                  <Empty
-                    title={
-                      mode === "friends"
-                        ? "Aucun short de vos amis pour le moment"
-                        : "Aucun short pour le moment"
-                    }
-                  />
-                  {mode === "friends" && (
-                    <Button
-                      title="Voir tous les Reels"
-                      onPress={() => changeMode("all")}
-                    />
-                  )}
-                  <Button
-                    title="Créer un short"
-                    onPress={() => router.push("/shorts/create")}
-                  />
-                </View>
-              )
-            }
-            refreshing={q.isRefetching && !q.isFetchingNextPage}
-            onRefresh={() => void q.refetch()}
-          />
-        </View>
-      </AuthGate>
+            )
+          }
+          refreshing={q.isRefetching && !q.isFetchingNextPage}
+          onRefresh={() => void q.refetch()}
+        />
+      </View>
     </SafeAreaView>
   );
 }
 export function ShortDetail() {
+  return (
+    <AuthGate publicPreview>
+      <ShortDetailContent />
+    </AuthGate>
+  );
+}
+
+function ShortDetailContent() {
   const { id, comments: commentsParam } = useLocalSearchParams<{
     id: string;
     comments?: string;
@@ -762,15 +908,24 @@ export function ShortDetail() {
   useEffect(() => setCommentsOpen(commentsParam === "1"), [id, commentsParam]);
   const q = useQuery({
     queryKey: ["short", id, session?.user.id],
-    enabled: !!session,
+    enabled: !!session || Platform.OS === "web",
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("shorts")
-        .select(selection)
-        .eq("id", id)
-        .single();
+      if (!session && Platform.OS === "web") {
+        const short = await readPublicPreviewShort(supabase, id);
+        if (!short) throw new Error("Ce short n’est pas disponible.");
+        return short;
+      }
+      let request = supabase.from("shorts").select(selection).eq("id", id);
+      if (!session)
+        request = request.or(
+          "moderation_hidden.is.null,moderation_hidden.eq.false",
+        );
+      const { data, error } = await request.maybeSingle();
       if (error) throw error;
-      const blocked = await blockedSocialAuthors(session!.user.id);
+      if (!data) throw new Error("Ce short n’est pas disponible.");
+      const blocked = session
+        ? await blockedSocialAuthors(session.user.id)
+        : [];
       if (blocked.includes(data.user_id))
         throw new Error("Ce short n’est plus disponible.");
       return data as unknown as Short;
@@ -781,7 +936,8 @@ export function ShortDetail() {
       edges={["top", "left", "right", "bottom"]}
       style={shortStyles.screen}
     >
-      <AuthGate>
+      {(q.isPending || q.isError) && <Header title="Short" back />}
+      <>
         {q.isPending ? (
           <View style={shortStyles.centerEmpty}>
             <Loading />
@@ -803,7 +959,7 @@ export function ShortDetail() {
           open={commentsOpen && q.isSuccess}
           onClose={() => setCommentsOpen(false)}
         />
-      </AuthGate>
+      </>
     </SafeAreaView>
   );
 }
@@ -882,7 +1038,7 @@ const shortStyles = StyleSheet.create({
     position: "absolute",
     left: 16,
     right: 88,
-    bottom: 84,
+    bottom: 132,
     zIndex: 8,
     gap: 8,
   },
@@ -1156,7 +1312,11 @@ function ShortCreateContent({
     },
     onSuccess: (id) => {
       if (!mounted.current || !isCurrentAccount()) return;
-      void notifyPublicationPublished({ authorId: userId, contentId: id, kind: "short" });
+      void notifyPublicationPublished({
+        authorId: userId,
+        contentId: id,
+        kind: "short",
+      });
       void notifyNetworkNewContent({
         authorId: userId,
         authorName: profile ? displayName(profile) : null,
@@ -1165,7 +1325,9 @@ function ShortCreateContent({
       });
       void cache.invalidateQueries({ queryKey: ["shorts-native", userId] });
       void cache.invalidateQueries({ queryKey: ["notifications", userId] });
-      void cache.invalidateQueries({ queryKey: ["notifications", userId, "unread-count"] });
+      void cache.invalidateQueries({
+        queryKey: ["notifications", userId, "unread-count"],
+      });
       attempt.current = null;
       router.replace("/shorts");
     },

@@ -1,6 +1,5 @@
 import React, { useRef, useState } from "react";
 import { FlatList, Linking, Share, Text, View } from "react-native";
-import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   useInfiniteQuery,
@@ -24,6 +23,7 @@ import {
   Screen,
   useUIStyles,
 } from "../components/ui";
+import { NewsVisual } from "../components/NewsVisual";
 import type { NewsReactionType } from "../types/news";
 
 type Comment = {
@@ -238,13 +238,11 @@ export default function NewsDetail() {
             />
           ) : (
             <View style={{ gap: 18 }}>
-              {!!article.data.image_url && (
-                <Image
-                  source={{ uri: article.data.image_url }}
-                  style={{ width: "100%", aspectRatio: 1.7, borderRadius: 20 }}
-                  contentFit="cover"
-                />
-              )}
+              <NewsVisual
+                imageUrl={article.data.image_url}
+                sourceName={article.data.source_name}
+                style={{ width: "100%", aspectRatio: 1.7, borderRadius: 20 }}
+              />
               <Text style={s.small}>
                 {article.data.source_name}
                 {article.data.published_at

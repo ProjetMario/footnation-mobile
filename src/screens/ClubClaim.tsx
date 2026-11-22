@@ -13,6 +13,7 @@ import { useAuth } from "../lib/auth";
 import { useClubs } from "../lib/data";
 import { supabase } from "../lib/supabase";
 import { validEmail } from "../lib/validation";
+import { CompactForm, FormDetails } from "../components/CompactForm";
 import { AuthGate } from "../components/AuthGate";
 import {
   Button,
@@ -143,7 +144,10 @@ function Form() {
             },
           },
         );
-        if (error) throw error;
+        if (error)
+          throw new Error(
+            error.message || "Le justificatif n’a pas pu être enregistré.",
+          );
         if (
           typeof data?.path !== "string" ||
           !data.path.startsWith(`club-claims/${uid}/`)
@@ -167,7 +171,11 @@ function Form() {
         id_card_front_url: attempt.current.paths.front || null,
         id_card_back_url: attempt.current.paths.back || null,
       });
-      if (error) throw error;
+      if (error)
+        throw new Error(
+          error.message ||
+            "La demande de représentation n’a pas pu être envoyée.",
+        );
     },
     onSuccess: () => {
       void cache.invalidateQueries({ queryKey: ["my-club-claims", uid] });
@@ -188,9 +196,11 @@ function Form() {
       </View>
     );
   return (
-    <>
-      <Text style={s.subtitle}>
-        Demandez à gérer la page officielle de votre club sur FootNation.
+    <CompactForm>
+      <Text style={s.small}>
+        {clubId
+          ? "Vos coordonnées pour demander la gestion du club."
+          : "Choisissez le club que vous représentez."}
       </Text>
       {clubId ? (
         <View style={s.card}>
@@ -215,12 +225,14 @@ function Form() {
             onChangeText={setSearch}
             placeholder="Rechercher mon club"
           />
-          <Field
-            label="Code du département (facultatif)"
-            value={department}
-            onChangeText={setDepartment}
-            maxLength={3}
-          />
+          <FormDetails title="Filtrer par département">
+            <Field
+              label="Code du département (facultatif)"
+              value={department}
+              onChangeText={setDepartment}
+              maxLength={3}
+            />
+          </FormDetails>
           {clubs.isPending ? (
             <Loading />
           ) : clubs.error ? (
@@ -249,106 +261,112 @@ function Form() {
           )}
         </View>
       )}
-      <Field
-        label="Nom complet"
-        value={fullName}
-        onChangeText={setFullName}
-        maxLength={120}
-        editable={!send.isPending}
-      />
-      <Field
-        label="Fonction au sein du club"
-        value={position}
-        onChangeText={setPosition}
-        maxLength={120}
-        editable={!send.isPending}
-      />
-      <Field
-        label="Adresse e-mail"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        editable={!send.isPending}
-      />
-      <Field
-        label="Téléphone (facultatif)"
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-        maxLength={30}
-        editable={!send.isPending}
-      />
-      <Field
-        label="Numéro d’affiliation FFF (8 chiffres)"
-        value={number}
-        onChangeText={setNumber}
-        keyboardType="number-pad"
-        maxLength={8}
-        editable={!send.isPending}
-      />
-      <Field
-        label="Message (facultatif)"
-        value={message}
-        onChangeText={setMessage}
-        multiline
-        maxLength={3000}
-        editable={!send.isPending}
-      />
-      <Text style={s.h2}>Justificatifs d’identité</Text>
-      <Text style={s.small}>
-        Vous pouvez joindre le recto et le verso de votre pièce d’identité. Les
-        photos seront envoyées avec votre demande, uniquement après validation
-        du formulaire.
-      </Text>
-      {(
-        [
-          ["front", "Recto"],
-          ["back", "Verso"],
-        ] as const
-      ).map(([side, label]) => (
-        <View key={side} style={{ gap: 8 }}>
-          <Button
-            secondary
-            title={`${label}${files[side] ? " : photo sélectionnée" : " : choisir une photo"}`}
-            disabled={send.isPending}
-            busy={pick.isPending}
-            onPress={() => pick.mutate(side)}
+      {!!clubId && (
+        <>
+          <Field
+            label="Nom complet"
+            value={fullName}
+            onChangeText={setFullName}
+            maxLength={120}
+            editable={!send.isPending}
           />
-          {!!files[side] && (
-            <Button
-              secondary
-              title={`Retirer le ${label.toLowerCase()}`}
-              disabled={send.isPending}
-              onPress={() => {
-                setFiles((current) => {
-                  const next = { ...current };
-                  delete next[side];
-                  return next;
-                });
-                delete attempt.current.paths[side];
-              }}
+          <Field
+            label="Fonction au sein du club"
+            value={position}
+            onChangeText={setPosition}
+            maxLength={120}
+            editable={!send.isPending}
+          />
+          <Field
+            label="Adresse e-mail"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            editable={!send.isPending}
+          />
+          <Field
+            label="Numéro d’affiliation FFF (8 chiffres)"
+            value={number}
+            onChangeText={setNumber}
+            keyboardType="number-pad"
+            maxLength={8}
+            editable={!send.isPending}
+          />
+          <FormDetails title="Compléments et justificatifs (facultatifs)">
+            <Field
+              label="Téléphone (facultatif)"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              maxLength={30}
+              editable={!send.isPending}
             />
-          )}
-        </View>
-      ))}
-      {!!pick.error && <ErrorState error={pick.error} />}
-      {!!send.error && <ErrorState error={send.error} />}
-      <Button
-        title="Envoyer ma demande"
-        busy={send.isPending}
-        disabled={
-          pick.isPending ||
-          !clubId ||
-          !selected.data ||
-          !fullName.trim() ||
-          !position.trim() ||
-          !validEmail(email) ||
-          !/^\d{8}$/.test(number)
-        }
-        onPress={() => send.mutate()}
-      />
-    </>
+            <Field
+              label="Message (facultatif)"
+              value={message}
+              onChangeText={setMessage}
+              multiline
+              maxLength={3000}
+              editable={!send.isPending}
+            />
+            <Text style={s.h2}>Justificatifs d’identité</Text>
+            <Text style={s.small}>
+              Vous pouvez joindre le recto et le verso de votre pièce
+              d’identité. Les photos seront envoyées avec votre demande,
+              uniquement après validation du formulaire.
+            </Text>
+            {(
+              [
+                ["front", "Recto"],
+                ["back", "Verso"],
+              ] as const
+            ).map(([side, label]) => (
+              <View key={side} style={{ gap: 8 }}>
+                <Button
+                  secondary
+                  title={`${label}${files[side] ? " : photo sélectionnée" : " : choisir une photo"}`}
+                  disabled={send.isPending}
+                  busy={pick.isPending}
+                  onPress={() => pick.mutate(side)}
+                />
+                {!!files[side] && (
+                  <Button
+                    secondary
+                    title={`Retirer le ${label.toLowerCase()}`}
+                    disabled={send.isPending}
+                    onPress={() => {
+                      setFiles((current) => {
+                        const next = { ...current };
+                        delete next[side];
+                        return next;
+                      });
+                      delete attempt.current.paths[side];
+                    }}
+                  />
+                )}
+              </View>
+            ))}
+            {!!pick.error && <ErrorState error={pick.error} />}
+          </FormDetails>
+          {!!send.error && <ErrorState error={send.error} />}
+          <Button
+            title="Envoyer ma demande"
+            busy={send.isPending}
+            disabled={
+              pick.isPending ||
+              !clubId ||
+              !selected.data ||
+              !fullName.trim() ||
+              !position.trim() ||
+              !validEmail(email) ||
+              !/^\d{8}$/.test(number)
+            }
+            onPress={() => send.mutate()}
+          />
+        </>
+      )}
+    </CompactForm>
   );
 }
 export function ClubClaims() {

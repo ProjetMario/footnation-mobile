@@ -493,6 +493,16 @@ export function createSuperAdminFixture(tables, ids) {
       });
     const row = tables.profiles.find((p) => p.id === body.userId);
     if (!row) return failure("P0002", "Compte introuvable", 404);
+    // Opt-in, local-only scenario: exercise the production recent-auth refusal
+    // without deleting even a synthetic account.
+    if (
+      process.env.AUDIT_ADMIN_REAUTH === "1" &&
+      body.action === "delete_account"
+    )
+      return {
+        status: 403,
+        data: { error: "Reconnectez-vous pour confirmer cette action sensible." },
+      };
     if (body.action === "security")
       return ok({ email: row.email || "member@fixture.test" });
     if (body.action === "avatar_upload")

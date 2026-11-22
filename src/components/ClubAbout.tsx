@@ -9,6 +9,7 @@ import {
 } from "lucide-react-native";
 import { useTheme } from "../theme";
 import { websiteUrl } from "../lib/websiteUrl";
+import { clubLocationLabel } from "../lib/clubLocation";
 import { ClubPublicInformation } from "./ClubPublicInformation";
 import { ClubAchievements } from "./ClubAchievements";
 import { ClubCommunityPanel } from "./ClubCommunityPanel";
@@ -67,9 +68,7 @@ export function ClubAbout({ club }: { club: Record<string, any> }) {
               : "Club de football"}
           </Text>
           <Text style={s.small}>
-            {[club.city, club.department_name || club.department_code]
-              .filter(Boolean)
-              .join(" · ")}
+            {clubLocationLabel(club, true)}
           </Text>
         </View>
         {!!description && (

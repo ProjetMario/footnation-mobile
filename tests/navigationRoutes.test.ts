@@ -72,6 +72,10 @@ function destination(node: ts.Node): string | null {
   }
   return null;
 }
+// Browser anchors include the production mount; router.push stays mount-relative.
+function resolvesHref(value: string) {
+  return resolves(value === "/app" ? "/" : value.replace(/^\/app\//, "/"));
+}
 it("every statically known in-app router destination has a matching Expo route", () => {
   const unresolved: string[] = [];
   for (const file of ["src", "app"]
@@ -110,7 +114,7 @@ it("every statically known in-app router destination has a matching Expo route",
           ? node.initializer.expression
           : node.initializer;
         const target = init && destination(init);
-        if (target?.startsWith("/") && !resolves(target))
+        if (target?.startsWith("/") && !resolvesHref(target))
           unresolved.push(path.relative(root, file) + " href → " + target);
       }
       if (
@@ -118,7 +122,7 @@ it("every statically known in-app router destination has a matching Expo route",
         node.name.getText(source) === "href"
       ) {
         const target = destination(node.initializer);
-        if (target?.startsWith("/") && !resolves(target))
+        if (target?.startsWith("/") && !resolvesHref(target))
           unresolved.push(
             path.relative(root, file) + " href config → " + target,
           );
@@ -129,6 +133,13 @@ it("every statically known in-app router destination has a matching Expo route",
   }
   expect(unresolved).toEqual([]);
 }, 30000);
+
+it("checks mounted browser links without weakening internal router validation", () => {
+  expect(resolvesHref("/app/supporters")).toBe(true);
+  expect(resolvesHref("/app/supporters/00000000-0000-4000-8000-000000000081")).toBe(true);
+  expect(resolvesHref("/app/page-inventee")).toBe(false);
+  expect(resolves("/app/supporters")).toBe(false);
+});
 
 it("does not mistake catch-all geography routes for existing screens", () => {
   for (const route of [

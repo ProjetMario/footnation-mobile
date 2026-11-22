@@ -1,3 +1,7 @@
+import { fetchClubSports as fetchFffClub } from "../lib/fffSportData";
+import { projectClubLogos } from "../lib/clubLogoPolicy.mjs";
+import { readClub } from '../lib/readClub';
+import { ClubDiscussions } from "../components/ClubDiscussions";
 import {
   ClubDesignProvider,
   ClubSheet,
@@ -18,6 +22,7 @@ import {
   type Team as FootballTeam,
 } from "../lib/clubFeaturedMatch";
 import { ClubCommunityPanel } from "../components/ClubCommunityPanel";
+import { ClubSupportersEntry } from "../components/ClubSupportersEntry";
 import { publicClubUrl } from "../lib/professionalContact";
 import { Image } from "expo-image";
 import Svg, { Circle, ClipPath, Defs, G, LinearGradient as SvgLinearGradient, Path, Rect, Stop } from "react-native-svg";
@@ -88,21 +93,9 @@ export function ClubDetail() {
   const query = useQuery({
     queryKey: ["club", id],
     queryFn: async () => {
-      requireBackend();
-      const { data, error } = await supabase
-        .from("fff_clubs")
-        .select("*")
-        .eq(
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-            id,
-          )
-            ? "id"
-            : "slug",
-          id,
-        )
-        .single();
-      if (error) throw error;
-      return data;
+      const data = await readClub(id);
+      if (!data) throw new Error('Club introuvable.');
+      return projectClubLogos(data);
     },
   });
 
@@ -176,12 +169,16 @@ function ClubProfileContent({ club }: { club: Record<string, any> }) {
             clubName={club.short_name || club.name}
             clubLogoUrl={club.logo_url}
           />
+          <ClubDiscussions clubId={club.id} clubSlug={club.slug} clubName={club.name} preview />
+          <ClubSupportersEntry id={club.id} name={club.name} />
           <ClubPublicInformation club={club} />
         </>
       )}
       {clubTab === "publications" && (
         <ClubMedia id={club.id} name={club.name} />
       )}
+      {clubTab === "discussions" && <ClubDiscussions clubId={club.id} clubSlug={club.slug} clubName={club.name} />}
+      {clubTab === "tags" && <ClubTaggedPosts club={club} />}
       {clubTab === "teams" && (
         <>
           <ClubFootball
@@ -217,6 +214,38 @@ function ClubProfileContent({ club }: { club: Record<string, any> }) {
         <ClubCommunityPanel id={club.id} name={club.name} mode="top" />
       )}
     </ClubProfileLayout>
+  );
+}
+
+function ClubTaggedPosts({ club }: { club: Record<string, any> }) {
+  const { colors } = useTheme();
+  const tagged = useQuery({
+    queryKey: ["club-tagged-posts", club.id, club.name],
+    queryFn: async () => {
+      const result = await supabase
+        .from("posts")
+        .select("id,content,image_url,video_url,created_at")
+        .ilike("content", `%@${club.name}%`)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (result.error) throw result.error;
+      return result.data || [];
+    },
+  });
+  if (tagged.isPending) return <Loading />;
+  if (tagged.isError)
+    return <ErrorState error={tagged.error} retry={() => void tagged.refetch()} />;
+  if (!tagged.data?.length)
+    return <Text style={{ color: colors.muted, textAlign: "center", padding: 28 }}>Aucune publication taguée</Text>;
+  return (
+    <View style={{ gap: 10, padding: 16 }}>
+      {tagged.data.map((post) => (
+        <View key={post.id} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 16, overflow: "hidden", backgroundColor: colors.surface }}>
+          {!!post.image_url && <Image source={{ uri: post.image_url }} style={{ width: "100%", height: 180 }} contentFit="cover" />}
+          {!!post.content && <Text style={{ color: colors.ink, padding: 14 }}>{post.content}</Text>}
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -645,7 +674,7 @@ function ClubFeaturedMatch({
   }, []);
   const cache = useQueryClient();
   const query = useQuery({
-    queryKey: ["club-featured-seniors-match", clubId],
+    queryKey: ["club-featured-seniors-match", clubId, "sports-v2"],
     queryFn: async () => {
       const now = new Date(Date.now() - 3600000).toISOString();
       const result = await supabase
@@ -659,22 +688,13 @@ function ClubFeaturedMatch({
         .order("id")
         .limit(50)
         .returns<ClubLandingMatch[]>();
-      const external = await supabase.functions.invoke("club-details", {
-        body: { clubId },
-      });
-      const details = external.data;
+      let sourceError: unknown = null;
+      const details = await fetchFffClub(clubId).catch(error => { sourceError = error; return null; });
       const teams: FootballTeam[] = details?.teams || [];
-      const selected =
-        !external.error && !details?.error
-          ? selectFeaturedClubMatch(
-              teams,
-              [
-                ...(details?.upcomingMatches || []),
-                ...(details?.pastMatches || []),
-              ],
-              new Date(Date.now() - 3600000),
-            )
-          : null;
+      // Day/local-time observations have no verified timezone for countdowns or filming windows.
+      const selected = details ? selectFeaturedClubMatch(teams,
+        [...details.upcomingMatches, ...details.pastMatches].filter(match => match.datePrecision === "instant"),
+        new Date(Date.now() - 3600000)) : null;
       const local = (result.data || []).filter(
         (match) =>
           match.status !== "postponed" &&
@@ -718,14 +738,11 @@ function ClubFeaturedMatch({
         .sort((a, b) => Date.parse(a.match_date) - Date.parse(b.match_date));
       const featured = seniors[0] || imported || local[0];
       if (featured) {
-        if (!featured.opponent_logo_url)
-          featured.opponent_logo_url = await findClubLogo(
-            featured.opponent_name,
-          );
+        // Legacy opponent badges have no canonical identity or professional status.
+        featured.opponent_logo_url = await findClubLogo(featured.opponent_name);
         return featured;
       }
-      if (external.error || details?.error)
-        throw external.error || new Error(details.error);
+      if (sourceError) throw sourceError;
       if (result.error) throw result.error;
       return null;
     },

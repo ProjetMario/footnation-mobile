@@ -55,6 +55,7 @@ vi.mock("expo-audio", () => ({
   useAudioPlayer: vi.fn(),
   useAudioPlayerStatus: vi.fn(),
 }));
+vi.mock("@react-native-community/slider", () => ({ default: "Slider" }));
 vi.mock("lucide-react-native", () => ({
   Play: "Play",
   Pause: "Pause",

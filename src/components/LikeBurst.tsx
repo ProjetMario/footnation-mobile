@@ -1,4 +1,5 @@
 import React, { memo, useEffect, useId, useRef, useState } from "react";
+import { brandIcon } from "../lib/brandAssets";
 import { AccessibilityInfo, AppState, StyleSheet, View } from "react-native";
 import Svg, {
   Circle,
@@ -16,7 +17,7 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 
-const BALL = require("../../assets/brand/app-icon.png");
+const BALL = brandIcon;
 const HEART =
   "M50 89C44 84 9 62 9 35C9 11 38 7 50 27C62 7 91 11 91 35C91 62 56 84 50 89Z";
 const DURATION = 1850;

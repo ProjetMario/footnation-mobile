@@ -5,7 +5,7 @@ import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
 import { declaredAge, memberAccessPublicPath } from "../lib/memberAccess";
 import { BirthdateField } from "./BirthdateField";
-import { Button, Field, Loading, Screen, useUIStyles } from "./ui";
+import { Button, Loading, Screen, useUIStyles } from "./ui";
 import { authGateReturnPath } from "../lib/authReturn";
 import { socialSignupPath } from "../lib/socialOnboarding";
 
@@ -20,10 +20,18 @@ export function MemberAccessBoundary({
   const params = useLocalSearchParams();
   if (!session || memberAccess?.allowed || memberAccessPublicPath(path))
     return <>{children}</>;
+  const state = memberAccess?.state;
+  if (
+    memberAccess &&
+    state !== "birthdate_required" &&
+    state !== "underage" &&
+    !memberAccess.onboarding_required
+  )
+    return <>{children}</>;
   if (
     !loading &&
     memberAccess?.onboarding_required &&
-    memberAccess.state !== "underage"
+    state !== "underage"
   )
     return (
       <Redirect href={socialSignupPath(authGateReturnPath(path, params))} />
@@ -41,16 +49,10 @@ function AccessForm() {
   const { session, memberAccess, reload } = useAuth();
   const uid = session!.user.id;
   const [birthdate, setBirthdate] = useState("");
-  const [parentEmail, setParentEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const [error, setError] = useState("");
-  const [sent, setSent] = useState(false);
   const state = memberAccess?.state;
-  const waiting = state === "parent_required" || state === "parent_pending";
-  const canResend =
-    !memberAccess?.resend_available_at ||
-    Date.parse(memberAccess.resend_available_at) <= Date.now();
   async function action(fn: (accessToken: string) => Promise<void>) {
     if (pending.current) return;
     pending.current = true;
@@ -86,12 +88,11 @@ function AccessForm() {
         <>
           <Text style={s.h2}>Quelle est ta date de naissance ?</Text>
           <Text style={s.text}>
-            FootNation est accessible dès 13 ans. De 13 à 15 ans, une
-            autorisation parentale est nécessaire. Cette date sert à vérifier
-            l’accès à ton compte.
+            FootNation est accessible dès 13 ans. Cette date sert à vérifier
+            que tu as l’âge minimum requis pour utiliser ton compte.
           </Text>
           <BirthdateField
-            minAge={0}
+            minAge={13}
             value={birthdate}
             onChange={setBirthdate}
             disabled={busy}
@@ -126,83 +127,6 @@ function AccessForm() {
             ta date de naissance est incorrecte, contacte l’aide.
           </Text>
         </>
-      ) : state === "parent_refused" ? (
-        <>
-          <Text style={s.h2}>Autorisation refusée</Text>
-          <Text style={s.text}>
-            Ton parent a refusé cette demande. Le compte reste restreint.
-            Contacte l’aide avec ton parent si vous souhaitez revoir cette
-            décision.
-          </Text>
-        </>
-      ) : waiting ? (
-        <>
-          <Text style={s.h2}>
-            {state === "parent_pending" || sent
-              ? "En attente de ton parent"
-              : "L’accord de ton parent est nécessaire"}
-          </Text>
-          <Text style={s.text}>
-            Entre 13 et 15 ans, ton parent doit autoriser l’utilisation de
-            FootNation. Le lien lui permet de lire la demande, puis de
-            l’accepter ou de la refuser. Il est valable 48 heures.
-          </Text>
-          <Field
-            label="Adresse e-mail de ton parent"
-            value={parentEmail}
-            onChangeText={setParentEmail}
-            editable={!busy}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="email"
-          />
-          <Button
-            title={
-              state === "parent_pending"
-                ? "Renvoyer la demande"
-                : "Demander l’autorisation"
-            }
-            busy={busy}
-            disabled={
-              !canResend ||
-              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail.trim()) ||
-              parentEmail.trim().toLowerCase() ===
-                session?.user.email?.toLowerCase()
-            }
-            onPress={() =>
-              void action(async (accessToken) => {
-                const result = await supabase.functions.invoke("age-consent", {
-                  headers: { Authorization: "Bearer " + accessToken },
-                  body: { action: "request", parentEmail: parentEmail.trim() },
-                });
-                if (result.error || result.data?.status !== "sent")
-                  throw new Error(
-                    "La demande n’a pas pu être envoyée. Vérifie l’adresse et réessaie plus tard.",
-                  );
-                setSent(true);
-                setParentEmail("");
-                await reload();
-              })
-            }
-          />
-          {!canResend && (
-            <Text style={s.small}>
-              Une demande vient d’être envoyée. Tu pourras la renvoyer après{" "}
-              {new Date(memberAccess!.resend_available_at!).toLocaleTimeString(
-                "fr-FR",
-                { hour: "2-digit", minute: "2-digit" },
-              )}
-              .
-            </Text>
-          )}
-          {!!sent && (
-            <Text accessibilityLiveRegion="polite" style={s.text}>
-              La demande a été envoyée. Pense à vérifier les courriers
-              indésirables avec ton parent.
-            </Text>
-          )}
-        </>
       ) : null}
       {error ? (
         <Text accessibilityRole="alert" style={s.text}>
@@ -210,11 +134,7 @@ function AccessForm() {
         </Text>
       ) : null}
       <Button
-        title={
-          waiting
-            ? "Mon parent a répondu : vérifier"
-            : "Réessayer la vérification"
-        }
+        title="Réessayer la vérification"
         secondary
         busy={busy}
         onPress={() => void action(reload)}
@@ -226,7 +146,7 @@ function AccessForm() {
           onPress={() => router.push("/help")}
         />
         <Button
-          title="Demander la suppression de mon compte"
+          title="Supprimer mon compte"
           secondary
           onPress={() => router.push("/suppression-compte")}
         />

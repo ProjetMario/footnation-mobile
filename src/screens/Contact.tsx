@@ -90,9 +90,7 @@ export default function Contact({ deletion = false }: { deletion?: boolean }) {
       ) : (
         <Button
           title={
-            deletion
-              ? "Demander la suppression de mon compte"
-              : "Envoyer le message"
+            deletion ? "Supprimer mon compte" : "Envoyer le message"
           }
           onPress={() => send.mutate()}
           busy={send.isPending}

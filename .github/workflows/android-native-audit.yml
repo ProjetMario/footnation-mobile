@@ -37,6 +37,8 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          ram-size: 3072M
+          cores: 4
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: python3 scripts/release/android-audit.py > "$RUNNER_TEMP/footnation-android-audit/ui.log" 2>&1

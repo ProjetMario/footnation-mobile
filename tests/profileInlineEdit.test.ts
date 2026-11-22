@@ -49,9 +49,12 @@ it("keeps the display name aligned with first and last names", () => {
     full_name: "Jean Dupont",
   });
 });
-it("rejects an arbitrary field and never edits age or birthdate", () => {
-  expect(editableProfileField(profile, "Âge")).toBeNull();
-  expect(editableProfileField(profile, "Date de naissance")).toBeNull();
+it("validates birthdates and rejects an arbitrary privileged field", () => {
+  const date = editableProfileField(profile, "Date de naissance")!;
+  expect(editableProfileField(profile, "Âge")?.keys).toEqual(["birthdate"]);
+  expect(inlineProfilePayload(profile, date, { birthdate: "2000-05-21" })).toEqual({ birthdate: "2000-05-21" });
+  expect(() => inlineProfilePayload(profile, date, { birthdate: "2024-02-31" })).toThrow();
+  expect(() => inlineProfilePayload(profile, date, { birthdate: new Date().toISOString().slice(0, 10) })).toThrow();
   expect(() =>
     inlineProfilePayload(
       profile,

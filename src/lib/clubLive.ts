@@ -32,6 +32,7 @@ export type ClubLiveStream = {
   ended_at: string | null;
   expires_at: string | null;
   video_url: string | null;
+  transport?: "webrtc" | null;
   broadcaster_id?: string | null;
   broadcaster?: {
     id: string;
@@ -40,7 +41,6 @@ export type ClubLiveStream = {
     avatar_url: string | null;
   } | null;
 };
-
 
 const stoppedStreamStatuses = new Set([
   "ended",

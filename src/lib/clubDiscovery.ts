@@ -1,9 +1,10 @@
 import type { Club, Profile } from "./models";
 import type { ClubSearchType } from "./clubSearch";
 import { supabase } from "./supabase";
+import { clubCountryCode, clubCountryLabel } from "./clubLocation";
 
 export const clubDirectoryColumns =
-  "id,name,short_name,city,department_code,department_name,logo_url,type,latitude,longitude";
+  "id,name,short_name,city,department_code,department_name,metadata,logo_url,type,latitude,longitude";
 const normalize = (value?: string | null) =>
   (value || "")
     .normalize("NFD")
@@ -23,7 +24,7 @@ export function matchesDirectoryClub(
     (!department || club.department_code === department) &&
     (type === "all" || (type === "five_center" ? indoor : !indoor)) &&
     (!search.trim() ||
-      normalize([club.name, club.short_name, club.city].join(" ")).includes(
+      normalize([club.name, club.short_name, club.city, clubCountryLabel(club), clubCountryCode(club)].join(" ")).includes(
         normalize(search),
       ))
   );

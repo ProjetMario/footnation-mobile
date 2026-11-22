@@ -1,6 +1,7 @@
-import React from "react";
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
+import React, { useRef } from "react";
 import {
-  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,6 +27,7 @@ import {
   Sparkles,
   UserRound,
   Users,
+  X,
 } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../lib/auth";
@@ -50,6 +52,11 @@ export function FirstLoginOnboarding() {
   } = useAuth();
   const t = useTranslation();
   const uid = session?.user.id || null;
+  const currentUser = useRef(uid);
+  currentUser.current = uid;
+  const pendingDestination = useRef<{ userId: string; path: string } | null>(
+    null,
+  );
   const state = useActivationPrompts(uid);
   const pathname = usePathname();
   const calls = useCalls();
@@ -87,8 +94,20 @@ export function FirstLoginOnboarding() {
 
   const close = (destination?: string) => {
     if (!activationPrompts.dismissOnboarding(uid)) return;
-    if (destination) router.push(destination);
-    else router.replace("/");
+    pendingDestination.current =
+      Platform.OS === "ios" && destination
+        ? { userId: uid, path: destination }
+        : null;
+    // Wait for UIKit to remove the presentation before changing the stack.
+    // A simple dismissal preserves the page underneath (including profiles).
+    if (destination && Platform.OS !== "ios") router.push(destination);
+  };
+
+  const afterDismiss = () => {
+    const destination = pendingDestination.current;
+    pendingDestination.current = null;
+    if (destination && destination.userId === currentUser.current)
+      router.push(destination.path);
   };
 
   return (
@@ -98,6 +117,7 @@ export function FirstLoginOnboarding() {
       animationType="fade"
       presentationStyle="overFullScreen"
       onRequestClose={() => void close()}
+      onDismiss={afterDismiss}
     >
       <SafeAreaView style={styles.overlay}>
         <ScrollView
@@ -105,15 +125,28 @@ export function FirstLoginOnboarding() {
           style={styles.card}
           contentContainerStyle={styles.cardContent}
         >
-          <LinearGradient
-            colors={signature}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.badge}
-          >
-            <Sparkles size={18} color={colors.white} />
-            <Text style={styles.badgeText}>{t("onboarding.badge")}</Text>
-          </LinearGradient>
+          <View style={styles.headingRow}>
+            <LinearGradient
+              colors={signature}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.badge}
+            >
+              <Sparkles size={18} color={colors.white} />
+              <Text style={styles.badgeText}>{t("onboarding.badge")}</Text>
+            </LinearGradient>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("common.close")}
+              onPress={() => void close()}
+              style={({ pressed }) => [
+                styles.closeButton,
+                { opacity: pressed ? 0.65 : 1 },
+              ]}
+            >
+              <X size={22} color={colors.ink} />
+            </Pressable>
+          </View>
 
           <Text accessibilityRole="header" style={styles.title}>
             {profile?.first_name
@@ -251,8 +284,22 @@ const createStyles = (colors: ThemeColors) =>
       borderColor: colors.border,
     },
     cardContent: { padding: 22, gap: 16 },
+    headingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    closeButton: {
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    },
     badge: {
       alignSelf: "flex-start",
+      flexShrink: 1,
       minHeight: 36,
       borderRadius: 18,
       paddingHorizontal: 13,
@@ -262,6 +309,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     badgeText: {
       color: colors.white,
+      flexShrink: 1,
       fontFamily: "Inter-Bold",
       fontSize: 13,
       fontWeight: "900",

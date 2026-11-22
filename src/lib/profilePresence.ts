@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supportRpc, supportUnavailable } from "./support";
 import { supabase } from "./supabase";
 import { useAuth } from "./auth";
+import { optionalRpc } from "./optionalRpc";
 
 export type ProfileActivity = {
   online: boolean;
@@ -31,10 +32,12 @@ function normalizeActivity(value: unknown): ProfileActivity {
 }
 
 export function useProfileActivity(profileId?: string | null, enabled = true) {
-  const uid = useAuth().session?.user.id;
+  const { session, profileStatus } = useAuth();
+  const uid = session?.user.id;
+  const ready = profileStatus === "ready";
   return useQuery({
     queryKey: ["profile-activity", uid, profileId],
-    enabled: !!uid && !!profileId && enabled,
+    enabled: !!uid && !!profileId && enabled && ready,
     staleTime: 0,
     refetchInterval: enabled ? 15_000 : false,
     retry: false,
@@ -42,17 +45,21 @@ export function useProfileActivity(profileId?: string | null, enabled = true) {
       const accountId = uid!;
       try {
         return normalizeActivity(
-          await supportRpc<unknown>(accountId, "read_profile_activity", {
+          await optionalRpc("read_profile_activity", () => supportRpc<unknown>(accountId, "read_profile_activity", {
             p_profile_id: profileId!,
-          }),
+          })),
         );
       } catch (error) {
         if (!supportUnavailable(error)) throw error;
-        return normalizeActivity(
-          await supportRpc<boolean>(accountId, "read_profile_presence", {
-            p_profile_id: profileId!,
-          }),
-        );
+        try {
+          return normalizeActivity(
+            await optionalRpc("read_profile_presence", () => supportRpc<boolean>(accountId, "read_profile_presence", {
+              p_profile_id: profileId!,
+            })),
+          );
+        } catch {
+          return { online: false, last_seen_at: null };
+        }
       }
     },
   });
@@ -65,11 +72,14 @@ export async function readProfilesActivity(
   const uniqueIds = [...new Set(profileIds.filter((id) => id && id !== uid))];
   if (!uniqueIds.length) return {};
   try {
-    const { data, error } = await supabase.rpc("read_profiles_activity", {
-      p_actor_id: uid,
-      p_profile_ids: uniqueIds,
+    const data = await optionalRpc("read_profiles_activity", async () => {
+      const result = await supabase.rpc("read_profiles_activity", {
+        p_actor_id: uid,
+        p_profile_ids: uniqueIds,
+      });
+      if (result.error) throw result.error;
+      return result.data;
     });
-    if (error) throw error;
     const rows = Array.isArray(data) ? data : [];
     return rows.reduce<Record<string, ProfileActivity>>((acc, row) => {
       const record = row as { profile_id?: string };
@@ -80,10 +90,14 @@ export async function readProfilesActivity(
     if (!supportUnavailable(error)) throw error;
     const entries = await Promise.all(
       uniqueIds.map(async (profileId) => {
-        const online = await supportRpc<boolean>(uid, "read_profile_presence", {
-          p_profile_id: profileId,
-        });
-        return [profileId, { online, last_seen_at: null }] as const;
+        try {
+          const online = await optionalRpc("read_profile_presence", () => supportRpc<boolean>(uid, "read_profile_presence", {
+            p_profile_id: profileId,
+          }));
+          return [profileId, { online, last_seen_at: null }] as const;
+        } catch {
+          return [profileId, { online: false, last_seen_at: null }] as const;
+        }
       }),
     );
     return Object.fromEntries(entries);

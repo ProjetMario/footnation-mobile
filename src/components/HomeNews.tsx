@@ -1,17 +1,16 @@
+import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import { NewsActions } from "./NewsActions";
 import { MediaActionShade } from "./MediaActionShade";
 import React, { useEffect, useState } from "react";
 import {
-  Modal,
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
   type ViewStyle,
 } from "react-native";
-import { Image } from "expo-image";
 import { useQuery } from "@tanstack/react-query";
 import { readNewsFeed } from "../lib/newsFeed";
 import type { NewsItem } from "../types/news";
@@ -19,6 +18,9 @@ import { Button, useUIStyles } from "./ui";
 import { useLanguage, useTranslation } from "../lib/i18n";
 import { useNewsTranslation } from "../lib/useNewsTranslation";
 import { TranslationQuotaError } from "../lib/postTranslation";
+import { NewsVisual } from "./NewsVisual";
+import { PostSoundtrack } from "./PostCard";
+import { getMusicForPublication } from "../data/shortMusicLibrary";
 
 function NewsPublication({
   item,
@@ -34,7 +36,6 @@ function NewsPublication({
   const s = useUIStyles();
   const t = useTranslation();
   const { language } = useLanguage();
-  const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [originalLanguage, setOriginalLanguage] = useState<string | null>(null);
   const translation = useNewsTranslation(item, active || expanded);
@@ -98,14 +99,14 @@ function NewsPublication({
           : undefined,
       ]}
     >
-      {!!item.imageUrl && !failed && (
-        <Image
-          source={{ uri: item.imageUrl }}
-          contentFit="cover"
-          style={StyleSheet.absoluteFill}
-          onError={() => setFailed(true)}
-        />
-      )}
+      <NewsVisual
+        imageUrl={item.imageUrl}
+        sourceName={item.sourceName}
+        topic={item.topic}
+        style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+        fallbackOverlay={false}
+        contentFit="contain"
+      />
       <MediaActionShade />
       <View style={{ position: "absolute", top: 16, left: 16, right: 16 }}>
         <Text
@@ -117,7 +118,7 @@ function NewsPublication({
             textShadowRadius: 4,
           }}
         >
-          {t("news.headline")} · {item.sourceName || "Football"}
+          {item.sourceName || t("news.headline")}
         </Text>
       </View>
       <View
@@ -126,9 +127,9 @@ function NewsPublication({
           bottom: bottomInset + 16,
           left: 16,
           right: 88,
-          padding: 18,
-          borderRadius: 18,
-          backgroundColor: "rgba(0,0,0,0.72)",
+          padding: 14,
+          borderRadius: 16,
+          backgroundColor: "rgba(0,0,0,0.56)",
           gap: 10,
         }}
       >
@@ -139,24 +140,16 @@ function NewsPublication({
           style={{ gap: 10 }}
         >
           <Text
-            numberOfLines={4}
+            numberOfLines={3}
             style={{
               color: "white",
-              fontSize: 24,
-              lineHeight: 30,
+              fontSize: 22,
+              lineHeight: 28,
               fontWeight: "700",
             }}
           >
             {copy.title}
           </Text>
-          {!!item.description && (
-            <Text
-              numberOfLines={3}
-              style={{ color: "white", fontSize: 16, lineHeight: 23 }}
-            >
-              {copy.description}
-            </Text>
-          )}
           <Text style={{ color: "white", fontSize: 14 }}>{t("news.more")}</Text>
         </Pressable>
         {translationControls}
@@ -172,13 +165,28 @@ function NewsPublication({
       >
         <NewsActions item={item} />
       </View>
+      <View
+        style={{
+          position: "absolute",
+          right: 13,
+          bottom: bottomInset + 16,
+          zIndex: 10,
+        }}
+      >
+        <PostSoundtrack
+          uri={getMusicForPublication(item.id).audioUrl}
+          active={active}
+          compact
+          overlay
+        />
+      </View>
       <Modal
         visible={expanded}
         transparent
         animationType="fade"
         onRequestClose={() => setExpanded(false)}
       >
-        <View
+        <SafeAreaView
           style={{
             flex: 1,
             justifyContent: "center",
@@ -197,7 +205,7 @@ function NewsPublication({
               onPress={() => setExpanded(false)}
             />
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );

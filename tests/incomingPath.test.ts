@@ -24,6 +24,23 @@ it("normalizes trusted web links and relative paths", () => {
   expect(incomingPath("https://www.foot-nation.com/actus/id")).toBe("/actu/id");
   expect(incomingPath("/clubs/id")).toBe("/club/id");
 });
+it("opens shared Expo Web supporter links in the equivalent installed-app route", () => {
+  const id = "10000000-0000-4000-8000-000000000001";
+  for (const path of [
+    `https://www.foot-nation.com/app/supporters/${id}`,
+    `https://foot-nation.com/app/supporters/${id}`,
+    `footnation://app/supporters/${id}`,
+    `/app/supporters/${id}`,
+  ])
+    expect(incomingPath(path)).toBe(`/supporters/${id}`);
+  expect(incomingPath("/app/supporters/new")).toBe("/supporters/new");
+  for (const path of [
+    "/app//evil.test",
+    "/app/%2Fevil.test",
+    "https://evil.test/app/supporters/123",
+  ])
+    expect(incomingPath(path)).toBe("/link-unavailable");
+});
 it("opens the exact content from legacy web links delivered by the OS", () => {
   const id = "00000000-0000-0000-0000-000000000042";
   expect(incomingPath(`footnation://shorts?id=${id}`)).toBe(`/shorts/${id}`);

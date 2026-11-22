@@ -32,13 +32,32 @@ try {
   const manifest=run('java',['-jar','bundletool.jar','dump','manifest','--bundle=app.aab']);
   if(!manifest.includes('package="com.footnation.app"')||!manifest.includes('android:versionName="'+data.version+'"')||!manifest.includes('android:versionCode="'+data.build+'"'))throw Error('Wrong app identity');
   if(/android.permission.READ_MEDIA_(IMAGES|VIDEO|VISUAL_USER_SELECTED)\b/.test(manifest))throw Error('Broad media permission present');
-  run('java',['-jar','bundletool.jar','build-apks','--bundle=app.aab','--output=app.apks','--mode=universal']);
+  // A fresh hosted runner has no default debug keystore. Sign only the derived
+  // emulator APK with an ephemeral test identity; never alter the store AAB.
+  run('keytool',['-genkeypair','-keystore','audit.keystore','-storepass','android','-keypass','android','-alias','androiddebugkey','-dname','CN=Android Debug,O=Android,C=US','-keyalg','RSA','-keysize','2048','-validity','2','-noprompt']);
+  run('java',['-jar','bundletool.jar','build-apks','--bundle=app.aab','--output=app.apks','--mode=universal','--ks=audit.keystore','--ks-pass=pass:android','--key-pass=pass:android','--ks-key-alias=androiddebugkey']);
   run('unzip',['-q','app.apks','universal.apk']);
+  // A separate, disposable instrumentation APK reads the current native tree.
+  // The shell uiautomator dumper can return stale XML on continuously animated
+  // screens. This helper never modifies or instruments the FootNation process.
+  const sdk=process.env.ANDROID_HOME||process.env.ANDROID_SDK_ROOT;
+  if(!sdk)throw Error('Android SDK unavailable');
+  const buildTools=fs.readdirSync(path.join(sdk,'build-tools')).filter(n=>/^\d/.test(n)).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true}))[0];
+  const sdkTools=path.join(sdk,'build-tools',buildTools),androidJar=path.join(sdk,'platforms/android-35/android.jar');
+  if(!fs.existsSync(androidJar))throw Error('Android 35 SDK platform unavailable');
+  const helper=path.join(process.env.GITHUB_WORKSPACE,'scripts/release/android-hierarchy');
+  fs.mkdirSync(path.join(base,'hierarchy-classes'));fs.mkdirSync(path.join(base,'hierarchy-dex'));
+  run('javac',['-source','8','-target','8','-cp',androidJar,'-d','hierarchy-classes',path.join(helper,'Hierarchy.java')]);
+  run(path.join(sdkTools,'d8'),['--min-api','24','--lib',androidJar,'--output','hierarchy-dex','hierarchy-classes/com/footnation/audit/Hierarchy.class']);
+  run(path.join(sdkTools,'aapt2'),['link','-I',androidJar,'--manifest',path.join(helper,'AndroidManifest.xml'),'-o','hierarchy.apk']);
+  fs.copyFileSync(path.join(base,'hierarchy-dex/classes.dex'),path.join(base,'classes.dex'));
+  run('zip',['-q','hierarchy.apk','classes.dex']);
+  run(path.join(sdkTools,'apksigner'),['sign','--ks','audit.keystore','--ks-key-alias','androiddebugkey','--ks-pass','pass:android','--key-pass','pass:android','hierarchy.apk']);
   console.log('Android store bundle validated; native audit APK prepared.');
  }else if(process.argv[2]==='finalize'){
   fs.mkdirSync(output,{mode:0o700});
   if(fs.existsSync(base)){
-   const entries=['provenance.json','commands.log','ui.log','report.json','screens','hierarchies','failure.png','failure.xml'].filter(f=>fs.existsSync(path.join(base,f)));
+   const entries=['provenance.json','commands.log','ui.log','report.json','screens','hierarchies','failure.png','failure.xml','native-errors.log'].filter(f=>fs.existsSync(path.join(base,f)));
    if(entries.length){run('tar',['-czf','proof.tar.gz',...entries]);fs.writeFileSync(path.join(output,'proof.tar.gz.enc'),encrypt(fs.readFileSync(path.join(base,'proof.tar.gz')),key));}
    fs.rmSync(base,{recursive:true,force:true});
   }

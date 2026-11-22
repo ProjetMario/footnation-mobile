@@ -1,3 +1,5 @@
+import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import { applyClubFollowIntent as applyFollowIntent } from "../lib/clubFollowIntent";
 import {
   connectionIntent,
@@ -8,7 +10,6 @@ import {
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -571,7 +572,7 @@ function ProfileActionsContent({
         animationType="fade"
         onRequestClose={() => setManageOpen(false)}
       >
-        <View style={heroStyles.backdrop}>
+        <SafeAreaView style={heroStyles.backdrop}>
           <View
             accessibilityViewIsModal
             style={[heroStyles.sheet, { backgroundColor: colors.surface }]}
@@ -591,7 +592,7 @@ function ProfileActionsContent({
               {controls}
             </ScrollView>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );

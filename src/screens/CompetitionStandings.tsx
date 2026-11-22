@@ -44,19 +44,25 @@ type StandingsResponse = {
 };
 export default function CompetitionStandings() {
   const s = useUIStyles();
+  const now = new Date();
+  // European leagues start in summer: in October 2026 the active season is
+  // 2026–2027 (and this rolls over automatically each July).
+  const seasonStart =
+    now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const activeSeason = String(seasonStart);
 
   const { competition = "ligue-1" } = useLocalSearchParams<{
     competition?: string;
   }>();
   const selected = competitions.find((item) => item.slug === competition);
   const query = useQuery({
-    queryKey: ["competition-standings", selected?.code],
+    queryKey: ["competition-standings", selected?.code, activeSeason],
     enabled: !!selected,
     queryFn: async () => {
       requireBackend();
       const { data, error } =
         await supabase.functions.invoke<StandingsResponse>("standings", {
-          body: { competitions: selected!.code },
+          body: { competitions: selected!.code, season: activeSeason },
         });
       if (error) throw error;
       const result = data?.standings?.find(
@@ -102,7 +108,7 @@ export default function CompetitionStandings() {
             </Text>
             {!!query.data && (
               <Text style={s.small}>
-                Saison {query.data.season}
+                Saison {activeSeason}–{Number(activeSeason) + 1}
                 {query.data.fetchedAt
                   ? ` · Actualisé le ${new Date(query.data.fetchedAt).toLocaleString("fr-FR")}`
                   : ""}

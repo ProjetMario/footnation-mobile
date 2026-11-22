@@ -9,6 +9,8 @@ import {
   QrCode,
   Radio,
   SquareUserRound,
+  Tag,
+  MessageCircle,
 } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
@@ -24,10 +26,22 @@ const clubNavigationGroups = [
     ],
   },
   {
+    key: "discussions",
+    label: "Discussions",
+    Icon: MessageCircle,
+    sections: [["discussions", "Discussions", MessageCircle]],
+  },
+  {
     key: "publications",
     label: "Publications",
     Icon: Newspaper,
     sections: [["publications", "Publications", Newspaper]],
+  },
+  {
+    key: "tags",
+    label: "Tags",
+    Icon: Tag,
+    sections: [["tags", "Tags", Tag]],
   },
   {
     key: "teams",

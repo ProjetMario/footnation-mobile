@@ -2,15 +2,25 @@ import {
   profileSnapshotRequest,
   saveProfileSnapshot,
 } from "../lib/profileSave";
+import { profileRolesDraft, saveProfileRoles } from "../lib/profileRoles";
 import { websiteUrl } from "../lib/websiteUrl";
 import { notifyClubChange } from "../lib/notificationEvents";
 import { displayName } from "../lib/models";
+import { isPlayerProfile } from "../lib/profileAbout";
+import { parseJerseyNumber } from "../lib/profileJersey";
 import { validEmail } from "../lib/validation";
 import { latestAllowedBirthdate, validBirthdate } from "../lib/calendarDate";
 import { ProfileAutocompleteField } from "../components/ProfileAutocompleteField";
 import { BirthdateField } from "../components/BirthdateField";
 import { countryOptions, proClubOptions } from "../lib/profileSelectionOptions";
+import { CompactForm, FormDetails } from "../components/CompactForm";
 import { ChoiceField } from "../components/ChoiceField";
+import { FavoriteClubSupportersPrompt } from "../components/FavoriteClubSupportersPrompt";
+import {
+  favoriteClubSupportersSuggestion,
+  type FavoriteClubSupportersSuggestion,
+} from "../lib/favoriteClubSupporters";
+import { SUPPORTERS_ENABLED } from "../lib/supportersConfig";
 import { roleOptions, departmentOptions } from "../lib/networkOptions";
 import {
   genderOptions,
@@ -29,13 +39,10 @@ import { authReturnPath } from "../lib/authReturn";
 import { profilePrefill } from "../lib/profilePrefill";
 import {
   Bell,
-  Camera,
   FileText,
   Lock,
-  LogOut,
   Settings as SettingsIcon,
   UserRound,
-  Upload,
 } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../lib/auth";
@@ -79,6 +86,7 @@ const personal = [
   ["last_name", "Nom"],
   ["primary_role", "Rôle dans le football"],
   ["position", "Poste"],
+  ["jersey_number", "Numéro de maillot (facultatif)"],
   ["club", "Club actuel"],
   ["highest_level", "Plus haut niveau"],
   ["gender", "Genre"],
@@ -132,7 +140,7 @@ function sessionAccountType(value: unknown) {
 export default function Settings() {
   const { session } = useAuth();
   return (
-    <Screen title="Votre profil">
+    <Screen title="Paramètres">
       <ProfileEditor key={session?.user.id || "guest"} />
     </Screen>
   );
@@ -152,6 +160,7 @@ function ProfileEditor() {
     networkInviteRequest,
   } = useAuth();
   const cache = useQueryClient();
+  const canEditJersey = !!profile && isPlayerProfile(profile);
   const initialized = useRef(false);
   const [baseline, setBaseline] = useState<Record<string, unknown> | null>(
     () => profile as unknown as Record<string, unknown> | null,
@@ -160,9 +169,14 @@ function ProfileEditor() {
     asset: ImagePicker.ImagePickerAsset;
     upload: Awaited<ReturnType<typeof uploadPhoto>>;
   } | null>(null);
+  const [roles, setRoles] = useState("");
+  const [focusedTab, setFocusedTab] = useState<string | null>(null);
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [confirmReload, setConfirmReload] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [favoriteSupporters, setFavoriteSupporters] =
+    useState<FavoriteClubSupportersSuggestion | null>(null);
   const [values, setValues] = useState<Record<string, string>>({}),
     [account, setAccount] = useState("personal"),
     [section, setSection] = useState<
@@ -189,8 +203,13 @@ function ProfileEditor() {
       ...personal,
       ...Object.values(organizations).flat(),
     ])
-      next[key] = typeof p?.[key] === "string" ? (p[key] as string) : "";
+      next[key] =
+        typeof p?.[key] === "string" ||
+        (key === "jersey_number" && typeof p?.[key] === "number")
+          ? String(p[key])
+          : "";
     setValues(next);
+    setRoles(profileRolesDraft(p));
     setAccount(
       typeof p?.account_type === "string"
         ? p.account_type
@@ -217,6 +236,7 @@ function ProfileEditor() {
     }
   }
   const save = useMutation({
+    onMutate: () => setFavoriteSupporters(null),
     mutationFn: async () => {
       if (!session) throw new Error("Connexion requise");
       const user = await supabase.auth.getUser();
@@ -236,7 +256,11 @@ function ProfileEditor() {
           .filter(Boolean),
       };
       for (const [key] of [...common, ...selected])
-        payload[key] = values[key]?.trim() || null;
+        if (key === "jersey_number") {
+          if (canEditJersey)
+            payload[key] = parseJerseyNumber(values[key] || "");
+        } else if (account !== "personal" || key !== "primary_role")
+          payload[key] = values[key]?.trim() || null;
       if (
         account === "personal" &&
         (!values.first_name?.trim() ||
@@ -297,7 +321,7 @@ function ProfileEditor() {
         };
       if (asset && uploaded.current)
         payload.avatar_url = uploaded.current.upload.url;
-      const saved = await saveProfileSnapshot(
+      let saved = await saveProfileSnapshot(
         {
           read: async () => {
             const r = await supabase
@@ -335,6 +359,16 @@ function ProfileEditor() {
         payload,
         baseline,
       );
+      if (account === "personal")
+        saved = await saveProfileRoles(saved, baseline || saved, roles);
+      const supportersSuggestion = SUPPORTERS_ENABLED
+        ? favoriteClubSupportersSuggestion({
+            ownerId: session.user.id,
+            before: baseline,
+            saved,
+            editedKeys: Object.keys(payload),
+          })
+        : null;
       if (profile && typeof payload.club === "string")
         void notifyClubChange({
           profileId: session.user.id,
@@ -346,9 +380,16 @@ function ProfileEditor() {
       uploaded.current = null;
       await reload();
       await cache.invalidateQueries({ queryKey: ["profile"] });
+      await cache.invalidateQueries({
+        queryKey: ["native-career-preferences", session.user.id],
+      });
+      await cache.invalidateQueries({
+        queryKey: ["matching-entities", session.user.id],
+      });
       setAsset(null);
+      return supportersSuggestion;
     },
-    onSuccess: async () => {
+    onSuccess: async (supportersSuggestion) => {
       const current = await supabase.auth.getSession();
       if (
         !session ||
@@ -359,6 +400,7 @@ function ProfileEditor() {
       if (returnTo) router.replace(returnTo);
       else if (!profile || networkInviteRequest?.userId === session?.user.id)
         router.replace("/my-profile");
+      else setFavoriteSupporters(supportersSuggestion);
     },
   });
   const logout = useMutation({
@@ -377,7 +419,7 @@ function ProfileEditor() {
   const selectedFields = [
     ...(account === "personal" ? personal : organizations[account] || personal),
     ...common,
-  ];
+  ].filter(([key]) => key !== "jersey_number" || canEditJersey);
   const basicFields = selectedFields.filter(([key]) =>
     account === "personal"
       ? [
@@ -386,6 +428,7 @@ function ProfileEditor() {
           "username",
           "primary_role",
           "position",
+          "jersey_number",
           "club",
           "city",
           "department",
@@ -413,7 +456,43 @@ function ProfileEditor() {
     { id: "privacy", label: "Confidentialité", icon: Lock },
   ] as const;
   const renderField = ([key, label]: string[]) =>
-    key === "birthdate" ? (
+    key === "primary_role" ? (
+      <View key={key} style={{ gap: 8 }}>
+        <ChoiceField
+          label="Rôles dans le football"
+          value={roles}
+          options={roleOptions}
+          multiple
+          optionalLabel="Aucun rôle"
+          disabled={save.isPending || reloading}
+          onChange={(value) => {
+            save.reset();
+            setRoles(value);
+          }}
+        />
+        <Text style={s.small}>
+          Plusieurs choix possibles. Le premier rôle sélectionné est votre rôle
+          principal.
+        </Text>
+      </View>
+    ) : key === "jersey_number" ? (
+      <View key={key} style={{ gap: 8 }}>
+        <Field
+          label={label}
+          value={values[key] || ""}
+          keyboardType="number-pad"
+          placeholder="Ex. : 10"
+          editable={!save.isPending && !reloading}
+          onChangeText={(text) => {
+            save.reset();
+            setValues((v) => ({ ...v, [key]: text }));
+          }}
+        />
+        <Text style={s.small}>
+          De 1 à 99. Laissez vide pour retirer le numéro de votre profil.
+        </Text>
+      </View>
+    ) : key === "birthdate" ? (
       <View key={key} style={{ gap: 8 }}>
         <BirthdateField
           label="Date de naissance"
@@ -483,266 +562,326 @@ function ProfileEditor() {
     );
   return (
     <AuthGate allowIncomplete>
-      <View style={styles.headerBlock}>
-        <Text style={styles.pageTitle}>Paramètres</Text>
-        <Text style={styles.profileName}>
-          {profile?.full_name || "FootNation"}
-        </Text>
-        <Text style={styles.profileRole}>{accountLabel(account)}</Text>
-      </View>
-
-      <View style={styles.tabsWrap}>
-        {sectionTabs.map(({ id, label, icon: Icon }) => (
-          <Pressable
-            key={id}
-            accessibilityRole="button"
-            accessibilityState={{ selected: section === id }}
-            onPress={() => setSection(id)}
-            style={[styles.tabButton, section === id && styles.tabButtonActive]}
-          >
-            <Icon
-              size={16}
-              color={section === id ? colors.ink : colors.muted}
-            />
-            <Text
-              style={[styles.tabLabel, section === id && styles.tabLabelActive]}
+      <CompactForm>
+        <View style={styles.tabsWrap}>
+          {sectionTabs.map(({ id, label, icon: Icon }) => (
+            <Pressable
+              key={id}
+              accessibilityRole="button"
+              accessibilityState={{ selected: section === id }}
+              onPress={() => setSection(id)}
+              onFocus={() => setFocusedTab(id)}
+              onBlur={() => setFocusedTab(null)}
+              onHoverIn={() => setHoveredTab(id)}
+              onHoverOut={() => setHoveredTab(null)}
+              style={({ pressed }) => [
+                styles.tabButton,
+                (section === id || hoveredTab === id || pressed) &&
+                  styles.tabButtonActive,
+                focusedTab === id && { borderColor: colors.blue },
+              ]}
             >
-              {label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+              <Icon
+                size={16}
+                color={section === id ? colors.ink : colors.muted}
+              />
+              <Text
+                style={[
+                  styles.tabLabel,
+                  section === id && styles.tabLabelActive,
+                ]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
 
-      {section === "profile" && (
-        <>
-          <View style={styles.card}>
-            <View style={styles.sectionTitleRow}>
-              <Camera size={24} color={colors.ink} />
-              <Text style={styles.sectionTitle}>Photo de profil</Text>
-            </View>
-            <View style={styles.photoRow}>
+        {section === "profile" && (
+          <>
+            <View style={styles.card}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Modifier la photo"
+                accessibilityLabel="Changer la photo de profil"
                 disabled={save.isPending || reloading}
                 onPress={() => void pick()}
+                style={({ pressed }) => [
+                  styles.photoRow,
+                  {
+                    opacity:
+                      save.isPending || reloading ? 0.45 : pressed ? 0.7 : 1,
+                  },
+                ]}
               >
                 <Avatar
                   uri={asset?.uri || profile?.avatar_url}
                   name={profile?.full_name || ""}
-                  size={104}
+                  size={56}
                 />
+                <View style={styles.photoCopy}>
+                  <Text style={styles.sectionTitle}>
+                    {profile?.full_name || "Mon profil"}
+                  </Text>
+                  <Text style={styles.photoLink}>Changer la photo</Text>
+                </View>
               </Pressable>
-              <View style={styles.photoCopy}>
-                <Text style={styles.helperText}>
-                  Choisis une photo pour ton profil.
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Changer la photo de profil"
-                  onPress={() => void pick()}
-                  disabled={save.isPending || reloading}
-                  style={({ pressed }) => [
-                    styles.uploadButton,
-                    {
-                      opacity:
-                        save.isPending || reloading ? 0.45 : pressed ? 0.72 : 1,
-                    },
-                  ]}
-                >
-                  <Upload size={18} color={colors.blue} />
-                  <Text style={styles.uploadButtonText}>Changer la photo</Text>
-                </Pressable>
-              </View>
+              {basicFields
+                .filter(
+                  ([key]) =>
+                    ![
+                      "primary_role",
+                      "position",
+                      "jersey_number",
+                      "club",
+                      "city",
+                      "department",
+                      "country",
+                      "nationality",
+                    ].includes(key),
+                )
+                .map(renderField)}
             </View>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Type de compte</Text>
-            <View style={styles.accountTypes}>
-              {[
-                ["personal", "Personnel"],
-                ["club", "Club"],
-                ["business", "Entreprise / Marque"],
-                ["institution", "Institution"],
-              ].map(([value, label]) => (
-                <Chip
-                  key={value}
-                  label={label}
-                  selected={account === value}
-                  disabled={save.isPending || reloading}
-                  onPress={() => {
-                    save.reset();
-                    setAccount(value);
-                  }}
-                />
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Informations de base</Text>
-            {basicFields.map(renderField)}
-          </View>
-        </>
-      )}
-
-      {section === "content" && (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Contenu et identité football</Text>
-          {contentFields.map(renderField)}
-          <ChoiceField
-            label="Compétences"
-            value={skills}
-            options={competenceSuggestions.map((value) => ({
-              value,
-              label: value,
-            }))}
-            multiple
-            allowCustom
-            optionalLabel="Non renseigné"
-            disabled={save.isPending || reloading}
-            onChange={(text) => {
-              save.reset();
-              setSkills(text);
-            }}
-          />
-        </View>
-      )}
-
-      {section === "account" && (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Compte</Text>
-          <Text style={styles.helperText}>
-            Gérez l’email, le mot de passe, les appareils et la suppression du
-            compte.
-          </Text>
-          <Button
-            title="Compte et confidentialité"
-            secondary
-            onPress={() => router.push("/account-settings")}
-          />
-          {confirmReload ? (
-            <>
-              <Text style={s.text}>
-                Abandonner les modifications et recharger votre profil ?
-              </Text>
-              <Button
-                title="Confirmer le rechargement"
-                busy={reloading}
-                disabled={save.isPending}
-                onPress={() =>
-                  void (async () => {
-                    setReloading(true);
-                    setLocalError("");
-                    try {
-                      const user = await supabase.auth.getUser();
-                      if (user.error) throw user.error;
-                      if (user.data.user?.id !== session?.user.id)
-                        throw new Error("La session a changé.");
-                      const r = await supabase
-                        .from("profiles")
-                        .select("*")
-                        .eq("id", session!.user.id)
-                        .maybeSingle();
-                      if (r.error) throw r.error;
-                      setBaseline(r.data);
-                      setRevision((value) => value + 1);
-                      setAsset(null);
-                      uploaded.current = null;
-                      setConfirmReload(false);
+            {account === "personal" && (
+              <FormDetails title="Mon football">
+                {basicFields
+                  .filter(([key]) =>
+                    [
+                      "primary_role",
+                      "position",
+                      "jersey_number",
+                      "club",
+                    ].includes(key),
+                  )
+                  .map(renderField)}
+              </FormDetails>
+            )}
+            <FormDetails title="Localisation et nationalité">
+              {basicFields
+                .filter(([key]) =>
+                  ["city", "department", "country", "nationality"].includes(
+                    key,
+                  ),
+                )
+                .map(renderField)}
+            </FormDetails>
+            <FormDetails title={`Type de compte · ${accountLabel(account)}`}>
+              <View style={styles.accountTypes}>
+                {[
+                  ["personal", "Personnel"],
+                  ["club", "Club"],
+                  ["business", "Entreprise / Marque"],
+                  ["institution", "Institution"],
+                ].map(([value, label]) => (
+                  <Chip
+                    key={value}
+                    label={label}
+                    selected={account === value}
+                    disabled={save.isPending || reloading}
+                    onPress={() => {
                       save.reset();
-                    } catch (e) {
-                      setLocalError(
-                        e instanceof Error
-                          ? e.message
-                          : "Impossible de recharger votre profil.",
-                      );
-                    } finally {
-                      setReloading(false);
-                    }
-                  })()
-                }
+                      setAccount(value);
+                    }}
+                  />
+                ))}
+              </View>
+            </FormDetails>
+          </>
+        )}
+
+        {section === "content" && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>À propos de moi</Text>
+            {contentFields
+              .filter(([key]) => ["bio", "birthdate", "gender"].includes(key))
+              .map(renderField)}
+            <FormDetails title="Parcours et caractéristiques">
+              {contentFields
+                .filter(
+                  ([key]) =>
+                    ![
+                      "bio",
+                      "birthdate",
+                      "gender",
+                      "favorite_pro_club",
+                      "favorite_amateur_club",
+                    ].includes(key),
+                )
+                .map(renderField)}
+              <ChoiceField
+                label="Compétences"
+                value={skills}
+                options={competenceSuggestions.map((value) => ({
+                  value,
+                  label: value,
+                }))}
+                multiple
+                allowCustom
+                optionalLabel="Non renseigné"
+                disabled={save.isPending || reloading}
+                onChange={(text) => {
+                  save.reset();
+                  setSkills(text);
+                }}
               />
-              <Button
-                title="Garder mes modifications"
-                secondary
-                disabled={reloading}
-                onPress={() => setConfirmReload(false)}
-              />
-            </>
-          ) : (
+            </FormDetails>
+            {account === "personal" && (
+              <FormDetails title="Clubs favoris">
+                {contentFields
+                  .filter(([key]) =>
+                    ["favorite_pro_club", "favorite_amateur_club"].includes(
+                      key,
+                    ),
+                  )
+                  .map(renderField)}
+              </FormDetails>
+            )}
+          </View>
+        )}
+
+        {section === "account" && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Compte</Text>
+            <Text style={styles.helperText}>
+              Connexion, appareils et sécurité.
+            </Text>
             <Button
-              title="Recharger le formulaire"
+              title="Compte et confidentialité"
               secondary
-              disabled={save.isPending || reloading}
-              onPress={() => setConfirmReload(true)}
+              onPress={() => router.push("/account-settings")}
             />
-          )}
-          <Button
-            title="Se déconnecter"
-            busy={logout.isPending}
-            disabled={save.isPending || reloading}
-            secondary
-            onPress={() => {
-              setLocalError("");
-              logout.mutate();
-            }}
-          />
-        </View>
-      )}
+            {confirmReload ? (
+              <>
+                <Text style={s.text}>
+                  Abandonner les modifications et recharger votre profil ?
+                </Text>
+                <Button
+                  title="Confirmer le rechargement"
+                  busy={reloading}
+                  disabled={save.isPending}
+                  onPress={() =>
+                    void (async () => {
+                      setReloading(true);
+                      setLocalError("");
+                      try {
+                        const user = await supabase.auth.getUser();
+                        if (user.error) throw user.error;
+                        if (user.data.user?.id !== session?.user.id)
+                          throw new Error("La session a changé.");
+                        const r = await supabase
+                          .from("profiles")
+                          .select("*")
+                          .eq("id", session!.user.id)
+                          .maybeSingle();
+                        if (r.error) throw r.error;
+                        setBaseline(r.data);
+                        setRevision((value) => value + 1);
+                        setAsset(null);
+                        uploaded.current = null;
+                        setConfirmReload(false);
+                        save.reset();
+                      } catch (e) {
+                        setLocalError(
+                          e instanceof Error
+                            ? e.message
+                            : "Impossible de recharger votre profil.",
+                        );
+                      } finally {
+                        setReloading(false);
+                      }
+                    })()
+                  }
+                />
+                <Button
+                  title="Garder mes modifications"
+                  secondary
+                  disabled={reloading}
+                  onPress={() => setConfirmReload(false)}
+                />
+              </>
+            ) : (
+              <Button
+                title="Recharger le formulaire"
+                secondary
+                disabled={save.isPending || reloading}
+                onPress={() => setConfirmReload(true)}
+              />
+            )}
+            <Button
+              title="Se déconnecter"
+              busy={logout.isPending}
+              disabled={save.isPending || reloading}
+              secondary
+              onPress={() => {
+                setLocalError("");
+                logout.mutate();
+              }}
+            />
+          </View>
+        )}
 
-      {section === "notifications" && (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          <Text style={styles.helperText}>
-            Gérez les notifications email, push et les alertes visibles dans
-            l’application.
+        {section === "notifications" && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Notifications</Text>
+            <Text style={styles.helperText}>
+              Choisissez les alertes que vous recevez.
+            </Text>
+            <Button
+              title="Gérer mes notifications"
+              onPress={() => router.push("/account-settings")}
+            />
+          </View>
+        )}
+
+        {section === "privacy" && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Confidentialité</Text>
+            <Text style={styles.helperText}>
+              Visibilité du profil et gestion de vos données.
+            </Text>
+            <Button
+              title="Confidentialité et comptes bloqués"
+              secondary
+              onPress={() => router.push("/account-settings")}
+            />
+            <Button
+              title="Désactiver temporairement"
+              secondary
+              onPress={() => router.push("/desactivation-compte")}
+            />
+            <Button
+              title="Supprimer mon compte"
+              secondary
+              onPress={() => router.push("/suppression-compte")}
+            />
+          </View>
+        )}
+
+        {!!save.isError && <ErrorState error={save.error} />}
+        {!!localError && (
+          <Text accessibilityRole="alert" style={{ color: colors.danger }}>
+            {localError}
           </Text>
-          <Button
-            title="Ouvrir les préférences de notification"
-            onPress={() => router.push("/account-settings")}
+        )}
+        {!!save.isSuccess && (
+          <Text style={styles.success}>Profil enregistré.</Text>
+        )}
+        {save.isSuccess && !!favoriteSupporters && (
+          <FavoriteClubSupportersPrompt
+            key={favoriteSupporters.ownerId}
+            suggestion={favoriteSupporters}
           />
-        </View>
-      )}
-
-      {section === "privacy" && (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Confidentialité</Text>
-          <Text style={styles.helperText}>
-            Contrôlez la visibilité de votre profil, les comptes bloqués et la
-            suppression de vos données.
-          </Text>
-          <Button
-            title="Confidentialité et comptes bloqués"
-            secondary
-            onPress={() => router.push("/account-settings")}
-          />
-          <Button
-            title="Supprimer mon compte"
-            secondary
-            onPress={() => router.push("/suppression-compte")}
-          />
-        </View>
-      )}
-
-      {!!save.isError && <ErrorState error={save.error} />}
-      {!!localError && (
-        <Text accessibilityRole="alert" style={{ color: colors.danger }}>
-          {localError}
-        </Text>
-      )}
-      {!!save.isSuccess && (
-        <Text style={styles.success}>Profil enregistré.</Text>
-      )}
-      <View style={styles.stickyActions}>
-        <Button
-          title="Enregistrer mon profil"
-          onPress={() => save.mutate()}
-          busy={save.isPending}
-          disabled={reloading}
-        />
-      </View>
+        )}
+        {(section === "profile" || section === "content") && (
+          <View style={styles.stickyActions}>
+            <Button
+              title="Enregistrer"
+              onPress={() => save.mutate()}
+              busy={save.isPending}
+              disabled={reloading}
+            />
+          </View>
+        )}
+      </CompactForm>
     </AuthGate>
   );
 }
@@ -751,31 +890,11 @@ function accountLabel(value: string) {
   if (value === "club") return "Club";
   if (value === "business") return "Entreprise / Marque";
   if (value === "institution") return "Institution";
-  return "Utilisateur FootNation";
+  return "Personnel";
 }
 
 const createSettingsStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    headerBlock: { gap: 10, paddingTop: 10, paddingBottom: 8 },
-    pageTitle: {
-      color: colors.ink,
-      fontFamily: "Inter-Bold",
-      fontSize: 38,
-      lineHeight: 46,
-      fontWeight: "900",
-    },
-    profileName: {
-      color: colors.muted,
-      fontFamily: "Inter-Regular",
-      fontSize: 22,
-      lineHeight: 29,
-    },
-    profileRole: {
-      color: colors.muted,
-      fontFamily: "Inter-Regular",
-      fontSize: 17,
-      lineHeight: 24,
-    },
     tabsWrap: {
       flexDirection: "row",
       flexWrap: "wrap",
@@ -791,20 +910,17 @@ const createSettingsStyles = (colors: ThemeColors) =>
       paddingHorizontal: 12,
       flexGrow: 1,
       flexBasis: "30%",
+      minWidth: 110,
+      borderWidth: 1,
+      borderColor: "transparent",
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: 6,
     },
-    tabButtonActive: {
-      backgroundColor: colors.white,
-      shadowColor: "#101828",
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 5 },
-      elevation: 2,
-    },
+    tabButtonActive: { backgroundColor: colors.surface },
     tabLabel: {
+      flexShrink: 1,
       color: colors.muted,
       fontFamily: "Inter-Bold",
       fontSize: 14,
@@ -812,50 +928,37 @@ const createSettingsStyles = (colors: ThemeColors) =>
     },
     tabLabelActive: { color: colors.ink },
     card: {
-      borderRadius: 22,
+      borderRadius: 18,
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      padding: 20,
+      padding: 16,
       gap: 16,
-      shadowColor: "#101828",
-      shadowOpacity: 0.07,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 3,
     },
-    sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
     sectionTitle: {
       color: colors.ink,
       fontFamily: "Inter-Bold",
-      fontSize: 26,
-      lineHeight: 32,
-      fontWeight: "900",
+      fontSize: 18,
+      lineHeight: 24,
     },
-    photoRow: { flexDirection: "row", alignItems: "center", gap: 18 },
-    photoCopy: { flex: 1, minWidth: 0, gap: 12 },
+    photoRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+      paddingBottom: 4,
+    },
+    photoCopy: { flex: 1, minWidth: 0, gap: 4 },
+    photoLink: {
+      color: colors.deepBlue,
+      fontFamily: "Inter-Medium",
+      fontSize: 14,
+      lineHeight: 20,
+    },
     helperText: {
       color: colors.muted,
       fontFamily: "Inter-Regular",
-      fontSize: 17,
-      lineHeight: 24,
-    },
-    uploadButton: {
-      minHeight: 46,
-      borderRadius: 16,
-      borderWidth: 2,
-      borderColor: colors.blue,
-      paddingHorizontal: 16,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 9,
-    },
-    uploadButtonText: {
-      color: colors.blue,
-      fontFamily: "Inter-Bold",
-      fontSize: 16,
-      fontWeight: "900",
+      fontSize: 14,
+      lineHeight: 20,
     },
     accountTypes: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     success: {

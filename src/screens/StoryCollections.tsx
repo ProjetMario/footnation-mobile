@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
+import { Images, Plus } from "lucide-react-native";
 import { randomUUID } from "expo-crypto";
 import { router, useLocalSearchParams } from "expo-router";
 import {
@@ -105,24 +106,35 @@ function Editor({
   const locked = save.isPending || !!snapshot.current;
   return (
     <>
-      <Text style={s.title}>
-        {collection ? "Personnaliser la bulle" : "Vos moments à la une"}
-      </Text>
-      <Text style={s.subtitle}>
-        Choisissez vos stories et donnez un nom à votre bulle. Elles resteront
-        sur votre profil après 24 heures, jusqu’à leur retrait de la bulle.
-      </Text>
-      <Field
-        label="Nom de la bulle"
-        value={title}
-        onChangeText={setTitle}
-        maxLength={24}
-        editable={!locked}
-        placeholder="Matchs, entraînements, souvenirs…"
-      />
-      <Text style={s.small}>
-        {selected.length}/20 stories · La première sert de couverture.
-      </Text>
+      {!!collection && <Text style={s.h2}>Modifier la bulle</Text>}
+      {sources.length > 0 && (
+        <>
+          <Text style={s.small}>
+            Gardez vos stories préférées sur votre profil.
+          </Text>
+          <Field
+            label="Nom de la bulle"
+            value={title}
+            onChangeText={setTitle}
+            maxLength={24}
+            editable={!locked}
+            placeholder="Ex. Matchs"
+          />
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <Text style={[s.text, { fontWeight: "600" }]}>
+              Choisir les stories
+            </Text>
+            <Text style={s.small}>{selected.length}/20</Text>
+          </View>
+        </>
+      )}
       {!!selected.length && (
         <View style={s.card}>
           {selected.map((id, i) => (
@@ -160,16 +172,48 @@ function Editor({
       {query.isPending && <Loading />}
       {!!query.error && <CollectionError error={query.error} />}
       {!query.isPending && !query.error && !sources.length && (
-        <>
-          <Empty
-            title="Créez votre première story"
-            description="Vos stories disponibles apparaîtront ici pour composer vos bulles."
-          />
-          <Button
-            title="Créer une story"
+        <View style={{ alignItems: "center", paddingVertical: 24, gap: 14 }}>
+          <View
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 22,
+              backgroundColor: colors.accentSoft,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Images size={28} color={colors.blue} />
+          </View>
+          <Text style={[s.h2, { textAlign: "center" }]}>
+            Votre première bulle
+          </Text>
+          <Text style={[s.small, { textAlign: "center", maxWidth: 280 }]}>
+            Créez une story pour la garder à la une sur votre profil.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Créer une story"
             onPress={() => router.push("/stories/create")}
-          />
-        </>
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              minHeight: 48,
+              paddingHorizontal: 20,
+              borderRadius: 14,
+              backgroundColor: colors.deepBlue,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Plus size={18} color={colors.white} />
+            <Text
+              style={{ color: colors.white, fontSize: 14, fontWeight: "700" }}
+            >
+              Créer une story
+            </Text>
+          </Pressable>
+        </View>
       )}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
         {sources.map((item) => (
@@ -225,20 +269,37 @@ function Editor({
         />
       )}
       {save.isError && <CollectionError error={save.error} />}
-      <Button
-        title={
-          save.isError ? "Réessayer l’enregistrement" : "Enregistrer ma bulle"
-        }
-        busy={save.isPending}
-        disabled={!title.trim() || !selected.length}
-        onPress={() => save.mutate()}
-      />
-      <Button
-        title="Annuler"
-        secondary
-        disabled={save.isPending}
-        onPress={onClose || (() => router.back())}
-      />
+      {(sources.length > 0 || save.isError) && (
+        <Button
+          title={
+            save.isError
+              ? "Réessayer"
+              : collection
+                ? "Enregistrer"
+                : "Créer la bulle"
+          }
+          busy={save.isPending}
+          disabled={!title.trim() || !selected.length}
+          onPress={() => save.mutate()}
+        />
+      )}
+      {(!!onClose || sources.length > 0) && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Annuler"
+          disabled={save.isPending}
+          onPress={onClose || (() => router.back())}
+          style={({ pressed }) => ({
+            alignSelf: "center",
+            minHeight: 44,
+            paddingHorizontal: 16,
+            justifyContent: "center",
+            opacity: save.isPending ? 0.5 : pressed ? 0.7 : 1,
+          })}
+        >
+          <Text style={s.small}>Annuler</Text>
+        </Pressable>
+      )}
     </>
   );
 }
