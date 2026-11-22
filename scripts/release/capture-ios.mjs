@@ -108,7 +108,7 @@ with open(p,'wb') as f:plistlib.dump(d,f)
  stage('verify native simulator identity and signing');
  const nativeIdentity=JSON.parse(run('python3',['-c',`import plistlib,json,sys
 p=plistlib.load(open(sys.argv[1],'rb'))
-assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='17'
+assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='23'
 print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
  const simulatorSigning=JSON.parse(run('python3',[path.join(scripts,'inspect-simulator-entitlements.py'),nativeApp,'8HYVPDRPT4',app.expo.version,String(app.expo.ios.buildNumber)],{capture:true}));
  if(touchTraceDiagnostic)simulatorSigning.method='Diagnostic-only JavaScript trace derived from existing simulator binary; simulator copy re-signed ad hoc, never a release candidate';
