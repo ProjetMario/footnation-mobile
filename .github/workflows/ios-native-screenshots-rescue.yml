@@ -9,6 +9,15 @@ on:
       payload_sha256:
         required: true
         type: string
+      reuse_run_id:
+        required: false
+        default: ""
+        type: string
+      capture_device:
+        required: false
+        default: all
+        type: choice
+        options: [all, iphone, ipad]
 permissions:
   contents: read
   actions: read
@@ -17,7 +26,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   compile:
-    if: github.event.repository.private == false
+    if: github.event.repository.private == false && inputs.reuse_run_id == ''
     runs-on: macos-26
     timeout-minutes: 50
     env:
@@ -41,7 +50,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: footnation-native-build-${{ github.run_id }}
+          name: footnation-native-build-${{ inputs.reuse_run_id || github.run_id }}
           path: ${{ runner.temp }}/footnation-screenshot-artifacts/*
           if-no-files-found: warn
           retention-days: 1
@@ -51,10 +60,11 @@ jobs:
         run: rm -rf "$RUNNER_TEMP/footnation-native-screenshots"
   capture:
     needs: compile
+    if: always() && github.event.repository.private == false && (needs.compile.result == 'success' || inputs.reuse_run_id != '')
     strategy:
       fail-fast: false
       matrix:
-        device: [iphone, ipad]
+        device: ${{ inputs.capture_device == 'all' && fromJSON('["iphone","ipad"]') || fromJSON(format('["{0}"]', inputs.capture_device)) }}
     runs-on: macos-26
     timeout-minutes: 35
     env:
@@ -70,12 +80,14 @@ jobs:
         with:
           name: footnation-native-build-${{ github.run_id }}
           path: ${{ runner.temp }}/footnation-reuse-simulator
+          run-id: ${{ inputs.reuse_run_id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Capture genuine native screens with the preserved binary
         env:
           FN_IOS_SCREENSHOT_KEY: ${{ secrets.FN_IOS_SCREENSHOT_KEY }}
           FN_PAYLOAD_PATH: ${{ inputs.payload_path }}
           FN_PAYLOAD_SHA256: ${{ inputs.payload_sha256 }}
-          FN_REUSE_RUN_ID: ${{ github.run_id }}
+          FN_REUSE_RUN_ID: ${{ inputs.reuse_run_id || github.run_id }}
           FN_CAPTURE_DEVICE: ${{ matrix.device }}
           FN_CAPTURE_DRIVER: xctest
           FN_CAPTURE_LOCALE: fr-FR

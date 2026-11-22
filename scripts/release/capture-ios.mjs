@@ -155,7 +155,14 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
  stage('encrypt native capture archive');run('tar',['-czf',path.join(work,'captures.tar.gz'),'-C',output,'.']);writeFileSync(path.join(deliverables,'captures.tar.gz.enc'),encrypt(readFileSync(path.join(work,'captures.tar.gz')),key));
  // The encrypted simulator binary was preserved immediately after compilation.
  console.log(touchTraceDiagnostic||reducedMotionDiagnostic?'Diagnostic comparison only; do not use as release acceptance evidence.':buildOnly?'Native simulator build encrypted and preserved for separate capture jobs.':'Genuine native screenshots encrypted; human review is required before App Store upload.');
-} catch { console.error('Native screenshots failed during: '+phase+'. Diagnostics encrypted.'); for(const device of devices){try{run('xcrun',['simctl','io',device.udid,'screenshot',path.join(output,device.kind+'-00-failure.png')],{allowFailure:true,timeoutMs:30000});}catch{}} process.exitCode=1; }
+} catch {
+ const safeReasons=['Native login controls were not reachable from the landing page','System Paste action was unavailable','Input did not accept the UI paste','Authenticated demo profile was not visible','Native password-save prompt did not close before navigation','An unknown native alert blocks navigation','Installed app did not become foreground'];
+ let safeReason='unclassified';
+ try { const diagnostic=readFileSync(path.join(work,'capture.log'),'utf8');safeReason=safeReasons.find(reason=>diagnostic.includes(reason))||safeReason; } catch {}
+ console.error('Native screenshots failed during: '+phase+'. Safe reason: '+safeReason+'. Diagnostics encrypted.');
+ for(const device of devices){try{run('xcrun',['simctl','io',device.udid,'screenshot',path.join(output,device.kind+'-00-failure.png')],{allowFailure:true,timeoutMs:30000});}catch{}}
+ process.exitCode=1;
+}
 finally {
  // Collect narrow trace evidence before debugger attachment can stall a device.
  if(touchTraceDiagnostic)for(const device of devices)try {

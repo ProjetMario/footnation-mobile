@@ -337,15 +337,18 @@ final class FootNationCaptureTests: XCTestCase {
             .localOnly: true, .expirationDate: Date().addingTimeInterval(45)
         ])
         defer { UIPasteboard.general.items = [] }
-        field.press(forDuration: 1.2)
         let pastePredicate = NSPredicate(format: "label IN %@", ["Paste", "Coller"])
         var pasted = false
-        for _ in 0..<3 {
-            let menuItem = app.menuItems.matching(pastePredicate).firstMatch
-            let button = app.buttons.matching(pastePredicate).firstMatch
-            if menuItem.exists && menuItem.isHittable { menuItem.tap(); pasted = true; break }
-            if button.exists && button.isHittable { button.tap(); pasted = true; break }
-            wait(1)
+        for _ in 0..<3 where !pasted {
+            reveal(field)
+            field.press(forDuration: 1.2)
+            for _ in 0..<3 {
+                let menuItem = app.menuItems.matching(pastePredicate).firstMatch
+                let button = app.buttons.matching(pastePredicate).firstMatch
+                if menuItem.exists && menuItem.isHittable { menuItem.tap(); pasted = true; break }
+                if button.exists && button.isHittable { button.tap(); pasted = true; break }
+                wait(1)
+            }
         }
         XCTAssertTrue(pasted, "System Paste action was unavailable")
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -391,14 +394,19 @@ final class FootNationCaptureTests: XCTestCase {
         paste(email, into: emailField, advanceToPassword: true)
         paste(password, into: passwordField)
         passwordPromptMayBePending = true
-        let submit = app.buttons["Se connecter"].firstMatch
-        if submit.exists && submit.isHittable {
-            submit.tap()
-        } else {
-            // Submit through the real password TextInput's return handler.
-            passwordField.typeText("\n")
+        for attempt in 0..<3 {
+            let submit = app.buttons["Se connecter"].firstMatch
+            if submit.exists && submit.isHittable {
+                submit.tap()
+            } else if passwordField.exists && passwordField.isHittable {
+                // Submit through the real password TextInput's return handler.
+                passwordField.typeText("\n")
+            }
+            wait(10)
+            dismissPasswordSavePrompt()
+            if !emailField.exists && !passwordField.exists { break }
+            if attempt < 2 { wait(2) }
         }
-        wait(10)
         // Dismiss only a recognized password prompt. A generic centre tap
         // would pause the first short and invalidate the later autoplay test.
         dismissPasswordSavePrompt()
