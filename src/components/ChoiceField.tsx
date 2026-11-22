@@ -1,5 +1,6 @@
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, { useState } from "react";
-import { Keyboard, Modal, Text, View } from "react-native";
+import { Keyboard, Text, View } from "react-native";
 import { Button, Chip, Screen, SearchField, useUIStyles } from "./ui";
 import { normalizeSuggestion } from "../lib/profileSelectionOptions";
 export function ChoiceField({
@@ -74,11 +75,12 @@ export function ChoiceField({
         onRequestClose={() => setOpen(false)}
       >
         <Screen
-          title={label}
+          title={label.length > 22 ? "Choisir" : label}
           back={false}
           right={
             <Button
-              title={multiple ? "Terminer" : "Fermer"}
+              title={multiple ? "Valider" : "Fermer"}
+              accessibilityLabel={multiple ? "Valider la sélection" : "Fermer"}
               secondary
               onPress={() => setOpen(false)}
             />

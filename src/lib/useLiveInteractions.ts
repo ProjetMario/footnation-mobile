@@ -57,49 +57,50 @@ async function loadLiveInteractions(
   userId?: string,
 ): Promise<LiveInteractionSnapshot> {
   const activeSince = new Date(Date.now() - liveWindowMs).toISOString();
-  const [comments, likes, viewers, liked, viewerPeople, likePeople] = await Promise.all([
-    supabase
-      .from("live_stream_comments")
-      .select(
-        "id,stream_id,user_id,body,created_at,profile:profiles(id,full_name,username,avatar_url)",
-      )
-      .eq("stream_id", streamId)
-      .order("created_at", { ascending: false })
-      .limit(40)
-      .returns<LiveComment[]>(),
-    supabase
-      .from("live_stream_likes")
-      .select("stream_id", { count: "exact", head: true })
-      .eq("stream_id", streamId),
-    supabase
-      .from("live_stream_viewers")
-      .select("stream_id", { count: "exact", head: true })
-      .eq("stream_id", streamId)
-      .gt("last_seen", activeSince),
-    userId
-      ? supabase
-          .from("live_stream_likes")
-          .select("stream_id")
-          .eq("stream_id", streamId)
-          .eq("user_id", userId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    supabase
-      .from("live_stream_viewers")
-      .select("user_id,profile:profiles(id,full_name,username,avatar_url)")
-      .eq("stream_id", streamId)
-      .gt("last_seen", activeSince)
-      .order("last_seen", { ascending: false })
-      .limit(20)
-      .returns<LivePerson[]>(),
-    supabase
-      .from("live_stream_likes")
-      .select("user_id,profile:profiles(id,full_name,username,avatar_url)")
-      .eq("stream_id", streamId)
-      .order("created_at", { ascending: false })
-      .limit(20)
-      .returns<LivePerson[]>(),
-  ]);
+  const [comments, likes, viewers, liked, viewerPeople, likePeople] =
+    await Promise.all([
+      supabase
+        .from("live_stream_comments")
+        .select(
+          "id,stream_id,user_id,body,created_at,profile:profiles(id,full_name,username,avatar_url)",
+        )
+        .eq("stream_id", streamId)
+        .order("created_at", { ascending: false })
+        .limit(40)
+        .returns<LiveComment[]>(),
+      supabase
+        .from("live_stream_likes")
+        .select("stream_id", { count: "exact", head: true })
+        .eq("stream_id", streamId),
+      supabase
+        .from("live_stream_viewers")
+        .select("stream_id", { count: "exact", head: true })
+        .eq("stream_id", streamId)
+        .gt("last_seen", activeSince),
+      userId
+        ? supabase
+            .from("live_stream_likes")
+            .select("stream_id")
+            .eq("stream_id", streamId)
+            .eq("user_id", userId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      supabase
+        .from("live_stream_viewers")
+        .select("user_id,profile:profiles(id,full_name,username,avatar_url)")
+        .eq("stream_id", streamId)
+        .gt("last_seen", activeSince)
+        .order("last_seen", { ascending: false })
+        .limit(20)
+        .returns<LivePerson[]>(),
+      supabase
+        .from("live_stream_likes")
+        .select("user_id,profile:profiles(id,full_name,username,avatar_url)")
+        .eq("stream_id", streamId)
+        .order("created_at", { ascending: false })
+        .limit(20)
+        .returns<LivePerson[]>(),
+    ]);
   if (comments.error) throw comments.error;
   if (likes.error) throw likes.error;
   if (viewers.error) throw viewers.error;
@@ -116,7 +117,10 @@ async function loadLiveInteractions(
   };
 }
 
-export function useLiveInteractions(streamId?: string | null) {
+export function useLiveInteractions(
+  streamId?: string | null,
+  viewerPresence = true,
+) {
   const uid = useAuth().session?.user.id;
   const cache = useQueryClient();
   const key = ["live-interactions", streamId, uid] as const;
@@ -134,7 +138,7 @@ export function useLiveInteractions(streamId?: string | null) {
   }, [cache, streamId]);
 
   useEffect(() => {
-    if (!streamId || !uid) return;
+    if (!streamId || !uid || !viewerPresence) return;
     let stopped = false;
     const heartbeat = async () => {
       if (stopped) return;
@@ -167,7 +171,7 @@ export function useLiveInteractions(streamId?: string | null) {
         .eq("stream_id", streamId)
         .eq("user_id", uid);
     };
-  }, [refresh, streamId, uid]);
+  }, [refresh, streamId, uid, viewerPresence]);
 
   useEffect(() => {
     if (!streamId) return;
@@ -175,17 +179,32 @@ export function useLiveInteractions(streamId?: string | null) {
       .channel(`live-interactions:${streamId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "live_stream_comments", filter: `stream_id=eq.${streamId}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "live_stream_comments",
+          filter: `stream_id=eq.${streamId}`,
+        },
         refresh,
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "live_stream_likes", filter: `stream_id=eq.${streamId}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "live_stream_likes",
+          filter: `stream_id=eq.${streamId}`,
+        },
         refresh,
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "live_stream_viewers", filter: `stream_id=eq.${streamId}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "live_stream_viewers",
+          filter: `stream_id=eq.${streamId}`,
+        },
         refresh,
       )
       .subscribe((status) => {
@@ -213,7 +232,8 @@ export function useLiveInteractions(streamId?: string | null) {
 
   const toggleLike = useMutation({
     mutationFn: async () => {
-      if (!streamId || !uid) throw new Error("Connecte-toi pour aimer ce live.");
+      if (!streamId || !uid)
+        throw new Error("Connecte-toi pour aimer ce live.");
       if (query.data?.liked) {
         const result = await supabase
           .from("live_stream_likes")
@@ -258,7 +278,11 @@ export function useLiveInteractions(streamId?: string | null) {
     liked: query.data?.liked ?? false,
     isPending: query.isPending,
     error: query.error || sendComment.error || toggleLike.error,
+    commentsError: query.error,
+    commentSendError: sendComment.error,
+    commentSendPending: sendComment.isPending,
     sendComment: (body: string) => sendComment.mutate(body),
+    sendCommentAsync: (body: string) => sendComment.mutateAsync(body),
     toggleLike: () => toggleLike.mutate(),
     refresh,
   };

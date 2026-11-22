@@ -1,5 +1,6 @@
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, { useState } from "react";
-import { Modal, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../lib/auth";
 import type { Profile } from "../lib/models";

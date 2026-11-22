@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectPostLanguage, translationSource } from "../src/lib/postLanguage";
+import { detectPostLanguage, translationSource, translationLanguage, translationPair } from "../src/lib/postLanguage";
 describe("post translation visibility", () => {
   it.each([
     "À la recherches d’un club de football #amienfc",
@@ -49,5 +49,26 @@ describe("post translation visibility", () => {
     expect(
       translationSource("今日はサッカーの試合に勝ちました", "ja"),
     ).toBeNull();
+  });
+  it("normalizes language tags for the translation service and never sends und", () => {
+    expect(translationLanguage("en-US")).toBe("en");
+    expect(translationLanguage("zh-Hans-CN")).toBe("zh");
+    expect(translationLanguage("zh-Hant-TW")).toBeNull();
+    expect(translationLanguage("und")).toBeNull();
+    expect(translationLanguage("sr-Latn")).toBeNull();
+    const text = "Salut je cherche un club pour jouer avec mon équipe";
+    expect(translationPair(text, "en-US", "und")).toEqual({ destination: "en", source: "fr" });
+    expect(translationPair(text, "fr-FR", "fr")).toEqual({ destination: "fr", source: null });
+    expect(translationPair(text, "sr-Latn", "fr")).toEqual({ destination: null, source: "fr" });
+  });
+  it("offers explicit source auto-detection for discussion text of unknown language", () => {
+    expect(translationPair("Привет друзья клуба", "fr", null, true)).toEqual({ destination: "fr", source: "auto" });
+    expect(translationPair("Привет друзья клуба", "fr")).toEqual({ destination: "fr", source: null });
+    expect(translationPair("⚽🔥", "fr", null, true)).toEqual({ destination: "fr", source: null });
+    expect(translationPair("你好", "fr", null, true)).toEqual({ destination: "fr", source: "auto" });
+    expect(translationPair("Salut je cherche un club pour jouer avec mon équipe", "fr", null, true)).toEqual({ destination: "fr", source: null });
+    expect(translationPair("مرحبا بكم في النادي", "fr", null, true)).toEqual({ destination: "fr", source: "auto" });
+    expect(translationPair("مرحبا بكم في النادي", "fr", "ar", true)).toEqual({ destination: "fr", source: "ar" });
+    expect(translationPair("سلام دوستان باشگاه", "fr", "fa", true)).toEqual({ destination: "fr", source: "auto" });
   });
 });

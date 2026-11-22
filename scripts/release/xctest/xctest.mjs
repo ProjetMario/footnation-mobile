@@ -24,9 +24,15 @@ function redact(text) {
 }
 function stage(value) { phase=value; console.log('XCTest fallback: '+value); }
 function run(cmd, args, timeout=120000) {
+ const started=Date.now();
  const result=spawnSync(cmd,args,{env,encoding:'utf8',timeout,killSignal:'SIGKILL',maxBuffer:64*1024*1024,cwd:work});
  if(work)writeFileSync(path.join(work,'redacted.log'),redact(result.stdout)+'\n'+redact(result.stderr),{flag:'a',mode:0o600});
- if(result.error||result.status!==0)throw Error('Command failed');
+ if(result.error||result.status!==0){
+  // Arguments can contain private fixture paths. Record only process outcome
+  // so an unresponsive CoreSimulator is distinguishable from a UI assertion.
+  if(work)writeFileSync(path.join(work,'redacted.log'),JSON.stringify({command:path.basename(cmd),elapsedMs:Date.now()-started,errorCode:result.error?.code||null,status:result.status,signal:result.signal})+'\n',{flag:'a',mode:0o600});
+  throw Error('Command failed');
+ }
  return result.stdout||'';
 }
 function allFiles(dir) { return readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?allFiles(path.join(dir,e.name)):[path.join(dir,e.name)]); }
@@ -75,11 +81,13 @@ try {
   writeFileSync(path.join(work,'runner.json'),JSON.stringify({schema:1,xctestrun:candidates[0],runnerBundle:'com.footnation.captureUITests.xctrunner',appBundle:'com.footnation.app'}),{mode:0o600});
   console.log('Standalone UI runner prepared; FootNation was not compiled or launched.');
  } else if(mode==='run') {
-  if(process.platform!=='darwin'||!/^[A-F0-9-]{36}$/i.test(options.udid||'')||!['login','capture'].includes(options.mode)||!['fr-FR','en-US'].includes(options.locale)||!['iphone','ipad'].includes(options.device)||!options.output||!path.isAbsolute(options.output))throw Error('Invalid run parameters');
+  if(process.platform!=='darwin'||!/^[A-F0-9-]{36}$/i.test(options.udid||'')||!['login','capture','header','publication','matches','video','audit'].includes(options.mode)||!['fr-FR','en-US'].includes(options.locale)||!['iphone','ipad'].includes(options.device)||!options.output||!path.isAbsolute(options.output))throw Error('Invalid run parameters');
   credentials=JSON.parse(readFileSync(path.join(work,'private-demo.json'),'utf8'));
   const metadata=JSON.parse(readFileSync(path.join(work,'runner.json'),'utf8'));
   // Inspect the already installed binary; never install or rebuild FootNation.
+  stage('inspect installed application container');
   const appPath=run('xcrun',['simctl','get_app_container',options.udid,metadata.appBundle,'app']).trim();
+  stage('verify installed application identity');
   run('python3',['-c',"import plistlib,sys;p=plistlib.load(open(sys.argv[1],'rb'));assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='17'",path.join(appPath,'Info.plist')]);
   const stamp=options.mode+'-'+options.locale+'-'+options.device;
   // Keep patched file beside the original so __TESTROOT__ resolves identically.
@@ -90,7 +98,7 @@ try {
   let failure;
   // Native navigation now uses only real buttons; no host URL bridge runs.
   try {
-   run('xcodebuild',['test-without-building','-xctestrun',patched,'-destination','platform=iOS Simulator,id='+options.udid,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-resultBundlePath',resultPath,'-test-timeouts-enabled','YES','-default-test-execution-time-allowance','420','-maximum-test-execution-time-allowance','480'],10*60000);
+   run('xcodebuild',['test-without-building','-xctestrun',patched,'-destination','platform=iOS Simulator,id='+options.udid,'-parallel-testing-enabled','NO','-maximum-concurrent-test-simulator-destinations','1','-resultBundlePath',resultPath,'-test-timeouts-enabled','YES','-default-test-execution-time-allowance',options.mode==='audit'?'900':'420','-maximum-test-execution-time-allowance',options.mode==='audit'?'1000':'480'],(options.mode==='audit'?20:10)*60000);
   } catch(e) { failure=e; }
   finally { rmSync(resultPath,{recursive:true,force:true}); rmSync(path.join(work,'DerivedData/Logs/Test'),{recursive:true,force:true}); }
   if(failure) {
@@ -99,6 +107,7 @@ try {
    try {
     const partialContainer=run('xcrun',['simctl','get_app_container',options.udid,metadata.runnerBundle,'data'],20000).trim();
     const partialDirectory=path.join(partialContainer,'Documents/FootNationNativeCaptures');
+    for(const name of ['control-failure.txt','control-failure.png','native-checks.json'])if(existsSync(path.join(partialDirectory,name)))cpSync(path.join(partialDirectory,name),path.join(options.output,options.device+'-'+name));
     if(existsSync(partialDirectory)) {
      mkdirSync(options.output,{recursive:true,mode:0o700});
      const preserved=[];
@@ -118,9 +127,14 @@ try {
    throw failure;
   }
   const container=run('xcrun',['simctl','get_app_container',options.udid,metadata.runnerBundle,'data']).trim();
+  if(['header','publication','matches','video'].includes(options.mode)) {
+   writeFileSync(path.join(options.output,'xctest-'+stamp+'.json'),JSON.stringify({passed:true,mode:options.mode,appBundle:metadata.appBundle,native:true}),{mode:0o600});
+   console.log('Native '+options.mode+' controls passed.');process.exit(0);
+  }
   const captures=path.join(container,'Documents/FootNationNativeCaptures');
+  if(options.mode==='audit')cpSync(path.join(captures,'native-checks.json'),path.join(options.output,options.device+'-native-checks.json'));
   const files=readdirSync(captures).filter(name=>options.mode==='login'?name==='authenticated-profile.png':name.startsWith(options.locale+'-'+options.device+'-')&&name.endsWith('.png')).sort();
-  if(files.length!==(options.mode==='login'?1:4))throw Error('Incomplete screenshot set');
+  if(files.length!==(options.mode==='login'?1:6))throw Error('Incomplete screenshot set');
   mkdirSync(options.output,{recursive:true,mode:0o700});
   const receipt=[];
   for(const filename of files) {

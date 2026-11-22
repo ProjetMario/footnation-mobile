@@ -5,7 +5,9 @@ import { useLanguage, useTranslation } from "../lib/i18n";
 import { supabase } from "../lib/supabase";
 import { useTheme } from "../theme";
 
-import { translationSource } from "../lib/postLanguage";
+import { translationPair, TRANSLATION_LANGUAGES } from "../lib/postLanguage";
+import { discussionTranslationLabel } from "../lib/discussionTranslationUi";
+import { discussionUi } from "../lib/discussionUi";
 import {
   translatePostText,
   translationRequestError,
@@ -15,19 +17,32 @@ import {
 export function PostTranslation({
   text,
   overlay = false,
+  targetLanguage,
+  sourceLanguage,
+  autoDetectUnknown = false,
+  communityUiLanguage,
 }: {
   text?: string | null;
   overlay?: boolean;
+  targetLanguage?: string;
+  sourceLanguage?: string | null;
+  autoDetectUnknown?: boolean;
+  communityUiLanguage?: string;
 }) {
-  const { language } = useLanguage();
-  const t = useTranslation();
+  const { language: preferredLanguage } = useLanguage();
+  const language = targetLanguage || preferredLanguage;
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [choosingSource, setChoosingSource] = useState(false);
+  const { destination, source } = translationPair(text || "", language, selectedSource || sourceLanguage, autoDetectUnknown);
+  const t = useTranslation(destination);
+  const label = (action: "show" | "original" | "hide" | "loading" | "retry" | "unavailable" | "quota") =>
+    discussionTranslationLabel(communityUiLanguage, action) || t(`translation.${action}`);
   const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
-  const source = translationSource(text || "", language);
-  useEffect(() => setVisible(false), [text, language]);
+  useEffect(() => { setVisible(false); setSelectedSource(null); setChoosingSource(false); }, [text, language, sourceLanguage]);
   const translation = useQuery({
     queryKey: ["post-translation", text, language, source],
-    enabled: visible && !!source,
+    enabled: visible && !choosingSource && !!source && source !== 'auto' && !!destination,
     staleTime: Infinity,
     retry: false,
     queryFn: ({ signal }) =>
@@ -38,7 +53,7 @@ export function PostTranslation({
             body: {
               texts,
               source_lang: source?.toUpperCase(),
-              target_lang: language.toUpperCase(),
+              target_lang: destination?.toUpperCase(),
             },
             signal: requestSignal,
             timeout: 20000,
@@ -59,7 +74,7 @@ export function PostTranslation({
         alignItems: "flex-start",
       }}
     >
-      {!!(visible && translation.data) && (
+      {!!(visible && !choosingSource && translation.data) && (
         <ScrollView
           style={{
             maxHeight: 160,
@@ -78,12 +93,37 @@ export function PostTranslation({
           </Text>
         </ScrollView>
       )}
-      {!!(visible && translation.isError) && (
+      {!!(visible && (source === 'auto' || choosingSource) && destination) && (
+        <View>
+          <Text style={{ color, fontSize: 12 }}>
+            {discussionUi(communityUiLanguage || language, 'Langue du sujet (fr, en, sr-Latn…)')}
+          </Text>
+          <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled>
+            {TRANSLATION_LANGUAGES.filter(code => code !== destination).map(code => {
+              let name: string = code;
+              try { name = new Intl.DisplayNames([code], { type: 'language' }).of(code) || code; } catch { /* ISO code remains usable. */ }
+              return (
+                <Pressable key={code} accessibilityRole="button" onPress={(event) => { event.stopPropagation(); setSelectedSource(code); setChoosingSource(false); }} style={{ minHeight: 44, justifyContent: 'center' }}>
+                  <Text style={{ color, fontSize: 12 }}>{name} ({code})</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+      {!!(visible && !choosingSource && (translation.isError || !destination)) && (
         <Text accessibilityRole="alert" style={{ color, fontSize: 12 }}>
-          {quotaReached ? t("translation.quota") : t("translation.unavailable")}
+          {quotaReached ? label("quota") : label("unavailable")}
         </Text>
       )}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16 }}>
+        {!!(visible && autoDetectUnknown && destination && source !== 'auto' && !choosingSource) && (
+          <Pressable accessibilityRole="button" onPress={(event) => { event.stopPropagation(); setChoosingSource(true); }} style={{ minHeight: 44, justifyContent: "center" }}>
+            <Text style={{ color: overlay ? "#FFFFFF" : colors.muted, fontSize: 11 }}>
+              {discussionUi(communityUiLanguage || language, 'Langue du sujet (fr, en, sr-Latn…)')}
+            </Text>
+          </Pressable>
+        )}
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ expanded: visible }}
@@ -105,14 +145,14 @@ export function PostTranslation({
           >
             {visible
               ? translation.isFetching
-                ? `${t("translation.loading")} · ${t("translation.hide")}`
+                ? `${label("loading")} · ${label("hide")}`
                 : translation.data
-                  ? t("translation.original")
-                  : t("translation.hide")
-              : t("translation.show")}
+                  ? label("original")
+                  : label("hide")
+              : label("show")}
           </Text>
         </Pressable>
-        {!!(visible && translation.isError && !quotaReached) && (
+        {!!(visible && !choosingSource && destination && translation.isError && !quotaReached) && (
           <Pressable
             accessibilityRole="button"
             disabled={translation.isFetching}
@@ -129,7 +169,7 @@ export function PostTranslation({
                 fontWeight: "600",
               }}
             >
-              {t("translation.retry")}
+              {label("retry")}
             </Text>
           </Pressable>
         )}

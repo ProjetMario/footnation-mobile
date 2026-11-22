@@ -41,6 +41,12 @@ it("ranks all mapped clubs by distance and applies the selected radius", () => {
     distanceKm({ latitude: 0, longitude: 0 }, { latitude: 0, longitude: 1 }),
   ).toBeCloseTo(111.19, 1);
 });
+it("keeps country searches consistent between the directory and geolocated results", () => {
+  const imported = club("world", 48.1, { name: "FC Example", city: "Munich", department_code: "INT", metadata: { country: "Allemagne", country_code: "DE" } });
+  expect(filterClubMap([imported], "Allemagne", "", "club").map(p => p.id)).toEqual(["world"]);
+  expect(filterClubMap([imported], "DE", "", "club").map(p => p.id)).toEqual(["world"]);
+  expect(filterClubMap([imported], "Allemagne", "73", "club")).toEqual([]);
+});
 it("ignores invalid coordinates but keeps valid equatorial locations", () => {
   expect(validMapLocation({ latitude: 0, longitude: 0 })).toBe(true);
   expect(

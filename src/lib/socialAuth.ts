@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import * as AuthSession from "expo-auth-session";
+import { authRedirectUri } from "./authRedirectUri";
 import * as WebBrowser from "expo-web-browser";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
@@ -12,9 +12,12 @@ import {
 } from "./appleCredentialRegistration";
 import { finishSocialAuth } from "./socialOnboarding";
 import { socialAuthAttempts } from "./socialAuthAttempt";
+import { createAuthCodeExchange } from "./authCodeExchange";
+import { createSocialAuthFlow } from "./socialAuthFlow";
 import {
   isSocialAuthCancellation,
-  socialCallbackParams,
+  socialCallbackErrorMessage,
+  socialCallbackUrlParams,
   SocialAuthError,
   type SocialAuthContext,
   type SocialProvider,
@@ -22,19 +25,28 @@ import {
 
 WebBrowser.maybeCompleteAuthSession();
 
-function socialRedirectUri(queryParams: Record<string, string>) {
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    const url = new URL("/auth/callback", window.location.origin);
-    for (const [key, value] of Object.entries(queryParams)) {
-      url.searchParams.set(key, value);
-    }
-    return url.toString();
-  }
-  return AuthSession.makeRedirectUri({
-    scheme: "com.footnation.app",
-    path: "auth/callback",
-    queryParams,
-  });
+function socialRedirectUri() {
+  const url = authRedirectUri();
+  if (url.startsWith("exp:") || url.startsWith("exps:"))
+    throw new SocialAuthError(
+      "Ouvrez FootNation dans son application ou son build de développement pour utiliser Google ou Apple.",
+    );
+  return url;
+}
+
+type CallbackInput = Parameters<typeof socialAuthAttempts.resolve>[0] & {
+  code?: string;
+};
+const callbackInputs = new Map<string, CallbackInput>();
+const resolveCallback = createAuthCodeExchange(async (code) =>
+  socialAuthAttempts.resolve(callbackInputs.get(code) || {}),
+);
+export function resolveSocialCallback(input: CallbackInput) {
+  if (!input.code) return socialAuthAttempts.resolve(input);
+  callbackInputs.set(input.code, input);
+  return resolveCallback(input.code).finally(() =>
+    callbackInputs.delete(input.code!),
+  );
 }
 
 // Shared by both the browser session result and the router callback.
@@ -113,14 +125,13 @@ export async function signInSocial(
   context: SocialAuthContext,
 ) {
   requireBackend();
+  let attemptId: string | undefined;
   try {
     if (provider === "apple" && Platform.OS === "ios")
       return await nativeApple(context);
-    const attempt = await socialAuthAttempts.begin(provider);
-    const redirectTo = socialRedirectUri({
-      ...socialCallbackParams(provider, context),
-      attempt: attempt.id,
-    });
+    const redirectTo = socialRedirectUri();
+    const attempt = await socialAuthAttempts.begin(provider, context);
+    attemptId = attempt.id;
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo, skipBrowserRedirect: true },
@@ -141,6 +152,7 @@ export async function signInSocial(
       return null;
     }
     const callback = new URL(result.url);
+    const params = socialCallbackUrlParams(result.url);
     const expected = new URL(redirectTo);
     if (
       callback.protocol !== expected.protocol ||
@@ -150,22 +162,35 @@ export async function signInSocial(
       throw new SocialAuthError(
         "Le retour de connexion est invalide. Recommencez la connexion.",
       );
-    if (callback.searchParams.get("error") === "access_denied") {
+    if (params.get("error") === "access_denied") {
       await socialAuthAttempts.clear(attempt.id);
       return null;
     }
-    if (callback.searchParams.has("error"))
+    if (params.has("error") || params.has("error_description"))
       throw new SocialAuthError(
-        "Le service de connexion n’a pas pu vous authentifier. Réessayez.",
+        socialCallbackErrorMessage({
+          error: params.get("error"),
+          errorCode: params.get("error_code"),
+          description: params.get("error_description"),
+          provider,
+        }),
       );
-    const code = callback.searchParams.get("code");
+    const code = params.get("code");
     if (!code)
       throw new SocialAuthError(
         "Le retour de connexion est incomplet. Réessayez.",
       );
+    await resolveSocialCallback({
+      code,
+      social: provider,
+      attempt: attempt.id,
+    });
     return await finishSocialCallback(code, provider, context, attempt.id);
   } catch (error) {
+    if (attemptId) await socialAuthAttempts.clear(attemptId);
     if (isSocialAuthCancellation(error)) return null;
     throw error;
   }
 }
+
+export const socialAuthFlow = createSocialAuthFlow(signInSocial);

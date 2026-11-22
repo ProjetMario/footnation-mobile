@@ -1,0 +1,56 @@
+/** Labels for the optional translation control inside club discussions. */
+const labels: Record<string, readonly string[]> = {
+  pt: ['Ver tradução','Ver original','Ocultar','Traduzindo…','Tentar tradução novamente','Tradução indisponível no momento.','O serviço de tradução atingiu o limite. Tente novamente mais tarde.'],
+  de: ['Übersetzung ansehen','Original ansehen','Ausblenden','Übersetzung läuft…','Übersetzung erneut versuchen','Übersetzung derzeit nicht verfügbar.','Das Übersetzungslimit ist erreicht. Versuche es später erneut.'],
+  it: ['Vedi traduzione','Vedi originale','Nascondi','Traduzione in corso…','Riprova la traduzione','Traduzione al momento non disponibile.','Il servizio di traduzione ha raggiunto il limite. Riprova più tardi.'],
+  nl: ['Vertaling bekijken','Origineel bekijken','Verbergen','Vertalen…','Vertaling opnieuw proberen','Vertaling is momenteel niet beschikbaar.','De vertaallimiet is bereikt. Probeer het later opnieuw.'],
+  ar: ['عرض الترجمة','عرض النص الأصلي','إخفاء','جارٍ الترجمة…','إعادة محاولة الترجمة','الترجمة غير متاحة حاليًا.','بلغت خدمة الترجمة الحد المسموح. حاول لاحقًا.'],
+  tr: ['Çeviriyi gör','Orijinali gör','Gizle','Çevriliyor…','Çeviriyi yeniden dene','Çeviri şu anda kullanılamıyor.','Çeviri hizmetinin sınırına ulaşıldı. Daha sonra tekrar deneyin.'],
+  ja: ['翻訳を見る','原文を見る','非表示','翻訳中…','翻訳を再試行','現在、翻訳を利用できません。','翻訳サービスの上限に達しました。後でもう一度お試しください。'],
+  zh: ['查看翻译','查看原文','隐藏','正在翻译…','重试翻译','翻译暂时不可用。','翻译服务已达到限额，请稍后重试。'],
+  ko: ['번역 보기','원문 보기','숨기기','번역 중…','번역 다시 시도','현재 번역을 사용할 수 없습니다.','번역 서비스 한도에 도달했습니다. 나중에 다시 시도해 주세요.'],
+  ru: ['Посмотреть перевод','Посмотреть оригинал','Скрыть','Перевод…','Повторить перевод','Перевод сейчас недоступен.','Лимит службы перевода исчерпан. Повторите попытку позже.'],
+  uk: ['Переглянути переклад','Переглянути оригінал','Приховати','Переклад…','Повторити переклад','Переклад зараз недоступний.','Ліміт служби перекладу вичерпано. Спробуйте пізніше.'],
+  pl: ['Zobacz tłumaczenie','Zobacz oryginał','Ukryj','Tłumaczenie…','Ponów tłumaczenie','Tłumaczenie jest obecnie niedostępne.','Limit usługi tłumaczenia został osiągnięty. Spróbuj później.'],
+  cs: ['Zobrazit překlad','Zobrazit originál','Skrýt','Překládání…','Zkusit překlad znovu','Překlad nyní není dostupný.','Byl dosažen limit překladové služby. Zkuste to později.'],
+  ro: ['Vezi traducerea','Vezi originalul','Ascunde','Se traduce…','Reîncearcă traducerea','Traducerea nu este disponibilă momentan.','Serviciul de traducere a atins limita. Încercați mai târziu.'],
+  hu: ['Fordítás megtekintése','Eredeti megtekintése','Elrejtés','Fordítás folyamatban…','Fordítás újrapróbálása','A fordítás jelenleg nem érhető el.','A fordítási szolgáltatás elérte a korlátot. Próbáld később újra.'],
+  fi: ['Näytä käännös','Näytä alkuperäinen','Piilota','Käännetään…','Yritä käännöstä uudelleen','Käännös ei ole juuri nyt saatavilla.','Käännöspalvelun raja on saavutettu. Yritä myöhemmin uudelleen.'],
+  sv: ['Visa översättning','Visa original','Dölj','Översätter…','Försök översätta igen','Översättning är inte tillgänglig just nu.','Översättningstjänstens gräns har nåtts. Försök igen senare.'],
+  da: ['Se oversættelse','Se original','Skjul','Oversætter…','Prøv oversættelsen igen','Oversættelse er ikke tilgængelig lige nu.','Oversættelsestjenestens grænse er nået. Prøv igen senere.'],
+  el: ['Προβολή μετάφρασης','Προβολή πρωτοτύπου','Απόκρυψη','Μετάφραση…','Επανάληψη μετάφρασης','Η μετάφραση δεν είναι διαθέσιμη αυτή τη στιγμή.','Η υπηρεσία μετάφρασης έφτασε στο όριό της. Δοκιμάστε αργότερα.'],
+  hr: ['Prikaži prijevod','Prikaži izvornik','Sakrij','Prevođenje…','Pokušaj ponovno prevesti','Prijevod trenutačno nije dostupan.','Dostignuto je ograničenje usluge prevođenja. Pokušajte kasnije.'],
+  sl: ['Prikaži prevod','Prikaži izvirnik','Skrij','Prevajanje…','Znova poskusi prevesti','Prevod trenutno ni na voljo.','Dosežena je omejitev storitve prevajanja. Poskusite pozneje.'],
+  sk: ['Zobraziť preklad','Zobraziť originál','Skryť','Prekladá sa…','Skúsiť preklad znova','Preklad momentálne nie je dostupný.','Bol dosiahnutý limit prekladovej služby. Skúste to neskôr.'],
+  bg: ['Виж превода','Виж оригинала','Скрий','Превеждане…','Опитай превода отново','Преводът временно не е достъпен.','Лимитът на услугата за превод е достигнат. Опитайте по-късно.'],
+  et: ['Vaata tõlget','Vaata originaali','Peida','Tõlkimine…','Proovi tõlkimist uuesti','Tõlge pole praegu saadaval.','Tõlketeenuse piir on saavutatud. Proovi hiljem uuesti.'],
+  lt: ['Peržiūrėti vertimą','Peržiūrėti originalą','Slėpti','Verčiama…','Bandyti versti dar kartą','Vertimas šiuo metu nepasiekiamas.','Pasiektas vertimo paslaugos limitas. Bandykite vėliau.'],
+  lv: ['Skatīt tulkojumu','Skatīt oriģinālu','Paslēpt','Tulko…','Mēģināt tulkot vēlreiz','Tulkojums pašlaik nav pieejams.','Tulkošanas pakalpojuma limits ir sasniegts. Mēģiniet vēlāk.'],
+  nb: ['Se oversettelse','Se original','Skjul','Oversetter…','Prøv oversettelsen på nytt','Oversettelse er ikke tilgjengelig akkurat nå.','Grensen for oversettelsestjenesten er nådd. Prøv igjen senere.'],
+  nn: ['Sjå omsetjing','Sjå originalen','Gøym','Omset…','Prøv omsetjinga på nytt','Omsetjing er ikkje tilgjengeleg no.','Grensa for omsetjingstenesta er nådd. Prøv igjen seinare.'],
+  mt: ['Ara t-traduzzjoni','Ara l-oriġinal','Aħbi','Qed jittraduċi…','Erġa’ pprova t-traduzzjoni','It-traduzzjoni mhijiex disponibbli bħalissa.','Intlaħaq il-limitu tas-servizz tat-traduzzjoni. Erġa’ pprova aktar tard.'],
+  sw: ['Tazama tafsiri','Tazama asili','Ficha','Inatafsiri…','Jaribu kutafsiri tena','Tafsiri haipatikani kwa sasa.','Kikomo cha huduma ya tafsiri kimefikiwa. Jaribu tena baadaye.'],
+  ga: ['Féach ar an aistriúchán','Féach ar an mbuntéacs','Folaigh','Á aistriú…','Bain triail eile as an aistriúchán','Níl aistriúchán ar fáil faoi láthair.','Tá teorainn na seirbhíse aistriúcháin sroichte. Bain triail eile as níos déanaí.'],
+  'zh-hant': ['查看翻譯','查看原文','隱藏','翻譯中…','重試翻譯','目前無法提供翻譯。','翻譯服務已達到限額，請稍後再試。'],
+  ca: ['Veure la traducció','Veure l’original','Amaga','S’està traduint…','Torna a provar la traducció','La traducció no està disponible ara mateix.','El servei de traducció ha arribat al límit. Torna-ho a provar més tard.'],
+  sr: ['Прикажи превод','Прикажи оригинал','Сакриј','Превођење…','Покушај превод поново','Превод тренутно није доступан.','Достигнуто је ограничење услуге превођења. Покушајте касније.'],
+  'sr-latn': ['Prikaži prevod','Prikaži original','Sakrij','Prevođenje…','Pokušaj prevod ponovo','Prevod trenutno nije dostupan.','Dostignuto je ograničenje usluge prevođenja. Pokušajte kasnije.'],
+  he: ['הצגת התרגום','הצגת המקור','הסתרה','מתרגמים…','ניסיון חוזר לתרגום','התרגום אינו זמין כרגע.','שירות התרגום הגיע למגבלה. נסו שוב מאוחר יותר.'],
+  fa: ['نمایش ترجمه','نمایش متن اصلی','پنهان‌کردن','در حال ترجمه…','تلاش دوباره برای ترجمه','ترجمه در حال حاضر در دسترس نیست.','سرویس ترجمه به محدودیت رسیده است. بعداً دوباره تلاش کنید.'],
+  hi: ['अनुवाद देखें','मूल पाठ देखें','छिपाएँ','अनुवाद हो रहा है…','अनुवाद फिर से आज़माएँ','अनुवाद अभी उपलब्ध नहीं है।','अनुवाद सेवा की सीमा पूरी हो गई है। बाद में पुनः प्रयास करें।'],
+  th: ['ดูคำแปล','ดูข้อความต้นฉบับ','ซ่อน','กำลังแปล…','ลองแปลอีกครั้ง','ขณะนี้ไม่สามารถแปลได้','บริการแปลถึงขีดจำกัดแล้ว โปรดลองอีกครั้งภายหลัง'],
+  id: ['Lihat terjemahan','Lihat teks asli','Sembunyikan','Menerjemahkan…','Coba terjemahkan lagi','Terjemahan saat ini tidak tersedia.','Batas layanan terjemahan tercapai. Coba lagi nanti.'],
+  is: ['Sjá þýðingu','Sjá upprunalegan texta','Fela','Þýði…','Reyna þýðingu aftur','Þýðing er ekki tiltæk eins og er.','Hámarki þýðingarþjónustunnar er náð. Reyndu aftur síðar.'],
+  ms: ['Lihat terjemahan','Lihat teks asal','Sembunyikan','Menterjemah…','Cuba terjemah lagi','Terjemahan tidak tersedia buat masa ini.','Had perkhidmatan terjemahan telah dicapai. Cuba lagi kemudian.'],
+  sq: ['Shiko përkthimin','Shiko origjinalin','Fshih','Po përkthehet…','Provo përkthimin sërish','Përkthimi nuk është i disponueshëm tani.','Është arritur kufiri i shërbimit të përkthimit. Provo më vonë.'],
+  mk: ['Прикажи превод','Прикажи оригинал','Сокриј','Се преведува…','Обиди се повторно со преводот','Преводот моментално не е достапен.','Достигнат е лимитот на услугата за превод. Обидете се подоцна.'],
+  ht: ['Gade tradiksyon an','Gade tèks orijinal la','Kache','Ap tradui…','Eseye tradui ankò','Tradiksyon an pa disponib kounye a.','Sèvis tradiksyon an rive nan limit li. Eseye ankò pita.'],
+  be: ['Паглядзець пераклад','Паглядзець арыгінал','Схаваць','Пераклад…','Паўтарыць пераклад','Пераклад зараз недаступны.','Ліміт службы перакладу вычарпаны. Паспрабуйце пазней.'],
+};
+const keys = ['show','original','hide','loading','retry','unavailable','quota'] as const;
+type TranslationAction = typeof keys[number];
+export function discussionTranslationLabel(locale: unknown, action: TranslationAction): string | null {
+  if (typeof locale !== 'string') return null;
+  const row = labels[/^zh-(?:hant|tw|hk|mo)(?:-|$)/i.test(locale) ? 'zh-hant' : /^sr-latn(?:-|$)/i.test(locale) ? 'sr-latn' : locale.toLowerCase().split('-')[0]];
+  return row?.[keys.indexOf(action)] || null;
+}

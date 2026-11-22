@@ -612,7 +612,10 @@ function PageForm({ initial }: { initial: any }) {
             .insert({ ...payload, owner_id: session!.user.id })
             .select("id")
             .single();
-      if (result.error) throw result.error;
+      if (result.error)
+        throw new Error(
+          result.error.message || "La création de la Page Pro a échoué.",
+        );
       return result.data.id;
     },
     onSuccess: (id) => {

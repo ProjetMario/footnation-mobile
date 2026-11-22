@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
-import { clubTeamBaseName, matchingClubLogo } from "./clubLogoIdentity";
+import { clubTeamBaseName } from "./clubLogoIdentity";
+import { exactAmateurClubLogo } from "./clubLogoPolicy.mjs";
 
 export function clubLogoName(name: string) {
   return name
@@ -20,32 +21,12 @@ export async function findClubLogo(name: string): Promise<string | null> {
     ?.sort((a, b) => b.length - a.length)
     .find((word) => !["football", "club"].includes(word.toLowerCase()));
   if (!token) return null;
-  const result = await supabase
-    .from("club_logos")
-    .select("club_name,logo_url")
-    .ilike("club_name", `%${token}%`)
-    .limit(100);
-  const exact = result.data?.find(
-    (row) => clubLogoName(row.club_name) === clubLogoName(baseName),
-  )?.logo_url;
-  const logo =
-    exact ||
-    matchingClubLogo(
-      baseName,
-      (result.data || []).map((row) => ({
-        name: row.club_name,
-        logo: row.logo_url,
-      })),
-    );
-  if (logo) return logo;
   const clubs = await supabase
     .from("fff_clubs")
-    .select("name,logo_url")
+    .select("id,name,is_pro,logo_url")
     .ilike("name", `%${token}%`)
-    .not("logo_url", "is", null)
-    .limit(100);
-  return matchingClubLogo(
-    baseName,
-    (clubs.data || []).map((row) => ({ name: row.name, logo: row.logo_url })),
-  );
+    .limit(101);
+  // A truncated lookup cannot prove that an identity is unique.
+  if (clubs.error || !clubs.data || clubs.data.length > 100) return null;
+  return exactAmateurClubLogo(baseName, clubs.data);
 }

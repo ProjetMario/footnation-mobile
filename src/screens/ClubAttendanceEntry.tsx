@@ -227,6 +227,8 @@ function EntryForm({
         "club-attendance-counts",
         "club-attendance-summary",
         "club-member-attendance",
+        "convocation-attendance",
+        "coach-session-attendance",
       ])
         void cache.invalidateQueries({ queryKey: [prefix, id] });
       close();
@@ -251,6 +253,8 @@ function EntryForm({
         "club-attendance-counts",
         "club-attendance-summary",
         "club-member-attendance",
+        "convocation-attendance",
+        "coach-session-attendance",
       ])
         void cache.invalidateQueries({ queryKey: [prefix, id] });
       close();

@@ -50,7 +50,10 @@ export async function shortPublicationServices(
       const bytes = await readAsset(uri, MAX_SHORT_BYTES);
       if (!bytes.byteLength)
         throw new Error("Cette vidéo est vide ou indisponible.");
-      const checksum = await digest(CryptoDigestAlgorithm.SHA256, bytes);
+      const checksum = await digest(
+        CryptoDigestAlgorithm.SHA256,
+        new Uint8Array(bytes),
+      );
       return {
         bytes,
         sha256: Array.from(new Uint8Array(checksum), (byte) =>
@@ -93,7 +96,10 @@ export async function shortPublicationServices(
       const bytes = Uint8Array.from(atob(draft.thumbnail.base64), (c) =>
         c.charCodeAt(0),
       ).buffer;
-      const checksum = await digest(CryptoDigestAlgorithm.SHA256, bytes);
+      const checksum = await digest(
+        CryptoDigestAlgorithm.SHA256,
+        new Uint8Array(bytes),
+      );
       const sha256 = Array.from(new Uint8Array(checksum), (b) =>
         b.toString(16).padStart(2, "0"),
       ).join("");

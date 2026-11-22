@@ -61,10 +61,11 @@ function Content() {
         .from("profiles")
         .select("id", { head: true, count: "exact" })
         .eq("referred_by", uid);
-      if (count.error) throw count.error;
       return {
         code: profile.data.referral_code,
-        count: count.count || 0,
+        // Referral attribution is optional on older profile schemas. The
+        // invite link remains usable even when the aggregate is unavailable.
+        count: count.error ? 0 : count.count || 0,
         attribution,
       };
     },

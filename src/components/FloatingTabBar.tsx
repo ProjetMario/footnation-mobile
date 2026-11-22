@@ -26,7 +26,7 @@ export const floatingBarSpace = (bottom: number) =>
   floatingBarHeight + floatingBarInset(bottom) + 12;
 
 const destinations = [
-  { name: "index", label: "nav.home", shortLabel: "nav.home", Icon: null },
+  { name: "home", label: "nav.home", shortLabel: "nav.home", Icon: null },
   {
     name: "shorts",
     label: "nav.shorts",
@@ -137,7 +137,7 @@ export function FloatingTabBar({
       : undefined;
   if (keyboardVisible) return null;
   const current = state.routes[state.index].name;
-  if (!session && current === "index") return null;
+  if (!session && current === "home") return null;
   const selected =
     current === "more"
       ? "my-profile"
@@ -167,7 +167,7 @@ export function FloatingTabBar({
                     accessibilityRole="button"
                     accessibilityLabel={t(label)}
                     accessibilityHint={t("nav.createHint")}
-                    onPress={() => router.navigate("/compose")}
+                    onPress={() => router.navigate("/compose/choose")}
                     style={({ pressed }) => [
                       styles.item,
                       compact && styles.itemCompact,

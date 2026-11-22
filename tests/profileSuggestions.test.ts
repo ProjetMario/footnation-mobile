@@ -68,3 +68,77 @@ it("reuses web country codes and international favorite clubs with accent-insens
   expect(proClubOptions.some((o) => o.value === "FC Barcelone")).toBe(true);
   expect(normalizeSuggestion("Défenseur central")).toContain("defenseur");
 });
+
+function clubQuery(result: { data: unknown; error: unknown }) {
+  const q = {
+    select: vi.fn(),
+    order: vi.fn(),
+    limit: vi.fn(),
+    ilike: vi.fn(),
+    or: vi.fn(),
+    abortSignal: vi.fn(),
+    then: (resolve: (value: typeof result) => unknown) =>
+      Promise.resolve(result).then(resolve),
+  };
+  for (const method of [
+    q.select,
+    q.order,
+    q.limit,
+    q.ilike,
+    q.or,
+    q.abortSignal,
+  ])
+    method.mockReturnValue(q);
+  return q;
+}
+it("shows the country when an international club is selected in a profile", async () => {
+  const q = clubQuery({ data: [{ id: "world", name: "FC Example", department_code: "INT", metadata: { country: "Allemagne", country_code: "DE" }, logo_url: null }], error: null });
+  client.from.mockReset().mockReturnValue(q);
+  expect(await searchProfileSuggestions("club", "Example")).toEqual([{ id: "world", name: "FC Example", detail: "Allemagne", logo: null }]);
+});
+it("finds a club by its official name before offering broader matches", async () => {
+  const q = clubQuery({
+    data: [
+      {
+        id: "club",
+        name: "Ent S Drumettaz Mouxy",
+        city: "Drumettaz",
+        department_code: "73",
+        logo_url: null,
+      },
+    ],
+    error: null,
+  });
+  client.from.mockReset().mockReturnValue(q);
+  const signal = new AbortController().signal;
+  expect(await searchProfileSuggestions("club", "drumett", signal)).toEqual([
+    {
+      id: "club",
+      name: "Ent S Drumettaz Mouxy",
+      detail: "Drumettaz · 73",
+      logo: null,
+    },
+  ]);
+  expect(q.ilike).toHaveBeenCalledWith("name", "%drumett%");
+  expect(q.or).not.toHaveBeenCalled();
+  expect(q.abortSignal).toHaveBeenCalledWith(signal);
+});
+it("tries the directory city and short name only when the name has no match", async () => {
+  const first = clubQuery({ data: [], error: null });
+  const second = clubQuery({ data: [], error: null });
+  client.from
+    .mockReset()
+    .mockReturnValueOnce(first)
+    .mockReturnValueOnce(second);
+  expect(await searchProfileSuggestions("club", "Mouxy")).toEqual([]);
+  expect(second.or).toHaveBeenCalledWith(expect.stringContaining("city.ilike"));
+  expect(client.from).toHaveBeenCalledTimes(2);
+});
+it("keeps a directory failure distinct from an empty club list", async () => {
+  const q = clubQuery({ data: null, error: new Error("unavailable") });
+  client.from.mockReset().mockReturnValue(q);
+  await expect(searchProfileSuggestions("club", "drumett")).rejects.toThrow(
+    "unavailable",
+  );
+  expect(client.from).toHaveBeenCalledTimes(1);
+});

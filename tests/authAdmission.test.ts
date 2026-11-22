@@ -33,7 +33,10 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("../src/lib/supabase", () => ({
   backendConfigured: true,
   supabase: {
-    auth: { getSession: async () => ({ data: { session: h.session } }) },
+    auth: {
+      getSession: async () => ({ data: { session: h.session } }),
+      getUser: async () => ({ data: { user: h.session.user }, error: null }),
+    },
     rpc: () => ({ setHeader: async () => h.admission }),
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle: h.profileRead }) }),
@@ -67,12 +70,10 @@ function render() {
 beforeEach(() => {
   h.slots = [];
   h.admission = { data: { state: "eligible", allowed: true }, error: null };
-  h.profileRead
-    .mockReset()
-    .mockResolvedValue({
-      data: { id: "player", full_name: "Recette" },
-      error: null,
-    });
+  h.profileRead.mockReset().mockResolvedValue({
+    data: { id: "player", full_name: "Recette" },
+    error: null,
+  });
 });
 it("loads the profile only after a positive admission result", async () => {
   await render().reload();
@@ -84,15 +85,15 @@ it.each([
   { data: null, error: null },
   { data: { state: "parent_pending", allowed: true }, error: null },
 ])(
-  "keeps the signed-in app usable when admission is unavailable: %j",
+  "reports admission failures instead of fabricating access: %j",
   async (response) => {
     h.admission = response;
     await render().reload();
-    expect(render().memberAccess?.allowed).toBe(true);
-    expect(render().memberAccess?.state).toBe("eligible");
+    expect(render().memberAccess).toBeNull();
     expect(render().loading).toBe(false);
-    expect(render().error).toBeNull();
-    expect(render().profile?.id).toBe("player");
+    expect(render().error).toBeTruthy();
+    expect(render().profile).toBeNull();
+    expect(h.profileRead).not.toHaveBeenCalled();
   },
 );
 it("keeps previously admitted screens after an online admission failure", async () => {

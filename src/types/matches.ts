@@ -44,6 +44,8 @@ export interface MatchDTO {
 
 export interface MatchesApiResponse {
   incomplete?: boolean;
+  /** The European calendar is temporarily showing the alternative provider. */
+  alternative_source?: boolean;
   date: string;
   fetched_at: string;
   matches: MatchDTO[];

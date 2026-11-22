@@ -12,7 +12,9 @@ it("supports every native profile form field in the latest server update contrac
   const fields = [...fieldsSource.matchAll(/\["([a-z_]+)",/g)].map(
     (match) => match[1],
   );
-  const migrations = new URL("../backend/migrations/", import.meta.url);
+  // The production migration chain lives at repository root. The older
+  // mobile-expo/backend snapshot predates later profile fields such as jersey_number.
+  const migrations = new URL("../../supabase/migrations/", import.meta.url);
   const definitions = readdirSync(migrations)
     .sort()
     .map((name) => readFileSync(new URL(name, migrations), "utf8"))

@@ -1,7 +1,10 @@
+import { Platform } from "react-native";
 import { PostCommentError, publishPostComment } from "../lib/postComments";
 import { usePostCommentDraft } from "../lib/usePostCommentDraft";
 import React from "react";
 import { Text, View } from "react-native";
+import { readPublicPreviewPost } from "../lib/publicPostPreview";
+import { GuestPreviewBoundary } from "../components/GuestPreviewBoundary";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   useQuery,
@@ -16,6 +19,7 @@ import { displayName } from "../lib/models";
 import {
   Avatar,
   Button,
+  Empty,
   ErrorState,
   Field,
   Loading,
@@ -27,6 +31,14 @@ import { PostCard, PostReelsDetail } from "../components/PostCard";
 import { AuthGate } from "../components/AuthGate";
 import { useTheme } from "../theme";
 export default function PostDetail() {
+  return (
+    <GuestPreviewBoundary>
+      <PostDetailContent />
+    </GuestPreviewBoundary>
+  );
+}
+
+function PostDetailContent() {
   const { colors } = useTheme();
   const s = useUIStyles();
 
@@ -38,21 +50,24 @@ export default function PostDetail() {
   const cache = useQueryClient();
   const [comment, setComment] = usePostCommentDraft(session?.user.id, id);
   const post = useQuery({
-    queryKey: ["post", id],
+    queryKey: ["post", id, session?.user.id || "public"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!session && Platform.OS === "web")
+        return readPublicPreviewPost(supabase, id);
+      const request = supabase
         .from("posts")
         .select(
           "*,author:profiles!posts_user_id_fkey(id,full_name,username,avatar_url),post_comments(count),post_reactions(id,user_id,reaction_type)",
         )
-        .eq("id", id)
-        .single();
+        .eq("id", id);
+      const { data, error } = await request.maybeSingle();
       if (error) throw error;
-      return data as Post;
+      return data as unknown as Post | null;
     },
   });
   const comments = useInfiniteQuery({
-    queryKey: ["comments", id],
+    queryKey: ["comments", id, session?.user.id || "public"],
+    enabled: !!session,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       const { data, error } = await supabase
@@ -99,6 +114,15 @@ export default function PostDetail() {
     return (
       <Screen title="Publication">
         <ErrorState error={post.error} />
+      </Screen>
+    );
+  if (!post.data)
+    return (
+      <Screen title="Publication">
+        <Empty
+          title="Publication indisponible"
+          description="Cette publication n’est pas accessible publiquement."
+        />
       </Screen>
     );
   if (post.data.video_url)

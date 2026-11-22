@@ -2,13 +2,25 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 import { useMatchClock } from "./useMatches";
 import { useConnectivity } from "../components/ConnectivityProvider";
-import { isActiveClubMatch, isActiveLiveStream, type ClubLiveStream, type LiveClubMatch } from "./clubLive";
+import { useAuth } from "./auth";
+import { resolveLiveLink } from "./liveLinkResolver";
+import { findClubLogo } from "./clubLogo";
+import {
+  isActiveClubMatch,
+  isActiveLiveStream,
+  type ClubLiveStream,
+  type LiveClubMatch,
+} from "./clubLive";
 
 const matchSelect =
   "id,club_id,opponent_name,opponent_logo_url,category,match_date,is_home,competition,venue,status,home_score,away_score,club:fff_clubs(id,name,logo_url)";
 const streamSelect =
-  "id,club_id,match_id,title,home_team,away_team,status,started_at,ended_at,expires_at,video_url,broadcaster_id,broadcaster:profiles!live_streams_broadcaster_id_fkey(id,full_name,username,avatar_url)";
+  "id,club_id,match_id,title,home_team,away_team,status,started_at,ended_at,expires_at,video_url,transport,broadcaster_id,broadcaster:profiles!live_streams_broadcaster_id_fkey(id,full_name,username,avatar_url)";
 const pageSize = 20;
+
+async function withVerifiedOpponentLogo(match: LiveClubMatch): Promise<LiveClubMatch> {
+  return { ...match, opponent_logo_url: match.opponent_logo_url ? await findClubLogo(match.opponent_name) : null };
+}
 
 function useLiveQueryOptions() {
   const { active } = useMatchClock();
@@ -41,7 +53,7 @@ export function useLiveClubMatches(clubId?: string) {
         .abortSignal(signal)
         .returns<LiveClubMatch[]>();
       if (result.error) throw result.error;
-      return result.data.filter(isActiveClubMatch);
+      return Promise.all(result.data.filter(isActiveClubMatch).map(withVerifiedOpponentLogo));
     },
     getNextPageParam: (last, pages) =>
       last.length === pageSize ? pages.length * pageSize : undefined,
@@ -89,7 +101,7 @@ export function useClubLiveMatch(id: string) {
         .abortSignal(signal)
         .maybeSingle<LiveClubMatch>();
       if (result.error) throw result.error;
-      return result.data;
+      return result.data ? withVerifiedOpponentLogo(result.data) : null;
     },
   });
 }
@@ -111,5 +123,45 @@ export function useClubLiveStream(id: string) {
       if (result.error) throw result.error;
       return result.data;
     },
+  });
+}
+
+export function useLiveLink(id: unknown, explicitStream?: unknown) {
+  const options = useLiveQueryOptions();
+  const { isOffline } = useConnectivity();
+  const uid = useAuth().session?.user.id;
+  return useQuery({
+    ...options,
+    enabled: !isOffline,
+    queryKey: ["live-link", uid, id, explicitStream],
+    queryFn: ({ signal }) =>
+      resolveLiveLink(id, explicitStream, {
+        stream: async (streamId) => {
+          const result = await supabase
+            .from("live_streams")
+            .select(streamSelect)
+            .eq("id", streamId)
+            .abortSignal(signal)
+            .maybeSingle<ClubLiveStream>();
+          if (result.error) throw result.error;
+          return result.data;
+        },
+        clubStreams: async (clubId) => {
+          const result = await supabase
+            .from("live_streams")
+            .select(streamSelect)
+            .eq("club_id", clubId)
+            .eq("status", "live")
+            .is("ended_at", null)
+            .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+            .order("started_at", { ascending: false })
+            .order("id")
+            .limit(20)
+            .abortSignal(signal)
+            .returns<ClubLiveStream[]>();
+          if (result.error) throw result.error;
+          return result.data;
+        },
+      }),
   });
 }

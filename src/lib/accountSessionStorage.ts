@@ -11,10 +11,12 @@ export type StorageLock = <T>(
 export function createAccountSessionStorage(
   store: KeyValueStore,
   options: {
+    authStorageKey?: string;
     withLock?: StorageLock;
     canRemoveAccount?: () => boolean;
   } = {},
 ) {
+  const sessionKey = options.authStorageKey || authStorageKey;
   const queues = new Map<string, Promise<unknown>>();
   const removedAccounts = new Set<string>();
   function locked<T>(key: string, operation: () => Promise<T>): Promise<T> {
@@ -37,14 +39,14 @@ export function createAccountSessionStorage(
     getItem: (key: string) =>
       locked(key, async () => {
         const raw = await store.getItem(key);
-        if (key !== authStorageKey || !raw) return raw;
+        if (key !== sessionKey || !raw) return raw;
         const safe = stripProviderCredentials(raw);
         if (safe !== raw) await store.setItem(key, safe);
         return safe;
       }),
     setItem: (key: string, value: string) =>
       locked(key, async () => {
-        if (key === authStorageKey) {
+        if (key === sessionKey) {
           const accountId = JSON.parse(value)?.user?.id;
           if (
             typeof accountId === "string" &&
@@ -55,33 +57,30 @@ export function createAccountSessionStorage(
         }
         await store.setItem(
           key,
-          key === authStorageKey ? stripProviderCredentials(value) : value,
+          key === sessionKey ? stripProviderCredentials(value) : value,
         );
       }),
     removeItem: (key: string) => locked(key, () => store.removeItem(key)),
     // Only called after a positive server deletion receipt. Compare + remove
     // share the exact queue used by every SDK write, including native chunks.
     removeAccountSession: (userId: string) =>
-      locked(
-        authStorageKey,
-        async (): Promise<"removed" | "empty" | "other"> => {
-          if (options.canRemoveAccount && !options.canRemoveAccount())
-            throw new Error(
-              "La fermeture sécurisée de la session doit être vérifiée sur cet appareil.",
-            );
-          removedAccounts.add(userId);
-          // Survives reloads and is visible to every tab under the shared auth
-          // lock. Otherwise another SDK instance could restore A over B later.
-          await store.setItem(deletionFenceKey(userId), "1");
-          const raw = await store.getItem(authStorageKey);
-          if (!raw) return "empty";
-          const currentId = JSON.parse(raw)?.user?.id;
-          if (typeof currentId !== "string")
-            throw new Error("Impossible de vérifier la session locale.");
-          if (currentId !== userId) return "other";
-          await store.removeItem(authStorageKey);
-          return "removed";
-        },
-      ),
+      locked(sessionKey, async (): Promise<"removed" | "empty" | "other"> => {
+        if (options.canRemoveAccount && !options.canRemoveAccount())
+          throw new Error(
+            "La fermeture sécurisée de la session doit être vérifiée sur cet appareil.",
+          );
+        removedAccounts.add(userId);
+        // Survives reloads and is visible to every tab under the shared auth
+        // lock. Otherwise another SDK instance could restore A over B later.
+        await store.setItem(deletionFenceKey(userId), "1");
+        const raw = await store.getItem(sessionKey);
+        if (!raw) return "empty";
+        const currentId = JSON.parse(raw)?.user?.id;
+        if (typeof currentId !== "string")
+          throw new Error("Impossible de vérifier la session locale.");
+        if (currentId !== userId) return "other";
+        await store.removeItem(sessionKey);
+        return "removed";
+      }),
   };
 }

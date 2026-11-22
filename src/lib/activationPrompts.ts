@@ -108,5 +108,5 @@ export function invitationPromptReady(
 }
 
 export function isActivationLanding(pathname: string) {
-  return pathname === "/" || pathname === "/my-profile";
+  return pathname === "/" || pathname === "/home" || pathname === "/my-profile";
 }

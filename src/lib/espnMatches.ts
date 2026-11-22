@@ -1,5 +1,7 @@
 import { calendarDate, validCalendarDate } from "./calendarDate";
 import { NATIONAL_LEAGUES } from "./nationalMatches";
+import { createScoreboardRequests } from "./scoreboardRequests";
+import { matchTeamLogo } from "./clubLogoPolicy.mjs";
 import type {
   MatchDTO,
   MatchesApiResponse,
@@ -68,7 +70,7 @@ function teamLogo(data: JsonObject): string | null {
   }
   return null;
 }
-function team(value: unknown): TeamInfo | null {
+function team(value: unknown, league: EspnLeague): TeamInfo | null {
   const data = object(value);
   if (!data) return null;
   const name = text(data.displayName) || text(data.name);
@@ -78,7 +80,7 @@ function team(value: unknown): TeamInfo | null {
     id: id ? `espn:team:${id}` : null,
     name,
     shortName: text(data.abbreviation) || text(data.shortDisplayName) || null,
-    logo: teamLogo(data),
+    logo: matchTeamLogo(teamLogo(data)),
   };
 }
 function score(value: unknown): number | null {
@@ -197,8 +199,8 @@ export function parseEspnScoreboard(
     const competitors = competition.competitors.map(object);
     const homeData = competitors.find((item) => item?.homeAway === "home");
     const awayData = competitors.find((item) => item?.homeAway === "away");
-    const home = team(homeData?.team);
-    const away = team(awayData?.team);
+    const home = team(homeData?.team, league);
+    const away = team(awayData?.team, league);
     const state = normalizedStatus(
       object(competition.status) || object(event.status),
     );
@@ -263,34 +265,78 @@ function offsetDate(date: string, offset: number) {
   value.setDate(value.getDate() + offset);
   return calendarDate(value);
 }
-class UnsupportedDateRange extends Error {}
+type Calendar = {
+  from: string;
+  to: string;
+  dates: Set<string>;
+  expires: number;
+};
+const calendars = new Map<string, Calendar>();
 
-async function fetchLeagueRequest(
-  league: string,
-  from: string,
-  to: string,
-  signal?: AbortSignal,
-) {
+function rememberCalendar(payload: unknown, league: string) {
+  const leagues = object(payload)?.leagues;
+  const metadata = Array.isArray(leagues)
+    ? leagues.map(object).find((item) => item?.slug === league)
+    : null;
+  const dates = metadata?.calendar;
+  const from = text(metadata?.calendarStartDate).slice(0, 10);
+  const to = text(metadata?.calendarEndDate).slice(0, 10);
+  // Only ESPN's explicit, exhaustive day calendar can prove a date empty.
+  // Stage/list calendars, empty/malformed calendars and other seasons cannot.
   if (
-    !validLeague(league) ||
+    metadata?.calendarType !== "day" ||
+    metadata.calendarIsWhitelist !== true ||
+    !Array.isArray(dates) ||
+    !dates.length ||
     !validCalendarDate(from) ||
-    !validCalendarDate(to)
-  )
+    !validCalendarDate(to) ||
+    from >= to ||
+    !dates.every(
+      (date) =>
+        typeof date === "string" &&
+        Number.isFinite(Date.parse(date)) &&
+        validCalendarDate(date.slice(0, 10)),
+    )
+  ) {
+    calendars.delete(league);
+    return;
+  }
+  calendars.set(league, {
+    from,
+    to,
+    dates: new Set(dates.map((date: string) => date.slice(0, 10))),
+    expires: Date.now() + 30_000,
+  });
+}
+
+function knownEmptyDay(league: string, date: string) {
+  const calendar = calendars.get(league);
+  return (
+    calendar &&
+    calendar.expires > Date.now() &&
+    date > calendar.from &&
+    date < calendar.to &&
+    !calendar.dates.has(date)
+  );
+}
+
+async function requestLeagueDay(
+  league: string,
+  date: string,
+  signal: AbortSignal,
+) {
+  if (!validLeague(league) || !validCalendarDate(date))
     throw new Error("Requête de match invalide.");
-  if (signal?.aborted) throw abortError();
+  if (signal.aborted) throw abortError();
   const controller = new AbortController();
   const forwardAbort = () => controller.abort();
-  signal?.addEventListener("abort", forwardAbort, { once: true });
+  signal.addEventListener("abort", forwardAbort, { once: true });
   let timedOut = false;
   const timer = setTimeout(() => {
     timedOut = true;
     controller.abort();
   }, 10_000);
   const fetchedAt = new Date().toISOString();
-  const dates =
-    from === to
-      ? from.replace(/-/g, "")
-      : `${from.replace(/-/g, "")}-${to.replace(/-/g, "")}`;
   let rejectAbort: (() => void) | undefined;
   const aborted = new Promise<never>((_, reject) => {
     rejectAbort = () => reject(abortError());
@@ -299,54 +345,111 @@ async function fetchLeagueRequest(
   try {
     const request = async () => {
       const response = await fetch(
-        `https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/scoreboard?dates=${dates}&limit=100`,
+        `https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/scoreboard?dates=${date.replace(/-/g, "")}&limit=100`,
         { signal: controller.signal, headers: { Accept: "application/json" } },
       );
-      if (response.status === 400 && from !== to)
-        throw new UnsupportedDateRange(serviceMessage);
       if (!response.ok) throw new Error(serviceMessage);
       const payload: unknown = await response.json();
       if (controller.signal.aborted) throw abortError();
-      return {
-        days: parseEspnScoreboard(payload, league, fetchedAt),
-        fetchedAt,
-      };
+      const days = parseEspnScoreboard(payload, league, fetchedAt);
+      rememberCalendar(payload, league);
+      return { days, fetchedAt };
     };
     return await Promise.race([request(), aborted]);
   } catch (error) {
-    if (signal?.aborted) throw abortError();
+    if (signal.aborted) throw abortError();
     if (timedOut) throw new Error("Le chargement des scores ESPN a expiré.");
     throw error;
   } finally {
     clearTimeout(timer);
-    signal?.removeEventListener("abort", forwardAbort);
+    signal.removeEventListener("abort", forwardAbort);
     if (rejectAbort)
       controller.signal.removeEventListener("abort", rejectAbort);
   }
 }
 
-// Soccer providers can reject ranges while still serving individual days.
-// Sequential daily requests preserve the limit of three concurrent leagues.
-async function fetchLeague(
-  league: string,
+const requests = createScoreboardRequests((key, signal) => {
+  const [league, date] = key.split("|");
+  return requestLeagueDay(league, date, signal);
+});
+
+// Also used when resetting isolated provider tests. No credentials or user data
+// are stored here, and errors/aborted responses are never cached.
+export function clearEspnScoreboardCache() {
+  requests.clear();
+  calendars.clear();
+}
+
+function fetchLeagueDay(league: string, date: string, signal?: AbortSignal) {
+  if (!validLeague(league) || !validCalendarDate(date))
+    throw new Error("Requête de match invalide.");
+  // Parsed days use the visitor's timezone, which can change during a trip.
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return requests.get(`${league}|${date}|${zone}`, signal);
+}
+
+export type ScoreboardSnapshot = {
+  days: MatchesApiResponse[];
+  incomplete: boolean;
+};
+type Progress = (snapshot: ScoreboardSnapshot) => void;
+
+async function fetchWindow(
+  leagues: readonly string[],
   from: string,
   to: string,
+  requestFrom: string,
+  requestTo: string,
+  anchor: string,
   signal?: AbortSignal,
-) {
-  try {
-    return await fetchLeagueRequest(league, from, to, signal);
-  } catch (error) {
-    if (!(error instanceof UnsupportedDateRange)) throw error;
-  }
+  onProgress?: Progress,
+): Promise<ScoreboardSnapshot> {
+  if (signal?.aborted) throw abortError();
+  const dates: string[] = [];
+  for (let date = requestFrom; date <= requestTo; date = offsetDate(date, 1))
+    dates.push(date);
+  // Today's first response supplies the provider calendar. Then show the
+  // nearest fixtures first instead of waiting for two full weeks per league.
+  dates.sort(
+    (a, b) =>
+      Math.abs(Date.parse(a) - Date.parse(anchor)) -
+      Math.abs(Date.parse(b) - Date.parse(anchor)),
+  );
   const days: MatchesApiResponse[] = [];
-  let fetchedAt = new Date().toISOString();
-  for (let date = from; date <= to; date = offsetDate(date, 1)) {
-    if (signal?.aborted) throw abortError();
-    const result = await fetchLeagueRequest(league, date, date, signal);
-    days.push(...result.days);
-    if (result.fetchedAt < fetchedAt) fetchedAt = result.fetchedAt;
-  }
-  return { days: mergeDays(days), fetchedAt };
+  let next = 0,
+    succeeded = 0,
+    incomplete = false;
+  await Promise.all(
+    Array.from({ length: Math.min(6, leagues.length) }, async () => {
+      while (next < leagues.length) {
+        const league = leagues[next++];
+        for (const date of dates) {
+          if (signal?.aborted) throw abortError();
+          // Always refresh the anchor, including calendars with changed fixtures.
+          if (date !== anchor && knownEmptyDay(league, date)) continue;
+          try {
+            const result = await fetchLeagueDay(league, date, signal);
+            if (signal?.aborted) throw abortError();
+            succeeded++;
+            days.push(
+              ...result.days.filter(
+                (day) => day.date >= from && day.date <= to,
+              ),
+            );
+            if (days.length)
+              onProgress?.({ days: mergeDays(days), incomplete: true });
+          } catch (error) {
+            if (signal?.aborted) throw abortError();
+            incomplete = true;
+            // Do not hammer an unavailable league for every remaining day.
+            break;
+          }
+        }
+      }
+    }),
+  );
+  if (!succeeded) throw new Error(serviceMessage);
+  return { days: mergeDays(days), incomplete };
 }
 
 function mergeDays(days: MatchesApiResponse[]) {
@@ -392,7 +495,8 @@ export async function fetchFeaturedScoreboard(
   today: string,
   signal?: AbortSignal,
   daysBack = 14,
-): Promise<{ days: MatchesApiResponse[]; incomplete: boolean }> {
+  onProgress?: Progress,
+): Promise<ScoreboardSnapshot> {
   if (
     !validCalendarDate(today) ||
     !Number.isInteger(daysBack) ||
@@ -401,42 +505,24 @@ export async function fetchFeaturedScoreboard(
   )
     throw new Error("Période de match invalide.");
   const from = offsetDate(today, -daysBack);
-  // ESPN filters its calendar separately from the device's local day. Fetch
-  // adjacent dates too, then retain only the requested local window below.
-  const requestFrom = offsetDate(from, -1);
-  const requestTo = offsetDate(today, 1);
-  const days: MatchesApiResponse[] = [];
-  let succeeded = 0;
-  let incomplete = false;
-  // Two bounded batches; a failed league does not hide the others' real results.
-  for (let start = 0; start < ESPN_LEAGUES.length; start += 3) {
-    if (signal?.aborted) throw abortError();
-    const results = await Promise.allSettled(
-      ESPN_LEAGUES.slice(start, start + 3).map((league) =>
-        fetchLeague(league, requestFrom, requestTo, signal),
-      ),
-    );
-    if (signal?.aborted) throw abortError();
-    for (const result of results) {
-      if (result.status === "fulfilled") {
-        succeeded++;
-        days.push(
-          ...result.value.days.filter(
-            (day) => day.date >= from && day.date <= today,
-          ),
-        );
-      } else incomplete = true;
-    }
-  }
-  if (!succeeded) throw new Error(serviceMessage);
-  return { days: mergeDays(days), incomplete };
+  return fetchWindow(
+    ESPN_LEAGUES,
+    from,
+    today,
+    offsetDate(from, -1),
+    offsetDate(today, 1),
+    today,
+    signal,
+    onProgress,
+  );
 }
 
 export async function fetchUpcomingFeaturedScoreboard(
   today: string,
   signal?: AbortSignal,
   daysAhead = 14,
-): Promise<{ days: MatchesApiResponse[]; incomplete: boolean }> {
+  onProgress?: Progress,
+): Promise<ScoreboardSnapshot> {
   if (
     !validCalendarDate(today) ||
     !Number.isInteger(daysAhead) ||
@@ -445,51 +531,26 @@ export async function fetchUpcomingFeaturedScoreboard(
   )
     throw new Error("Période de match invalide.");
   const to = offsetDate(today, daysAhead);
-  // Adjacent dates cover UTC/local-calendar offsets around midnight.
-  const requestFrom = offsetDate(today, -1);
-  const requestTo = offsetDate(to, 1);
-  const days: MatchesApiResponse[] = [];
-  let succeeded = 0;
-  let incomplete = false;
-  for (let start = 0; start < ESPN_LEAGUES.length; start += 3) {
-    if (signal?.aborted) throw abortError();
-    const results = await Promise.allSettled(
-      ESPN_LEAGUES.slice(start, start + 3).map((league) =>
-        fetchLeague(league, requestFrom, requestTo, signal),
-      ),
-    );
-    if (signal?.aborted) throw abortError();
-    for (const result of results) {
-      if (result.status === "fulfilled") {
-        succeeded++;
-        days.push(
-          ...result.value.days.filter(
-            (day) => day.date >= today && day.date <= to,
-          ),
-        );
-      } else incomplete = true;
-    }
-  }
-  if (!succeeded) throw new Error(serviceMessage);
-  return { days: mergeDays(days), incomplete };
+  return fetchWindow(
+    ESPN_LEAGUES,
+    today,
+    to,
+    offsetDate(today, -1),
+    offsetDate(to, 1),
+    today,
+    signal,
+    onProgress,
+  );
 }
 
-export async function fetchEspnMatchDay(
-  league: string,
+function matchDay(
   date: string,
-  signal?: AbortSignal,
-): Promise<MatchesApiResponse> {
-  // Adjacent UTC days cover local-calendar offsets for deep links after midnight.
-  const result = await fetchLeague(
-    league,
-    offsetDate(date, -1),
-    offsetDate(date, 1),
-    signal,
-  );
-  const days = mergeDays(result.days);
+  snapshot: ScoreboardSnapshot,
+): MatchesApiResponse {
+  const days = snapshot.days;
   return {
     date,
-    fetched_at: result.fetchedAt,
+    fetched_at: days[0]?.fetched_at || new Date().toISOString(),
     source: "espn",
     matches: days.flatMap((day) => day.matches),
     tournaments: [
@@ -506,54 +567,47 @@ export async function fetchEspnMatchDay(
           .map((member) => [member.id || member.name, member]),
       ).values(),
     ],
+    incomplete: snapshot.incomplete,
   };
+}
+
+export async function fetchEspnMatchDay(
+  league: string,
+  date: string,
+  signal?: AbortSignal,
+): Promise<MatchesApiResponse> {
+  if (!validLeague(league) || !validCalendarDate(date))
+    throw new Error("Requête de match invalide.");
+  const from = offsetDate(date, -1),
+    to = offsetDate(date, 1);
+  // Retain adjacent days for deep links to fixtures around local midnight.
+  return matchDay(
+    date,
+    await fetchWindow([league], from, to, from, to, date, signal),
+  );
 }
 
 export async function fetchNationalMatchDay(
   date: string,
   signal?: AbortSignal,
+  onProgress?: (day: MatchesApiResponse) => void,
 ): Promise<MatchesApiResponse> {
   if (!validCalendarDate(date)) throw new Error("Date de match invalide.");
-  // Query the UTC dates intersecting the requested local day. Single dates are
-  // supported by these scoreboards; ranges are rejected by the soccer API.
   const from = new Date(`${date}T00:00:00`).toISOString().slice(0, 10);
   const to = new Date(`${date}T23:59:59`).toISOString().slice(0, 10);
-  const days: MatchesApiResponse[] = [];
-  let succeeded = 0;
-  let incomplete = false;
-  for (let start = 0; start < NATIONAL_LEAGUES.length; start += 3) {
-    if (signal?.aborted) throw abortError();
-    const results = await Promise.allSettled(
-      NATIONAL_LEAGUES.slice(start, start + 3).map(async (league) => {
-        const results = [];
-        for (let utcDay = from; utcDay <= to; utcDay = offsetDate(utcDay, 1)) {
-          results.push(
-            await fetchLeagueRequest(league, utcDay, utcDay, signal),
-          );
-        }
-        return results.flatMap((result) => result.days);
-      }),
-    );
-    if (signal?.aborted) throw abortError();
-    for (const result of results) {
-      if (result.status === "fulfilled") {
-        succeeded++;
-        days.push(...result.value.filter((day) => day.date === date));
-      } else incomplete = true;
-    }
-  }
-  if (!succeeded)
-    throw new Error(
-      "Les matchs des nations sont temporairement indisponibles.",
-    );
-  const merged = mergeDays(days)[0];
-  return {
+  return matchDay(
     date,
-    fetched_at: merged?.fetched_at || new Date().toISOString(),
-    source: "espn",
-    matches: merged?.matches || [],
-    teams: merged?.teams || [],
-    tournaments: merged?.tournaments || [],
-    incomplete,
-  };
+    await fetchWindow(
+      NATIONAL_LEAGUES,
+      date,
+      date,
+      from,
+      to,
+      date,
+      signal,
+      onProgress
+        ? (snapshot) => onProgress(matchDay(date, snapshot))
+        : undefined,
+    ),
+  );
 }

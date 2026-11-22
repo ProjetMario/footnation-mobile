@@ -17,12 +17,12 @@ const mock = vi.hoisted(() => ({
   checkAttempt: vi.fn(),
   clearAttempt: vi.fn(),
   checkLegacy: vi.fn(),
+  resolveAttempt: vi.fn(),
   current: null as any,
 }));
 vi.mock("react-native", () => ({ Platform: mock.platform }));
 vi.mock("expo-auth-session", () => ({
-  makeRedirectUri: ({ queryParams }: any) =>
-    `com.footnation.app://auth/callback?${new URLSearchParams(queryParams)}`,
+  makeRedirectUri: () => "com.footnation.app://auth/callback",
 }));
 vi.mock("expo-web-browser", () => ({
   maybeCompleteAuthSession: vi.fn(),
@@ -65,9 +65,14 @@ vi.mock("../src/lib/socialAuthAttempt", () => ({
     check: mock.checkAttempt,
     clear: mock.clearAttempt,
     checkLegacy: mock.checkLegacy,
+    resolve: mock.resolveAttempt,
   },
 }));
-import { signInSocial, finishSocialCallback } from "../src/lib/socialAuth";
+import {
+  signInSocial,
+  finishSocialCallback,
+  resolveSocialCallback,
+} from "../src/lib/socialAuth";
 import { exchangeAuthCode } from "../src/lib/exchangeAuthCode";
 import {
   registerAppleCredentials,
@@ -124,6 +129,11 @@ beforeEach(() => {
   mock.checkAttempt.mockResolvedValue(undefined);
   mock.clearAttempt.mockResolvedValue(undefined);
   mock.checkLegacy.mockResolvedValue(undefined);
+  mock.resolveAttempt.mockResolvedValue({
+    id: "oauth-attempt",
+    provider: "google",
+    context: {},
+  });
   mock.signOut.mockImplementation(async () => {
     mock.current = null;
     return { error: null };
@@ -287,9 +297,10 @@ describe("provider OAuth callbacks", () => {
     ).toBeNull();
     expect(mock.oauth.mock.calls[0][0].options.skipBrowserRedirect).toBe(true);
     const redirectTo = mock.oauth.mock.calls[0][0].options.redirectTo;
-    expect(redirectTo).toMatch(/^http:\/\/localhost:8082\/auth\/callback\?/);
-    expect(redirectTo).toContain("social=google");
-    expect(redirectTo).toContain("teamInvite");
+    expect(redirectTo).toBe("http://localhost:8082/auth/callback");
+    expect(mock.beginAttempt).toHaveBeenCalledWith("google", {
+      next: "/member/invitations?teamInvite=ABCDEFGHJK",
+    });
     expect((window.location.assign as any).mock.calls[0][0]).toBe(
       "https://provider.example/authorize",
     );
@@ -301,6 +312,10 @@ describe("provider OAuth callbacks", () => {
     expect(await signInSocial("google", {})).toBeNull();
     expect(mock.oauth.mock.calls[0][0].options.skipBrowserRedirect).toBe(true);
     expect(mock.finish).not.toHaveBeenCalled();
+    expect(mock.browser).toHaveBeenCalledWith(
+      "https://provider.example/authorize",
+      "com.footnation.app://auth/callback",
+    );
   });
   it("completes a native Google browser return while preserving its safe destination", async () => {
     mock.platform.OS = "android";
@@ -328,6 +343,55 @@ describe("provider OAuth callbacks", () => {
       "retour de connexion est invalide",
     );
     expect(mock.exchange).not.toHaveBeenCalled();
+    expect(mock.clearAttempt).toHaveBeenCalledWith("oauth-attempt");
+  });
+  it("keeps the callback context when a native return precedes the router remount", async () => {
+    mock.platform.OS = "android";
+    mock.resolveAttempt.mockResolvedValue({
+      id: "oauth-attempt",
+      provider: "google",
+      context: { next: "/clubs" },
+    });
+    mock.browser.mockResolvedValue({
+      type: "success",
+      url: "com.footnation.app://auth/callback?code=remount-context",
+    });
+    await signInSocial("google", { next: "/clubs" });
+    mock.resolveAttempt.mockResolvedValue(null);
+    expect(
+      await resolveSocialCallback({ code: "remount-context" }),
+    ).toMatchObject({ context: { next: "/clubs" } });
+    expect(mock.resolveAttempt).toHaveBeenCalledTimes(1);
+    expect(mock.exchange).toHaveBeenCalledTimes(1);
+  });
+  it.each(["google", "apple"] as const)(
+    "handles %s cancellation in the native callback fragment",
+    async (provider) => {
+      mock.platform.OS = "android";
+      mock.browser.mockResolvedValue({
+        type: "success",
+        url: "com.footnation.app://auth/callback#error=access_denied",
+      });
+      expect(await signInSocial(provider, {})).toBeNull();
+      expect(mock.exchange).not.toHaveBeenCalled();
+      expect(mock.clearAttempt).toHaveBeenCalledWith("oauth-attempt");
+    },
+  );
+  it("uses Apple-specific errors and releases the attempt after a browser failure", async () => {
+    mock.platform.OS = "android";
+    mock.browser.mockResolvedValue({
+      type: "success",
+      url: "com.footnation.app://auth/callback#error=server_error",
+    });
+    await expect(signInSocial("apple", {})).rejects.toThrow("Apple");
+    expect(mock.exchange).not.toHaveBeenCalled();
+    expect(mock.clearAttempt).toHaveBeenCalledWith("oauth-attempt");
+  });
+  it("releases an attempt when the browser cannot open", async () => {
+    mock.platform.OS = "android";
+    mock.browser.mockRejectedValueOnce(new Error("browser unavailable"));
+    await expect(signInSocial("google", {})).rejects.toThrow();
+    expect(mock.clearAttempt).toHaveBeenCalledWith("oauth-attempt");
   });
   it("shares a single exchange and Apple registration across repeated callbacks", async () => {
     mock.exchange.mockImplementation(async () => {

@@ -4,6 +4,7 @@ import {
 } from "./profileInfoActions";
 import { supabase } from "./supabase";
 import { isSuspended } from "./validation";
+import { blockedSocialAuthors } from "./socialVisibility";
 export const searchCategories = [
   { key: "all", label: "Tout" },
   { key: "profiles", label: "Profils" },
@@ -45,17 +46,14 @@ export async function searchFootNation(
   profileField?: string,
   browse = false,
   excludedIds: string[] = [],
+  options?: { blockedAuthors?: string[]; signal?: AbortSignal },
 ): Promise<{ rows: SearchResult[]; hasMore: boolean }> {
   term = term.trim();
+  const mentionTerm = term.startsWith("@") ? term.slice(1).trim() : term;
   if ((!term && !browse) || !uid) return { rows: [], hasMore: false };
-  const blocks = await supabase
-    .from("user_blocks")
-    .select("blocker_id,blocked_id")
-    .or(`blocker_id.eq.${uid},blocked_id.eq.${uid}`);
-  if (blocks.error) throw blocks.error;
-  const blocked = (blocks.data || []).map((row) =>
-    row.blocker_id === uid ? row.blocked_id : row.blocker_id,
-  );
+  const blocked =
+    options?.blockedAuthors ??
+    (await blockedSocialAuthors(uid, options?.signal));
   const kinds: Exclude<SearchCategory, "all">[] =
     category === "all" ? ["profiles", "clubs", "posts", "events"] : [category];
   const pages = await Promise.all(
@@ -77,7 +75,7 @@ export async function searchFootNation(
             : query.or(
                 fieldSearchFilter(
                   ["full_name", "username", "club", "city", "position"],
-                  term,
+                  mentionTerm,
                 ),
               );
         else
@@ -96,7 +94,7 @@ export async function searchFootNation(
           query = query.or(
             fieldSearchFilter(
               ["name", "short_name", "city", "department_name"],
-              term,
+              mentionTerm,
             ),
           );
         query = query.order("name");
@@ -105,11 +103,12 @@ export async function searchFootNation(
           .from("posts")
           .select("id,user_id,content,hashtags,image_url,created_at")
           .or("moderation_hidden.is.null,moderation_hidden.eq.false");
-        if (term)
-          query = query.ilike(
-            "content",
-            `%${term.replace(/[%_\\]/g, "\\$&")}%`,
-          );
+        if (term) {
+          const normalizedTag = term.replace(/^#/, "").trim();
+          query = term.startsWith("#")
+            ? query.contains("hashtags", [normalizedTag])
+            : query.ilike("content", `%${term.replace(/[%_\\]/g, "\\$&")}%`);
+        }
         query = query.order("created_at", { ascending: false });
       } else {
         query = supabase
@@ -131,7 +130,9 @@ export async function searchFootNation(
         );
       if (excludedIds.length)
         query = query.not("id", "in", `(${excludedIds.join(",")})`);
-      const result = await query.order("id").range(offset, offset + 19);
+      query = query.order("id").range(offset, offset + 19);
+      if (options?.signal) query = query.abortSignal(options.signal);
+      const result = await query;
       if (result.error) throw result.error;
       const raw = result.data as unknown as {
         id: string;
@@ -165,7 +166,12 @@ export async function searchFootNation(
               : kind === "clubs"
                 ? row.name || "Club"
                 : kind === "posts"
-                  ? [row.content, ...(row.hashtags || []).map((tag) => `#${tag}`)].filter(Boolean).join(" ") || "Publication"
+                  ? [
+                      row.content,
+                      ...(row.hashtags || []).map((tag) => `#${tag}`),
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || "Publication"
                   : row.title || "Événement",
           subtitle:
             kind === "profiles"

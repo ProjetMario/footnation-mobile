@@ -13,6 +13,8 @@ const env={...process.env}; delete env.FN_IOS_SCREENSHOT_KEY; delete env.GITHUB_
 let log,key,phase='configuration',created=false;
 const devices=[];
 const useXCTest=process.env.FN_CAPTURE_DRIVER==='xctest';
+const reducedMotionDiagnostic=process.env.FN_REDUCE_MOTION_DIAGNOSTIC==='true';
+const touchTraceDiagnostic=process.env.FN_TOUCH_TRACE_DIAGNOSTIC==='true';
 const xctestScript=path.join(scripts,'xctest','xctest.mjs');
 const xctestWork=path.join(work,'native-ui-driver');
 function run(command,args,{cwd=source,capture=false,allowFailure=false,commandEnv=env,timeoutMs=8*60*1000}={}) {
@@ -87,22 +89,37 @@ with open(p,'wb') as f:plistlib.dump(d,f)
   run('tar',['-czf',path.join(work,'simulator-app.tar.gz'),'-C',products,appName]);writeFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'),encrypt(readFileSync(path.join(work,'simulator-app.tar.gz')),key));
  }
  nativeArchiveSha256 ||= createHash('sha256').update(readFileSync(path.join(deliverables,'simulator-app.tar.gz.enc'))).digest('hex');
+ if(touchTraceDiagnostic){
+  if(!reuse)throw Error('Touch tracing requires an existing simulator build');
+  stage('derive diagnostic-only JavaScript bundle with touch tracing');
+  run('npm',['ci','--include=dev','--legacy-peer-deps','--no-audit','--no-fund']);
+  run(process.execPath,[path.join(scripts,'ios-touch-trace.mjs'),source]);
+  run('npx',['--no-install','expo','export:embed','--platform','ios','--dev','false','--entry-file','node_modules/expo-router/entry.js','--bundle-output',path.join(nativeApp,'main.jsbundle'),'--assets-dest',nativeApp,'--bytecode'],{timeoutMs:12*60*1000});
+  // Re-sign only this disposable simulator copy after replacing JavaScript.
+  // The original encrypted binary remains unchanged and distribution never
+  // consumes this derived product. Simulated keychain sections are preserved.
+  run('codesign',['--force','--sign','-',nativeApp]);
+  writeFileSync(path.join(output,'touch-trace-receipt.json'),readFileSync(path.join(source,'touch-trace-receipt.json')));
+ }
+ stage('verify native simulator identity and signing');
  const nativeIdentity=JSON.parse(run('python3',['-c',`import plistlib,json,sys
 p=plistlib.load(open(sys.argv[1],'rb'))
 assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='17'
 print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionString','CFBundleVersion']}))`,path.join(nativeApp,'Info.plist')],{capture:true}));
- const simulatorSigning=JSON.parse(run('python3',[path.join(scripts,'inspect-simulator-entitlements.py'),nativeApp,'8HYVPDRPT4'],{capture:true}));
- const manifest={simulatorSigning,captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.5',buildNumber:'17',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
- const routes=[['06-profil','my-profile'],['02-recherche','search'],['03-clubs','clubs'],['01-accueil','home']];
+ const simulatorSigning=JSON.parse(run('python3',[path.join(scripts,'inspect-simulator-entitlements.py'),nativeApp,'8HYVPDRPT4',app.expo.version,String(app.expo.ios.buildNumber)],{capture:true}));
+ if(touchTraceDiagnostic)simulatorSigning.method='Diagnostic-only JavaScript trace derived from existing simulator binary; simulator copy re-signed ad hoc, never a release candidate';
+ const manifest={simulatorSigning,reducedMotionDiagnostic,touchTraceDiagnostic,releaseAcceptanceEligible:!reducedMotionDiagnostic&&!touchTraceDiagnostic,captureDriver:useXCTest?'xctest':'maestro',app:'com.footnation.app',version:'1.0.5',buildNumber:'17',sourceSha256:compiledSourceSha256,compiledSourceSha256,compiledGithubCommit,capturePayloadSha256:expected,nativeArchiveSha256,nativeIdentity,reusedNativeBuildRun:reuse||null,githubCommit:process.env.GITHUB_SHA,native:true,buildOnly,method:useXCTest?'Release iOS Simulator build from submitted source; native XCUIScreen capture':'Release iOS Simulator build from submitted source; native screenshot capture via simctl',capturedAt:new Date().toISOString(),devices:[],screens:[]};
+ const routes=[['06-profil','my-profile'],['02-recherche','search'],['03-clubs','clubs'],['04-opportunites','opportunities'],['05-matchs','matches'],['01-accueil','home']];
  if(!buildOnly){
  if(useXCTest){stage('prepare standalone XCTest UI runner');run(process.execPath,[xctestScript,'prepare','--work',xctestWork,'--demo',path.join(source,'release-private/demo.json')],{timeoutMs:12*60*1000});}
  else {stage('install native UI automation');run('curl',['--connect-timeout','20','--max-time','120','-fsSL','https://get.maestro.mobile.dev','-o',path.join(work,'install-maestro.sh')]);run('bash',[path.join(work,'install-maestro.sh')]);}
  for(const device of devices){
   stage('capture '+device.kind+' native interface');run('xcrun',['simctl','boot',device.udid]);run('xcrun',['simctl','bootstatus',device.udid,'-b']);
+  if(reducedMotionDiagnostic){stage('diagnostic reduced motion accessibility preference');run('xcrun',['simctl','spawn',device.udid,'defaults','write','com.apple.Accessibility','ReduceMotionEnabled','-bool','true']);}
   run('xcrun',['simctl','ui',device.udid,'appearance','light']);run('xcrun',['simctl','status_bar',device.udid,'override','--time','9:41','--dataNetwork','wifi','--wifiMode','active','--wifiBars','3','--batteryState','charged','--batteryLevel','100']);
   run('xcrun',['simctl','install',device.udid,nativeApp]);
   const container=run('xcrun',['simctl','get_app_container',device.udid,'com.footnation.app','data'],{capture:true}).trim();const storage=path.join(container,'Library/Application Support/com.footnation.app/RCTAsyncLocalStorage_V1');mkdirSync(storage,{recursive:true});const preferences={'footnation:language:v1':'fr','footnation:appearance:v1':'light'};if(/^[0-9a-f-]{36}$/.test(demo.userId||'')){preferences['footnation:first-login-onboarding:v1:'+demo.userId]='seen';preferences['footnation:invitation-prompt-until:v1:'+demo.userId]=String(Date.now()+7*86400000);}writeFileSync(path.join(storage,'manifest.json'),JSON.stringify(preferences));
-  run('xcrun',['simctl','launch',device.udid,'com.footnation.app','-AppleLanguages','(fr)','-AppleLocale','fr_FR']);await wait(15000);
+  run('xcrun',['simctl','launch','--stdout='+path.join(work,device.kind+'-app.stdout.log'),'--stderr='+path.join(work,device.kind+'-app.stderr.log'),device.udid,'com.footnation.app','-AppleLanguages','(fr)','-AppleLocale','fr_FR']);await wait(15000);
   if(!useXCTest){run('xcrun',['simctl','openurl',device.udid,'footnation://login?next=%2Fsearch']);await wait(8000);}
   if(useXCTest){stage('authenticate '+device.kind+' through native XCTest fields');run(process.execPath,[xctestScript,'run','--work',xctestWork,'--udid',device.udid,'--mode','login','--locale','fr-FR','--device',device.kind,'--output',output],{timeoutMs:12*60*1000});}
   else {
@@ -119,7 +136,7 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
     const settings=JSON.parse(readFileSync(path.join(storage,'manifest.json'),'utf8'));settings['footnation:language:v1']='en';writeFileSync(path.join(storage,'manifest.json'),JSON.stringify(settings));
     run('xcrun',['simctl','launch',device.udid,'com.footnation.app','-AppleLanguages','(en)','-AppleLocale','en_US']);await wait(10000);
    }
-   if(useXCTest){stage('capture '+locale+' '+device.kind+' with native XCTest');run(process.execPath,[xctestScript,'run','--work',xctestWork,'--udid',device.udid,'--mode','capture','--locale',locale,'--device',device.kind,'--output',output],{timeoutMs:12*60*1000});}
+   if(useXCTest){const mode=locale==='fr-FR'?'audit':'capture';stage('capture '+locale+' '+device.kind+' with native XCTest and controls');run(process.execPath,[xctestScript,'run','--work',xctestWork,'--udid',device.udid,'--mode',mode,'--locale',locale,'--device',device.kind,'--output',output],{timeoutMs:(mode==='audit'?22:12)*60*1000});}
    for(const [name,route] of routes){
     if(!useXCTest){run('xcrun',['simctl','openurl',device.udid,'footnation://'+route]);await wait(18000);
     if(route==='home')maestro(device.udid,`appId: com.footnation.app\n---\n- tapOn:\n    text: "Fermer l’invitation"\n    optional: true\n- tapOn:\n    text: "Plus tard"\n    optional: true\n- tapOn:\n    text: "Close invitation"\n    optional: true\n- tapOn:\n    text: "Later"\n    optional: true\n`,device.kind+'-dismiss',true);await wait(3000);
@@ -133,10 +150,31 @@ print(json.dumps({k:p[k] for k in ['CFBundleIdentifier','CFBundleShortVersionStr
  writeFileSync(path.join(output,'manifest.json'),JSON.stringify(manifest,null,2));
  stage('encrypt native capture archive');run('tar',['-czf',path.join(work,'captures.tar.gz'),'-C',output,'.']);writeFileSync(path.join(deliverables,'captures.tar.gz.enc'),encrypt(readFileSync(path.join(work,'captures.tar.gz')),key));
  // The encrypted simulator binary was preserved immediately after compilation.
- console.log(buildOnly?'Native simulator build encrypted and preserved for separate capture jobs.':'Genuine native screenshots encrypted; human review is required before App Store upload.');
+ console.log(touchTraceDiagnostic||reducedMotionDiagnostic?'Diagnostic comparison only; do not use as release acceptance evidence.':buildOnly?'Native simulator build encrypted and preserved for separate capture jobs.':'Genuine native screenshots encrypted; human review is required before App Store upload.');
 } catch { console.error('Native screenshots failed during: '+phase+'. Diagnostics encrypted.'); for(const device of devices){try{run('xcrun',['simctl','io',device.udid,'screenshot',path.join(output,device.kind+'-00-failure.png')],{allowFailure:true,timeoutMs:30000});}catch{}} process.exitCode=1; }
 finally {
- try{if(log!==undefined)closeSync(log);if(key&&existsSync(path.join(work,'capture.log'))){const entries=['capture.log'];if(existsSync(path.join(work,'maestro-output')))entries.push('maestro-output');if(existsSync(output))entries.push('captures');if(existsSync(xctestWork))for(const name of readdirSync(xctestWork))if(name.endsWith('.log'))entries.push('native-ui-driver/'+name);const archive=path.join(work,'diagnostics.tar.gz');const r=spawnSync('tar',['-czf',archive,'-C',work,...entries],{stdio:'ignore'});if(r.status===0)writeFileSync(path.join(deliverables,'diagnostics.tar.gz.enc'),encrypt(readFileSync(archive),key));}}catch{console.error('Encrypted diagnostics unavailable');}
+ // Collect narrow trace evidence before debugger attachment can stall a device.
+ if(touchTraceDiagnostic)for(const device of devices)try {
+  const traces=run('xcrun',['simctl','spawn',device.udid,'log','show','--info','--style','compact','--last','35m','--predicate','eventMessage CONTAINS "FN_DIAG_"'],{capture:true,allowFailure:true,timeoutMs:90000});
+  writeFileSync(path.join(work,device.kind+'-touch-trace.log'),traces,{mode:0o600});
+ }catch{}
+ for(const device of devices)if(process.exitCode && /authenticate|controls|capture fr|capture en/.test(phase))try {
+  const processes=run('xcrun',['simctl','spawn',device.udid,'launchctl','list'],{capture:true,allowFailure:true,timeoutMs:15000});
+  const appProcess=processes.split('\n').find(line=>/^\d+\s/.test(line)&&line.includes('UIKitApplication:com.footnation.app['));
+  const pid=appProcess?.trim().split(/\s+/)[0];
+  if(pid&&/^\d+$/.test(pid)) {
+   // Inspect the actual UIKit hit target and ancestor recognizers on failure.
+   // No route, authentication state, gesture state or view is modified.
+   const hitProbe = `({ UIWindow *w = [(UIWindowScene *)[[UIApplication sharedApplication].connectedScenes anyObject] windows].firstObject; NSMutableArray *pending = [NSMutableArray arrayWithObject:w]; NSMutableString *report = [NSMutableString string]; while (pending.count) { UIView *v = pending.lastObject; [pending removeLastObject]; [pending addObjectsFromArray:v.subviews]; if (([v.accessibilityLabel isEqualToString:@"Se connecter"] || [v.accessibilityLabel isEqualToString:@"Changer la langue"] || [v.accessibilityLabel isEqualToString:@"Accueil"]) && !v.hidden && v.alpha > 0) { CGRect f = [v convertRect:v.bounds toView:w]; CGPoint p = CGPointMake(CGRectGetMidX(f), CGRectGetMidY(f)); [report appendFormat:@"CONTROL %@ WINDOW_FRAME %@ HIT %@\\n", v, NSStringFromCGRect(f), [w hitTest:p withEvent:nil]]; for (UIWindow *candidate in [(UIWindowScene *)[[UIApplication sharedApplication].connectedScenes anyObject] windows]) { CGPoint q = [candidate convertPoint:p fromWindow:w]; [report appendFormat:@"WINDOW %@ KEY %d LEVEL %f HIDDEN %d ALPHA %f HIT %@\\n", candidate, candidate.isKeyWindow, candidate.windowLevel, candidate.hidden, candidate.alpha, [candidate hitTest:q withEvent:nil]]; } for (UIView *a = v; a; a = a.superview) { [report appendFormat:@"ANCESTOR %@ ENABLED %d RECOGNIZERS %@\\n", a, a.userInteractionEnabled, a.gestureRecognizers]; } } } report; })`;
+   const debug=spawnSync('xcrun',['lldb','--batch','-p',pid,'-o','thread select 1','-o','thread backtrace all','-o','expression -l objc++ -- @import UIKit','-o','expression -l objc++ -O -- '+hitProbe,'-o','expression -l objc++ -O -- [[(UIWindowScene *)[[UIApplication sharedApplication].connectedScenes anyObject] windows] valueForKey:@"recursiveDescription"]','-o','process detach'],{cwd:source,env,encoding:'utf8',timeout:120000,killSignal:'SIGKILL',maxBuffer:8*1024*1024});
+   writeFileSync(path.join(work,device.kind+'-views.log'),((debug.stdout||'')+'\n'+(debug.stderr||'')+'\nDebugger status: '+debug.status+' '+(debug.error?.code||'')).slice(-8*1024*1024),{mode:0o600});
+  }
+ }catch{}
+ for(const device of devices)try {
+  const nativeLogs=run('xcrun',['simctl','spawn',device.udid,'log','show','--info','--style','compact','--last','25m','--predicate','process == "FootNation" OR eventMessage CONTAINS[c] "RCTFabricModal" OR eventMessage CONTAINS[c] "already presenting"'],{capture:true,allowFailure:true,timeoutMs:30000});
+  writeFileSync(path.join(work,device.kind+'-native.log'),nativeLogs.slice(-12*1024*1024),{mode:0o600});
+ }catch{}
+ try{if(log!==undefined)closeSync(log);if(key&&existsSync(path.join(work,'capture.log'))){const entries=readdirSync(work).filter(name=>name.endsWith('.log'));if(existsSync(path.join(work,'maestro-output')))entries.push('maestro-output');if(existsSync(output))entries.push('captures');if(existsSync(xctestWork))for(const name of readdirSync(xctestWork))if(name.endsWith('.log'))entries.push('native-ui-driver/'+name);const archive=path.join(work,'diagnostics.tar.gz');const r=spawnSync('tar',['-czf',archive,'-C',work,...entries],{stdio:'ignore'});if(r.status===0)writeFileSync(path.join(deliverables,'diagnostics.tar.gz.enc'),encrypt(readFileSync(archive),key));}}catch{console.error('Encrypted diagnostics unavailable');}
  for(const device of devices)spawnSync('xcrun',['simctl','delete',device.udid],{stdio:'ignore'});
  if(created&&process.env.RUNNER_TEMP&&work.startsWith(process.env.RUNNER_TEMP+path.sep))rmSync(work,{recursive:true,force:true});key?.fill(0);
 }

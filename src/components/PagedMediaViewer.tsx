@@ -1,5 +1,6 @@
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, { useCallback, useRef, useState } from "react";
-import { FlatList, Modal, Text, View } from "react-native";
+import { FlatList, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 

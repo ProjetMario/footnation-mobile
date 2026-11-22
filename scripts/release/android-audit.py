@@ -248,6 +248,27 @@ try:
  adb('shell','input','swipe','432','1500','432','450','400');video_progress()
  route('search');route('shorts');video_progress()
  checks.append('video-autoplay-pause-resume-scroll-and-return')
+ stage='profile-short-grid'
+ route('my-profile')
+ profile_shorts=None
+ for _ in range(16):
+  candidates=[]
+  for node in tree().iter('node'):
+   if node.get('content-desc')!='Shorts' or not visible(node):continue
+   bounds=list(map(int,re.findall(r'-?\d+',node.get('bounds',''))))
+   if len(bounds)==4 and bounds[3] < display_height-250:candidates.append(node)
+  if candidates:
+   profile_shorts=max(candidates,key=lambda node:list(map(int,re.findall(r'-?\d+',node.get('bounds',''))))[1])
+   break
+  adb('shell','input','swipe','540','1450','540','650','450');time.sleep(1)
+ if profile_shorts is None:raise RuntimeError('Profile Shorts tab unavailable')
+ tap(profile_shorts)
+ tile=wait_for(lambda n:n.get('content-desc','').startswith('Ouvrir le Short') and visible(n),45)
+ tap(tile)
+ wait_for(lambda n:n.get('content-desc')=='Retour' and visible(n),20)
+ video_progress()
+ tap(control('Retour'))
+ checks.append('profile-short-thumbnail-opens-and-plays')
  stage='tablet-captures'
  # Capture actual responsive Android renders, never resize phone PNGs.
  # Smallest widths of 720dp and 1067dp exercise tablet layouts on this emulator.

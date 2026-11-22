@@ -542,3 +542,21 @@ it("serves a local portrait presentation short with its author and byte ranges f
     .eq("short_id", short.id);
   expect(comments.data?.[0].author.full_name).toBe("Recette player");
 });
+
+it("supports baseline signup admission and call polling without enabling publication writes", async () => {
+  const signup = await client.rpc("get_signup_status");
+  expect(signup.error).toBeNull();
+  expect(signup.data).toMatchObject({ required: false, username: "player" });
+  const calls = await client
+    .from("call_sessions")
+    .select("*")
+    .eq("callee_id", actor)
+    .eq("status", "ringing")
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1);
+  expect(calls.error).toBeNull();
+  expect(calls.data).toEqual([]);
+  expect((await client.rpc("create_call", {})).status).toBe(501);
+  expect((await client.rpc("complete_signup", {})).status).toBe(501);
+});

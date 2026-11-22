@@ -1,0 +1,11 @@
+# Mise en production de l'espace club — 4 novembre 2026
+
+La base Supabase de production a reçu la migration groupée `20261104212403_club_isolated_release_20261104`, composée de 17 migrations locales de l'espace club. Son contenu consolidé a pour SHA-256 `dedd7a93323f0538c8a6f8800fd58db93fe7659ddbbc2955b43636b84bc6ec20`. Les migrations individuelles restent dans `supabase/migrations` pour la maintenance, mais leur historique distant est représenté par cette migration groupée : ne pas les rejouer sans réconciliation préalable de l'historique et inspection du schéma.
+
+Le déploiement Netlify `6aeba27f45cdbdb3f0e5bec7` publie les écrans web club isolés en conservant le manifeste du site et le bundle Edge précédents. Les empreintes des 70 167 fichiers publiés ont été comparées au manifeste préparé, sans écart. Les artefacts de cette publication sont conservés localement dans `.cache/club-isolated-production-20261104` ; les scripts de greffe dépendent de fichiers de travail et ne constituent pas à eux seuls une chaîne de build autonome.
+
+Le site est toujours relié à une branche Git de production. Un futur déploiement automatique depuis cette branche peut remplacer la publication manuelle. Avant une autre publication, intégrer et vérifier les changements club dans une source de référence appropriée, y compris les changements compilés dans la greffe.
+
+Les essais ont couvert le lot SQL en transaction sur des copies jetables du schéma réel, notamment les droits par équipe, affectations multiples, retrait et réapprobation d'un coach, invitations, pointages et notifications enregistrées en base. Des essais navigateur sur données fictives ont couvert les parcours club et les retours après connexion ; la page d'accueil, la fiche club et un lien de connexion ont été contrôlés en recette et l'accueil et la fiche club en production. Les branches et données de test ont été supprimées.
+
+Limites : aucune nouvelle version Android ou iOS n'a été distribuée. Les parcours authentifiés réels complets, la livraison effective des notifications push et e-mail et les essais sur téléphone physique n'ont pas été validés. La publication doit donc être vérifiée avec les comptes et appareils du club. Les premières affectations et validations des coachs restent à effectuer par les administrateurs.

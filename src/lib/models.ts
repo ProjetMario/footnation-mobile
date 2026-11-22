@@ -1,3 +1,5 @@
+import type { OptimizedVideoFields } from "./videoSource";
+
 export interface Profile {
   account_type?: string | null;
   is_verified?: boolean | null;
@@ -39,6 +41,7 @@ export interface Profile {
   club?: string | null;
   primary_role?: string | null;
   position?: string | null;
+  jersey_number?: number | null;
   height?: string | null;
   weight?: string | null;
   birthdate?: string | null;
@@ -61,11 +64,13 @@ export interface Profile {
   characteristics?: string | null;
   highest_level?: string | null;
   skills?: string[] | null;
+  is_private?: boolean | null;
   is_admin?: boolean;
   is_suspended?: boolean;
   suspended_until?: string | null;
 }
-export interface Post {
+export interface Post extends OptimizedVideoFields {
+  feedRecommendation?: string;
   id: string;
   user_id: string;
   content: string;
@@ -86,6 +91,7 @@ export interface Club {
   city?: string;
   department_code?: string;
   department_name?: string | null;
+  metadata?: Record<string, unknown> | null;
   logo_url?: string;
   type?: "club" | "five_center" | string | null;
   latitude?: number;

@@ -15,6 +15,7 @@ function query(data: unknown[], error: unknown = null) {
     ilike: vi.fn(),
     order: vi.fn(),
     range: vi.fn(),
+    abortSignal: vi.fn(),
     then: result.then.bind(result),
   };
   for (const method of [
@@ -27,6 +28,7 @@ function query(data: unknown[], error: unknown = null) {
     q.ilike,
     q.order,
     q.range,
+    q.abortSignal,
   ])
     method.mockReturnValue(q);
   return q;
@@ -182,4 +184,27 @@ it("keeps club logos when browsing the directory", async () => {
   );
   const result = await searchFootNation("me", "", "clubs", 0, undefined, true);
   expect(result.rows[0].image).toBe("logo.png");
+});
+
+it("reuses verified block visibility across searches and cancels obsolete requests", async () => {
+  const profiles = query([]);
+  client.from.mockReturnValue(profiles);
+  const signal = new AbortController().signal;
+  await searchFootNation("me", "Alex", "profiles", 0, undefined, false, [], {
+    blockedAuthors: ["hidden"],
+    signal,
+  });
+  expect(client.from).toHaveBeenCalledTimes(1);
+  expect(client.from).toHaveBeenCalledWith("profiles");
+  expect(profiles.not).toHaveBeenCalledWith("id", "in", "(hidden)");
+  expect(profiles.abortSignal).toHaveBeenCalledWith(signal);
+});
+
+it("fails closed when block visibility cannot be loaded", async () => {
+  client.from.mockReturnValue(query([], new Error("visibility unavailable")));
+  await expect(searchFootNation("me", "Alex", "all", 0)).rejects.toThrow(
+    "visibility unavailable",
+  );
+  expect(client.from).toHaveBeenCalledTimes(1);
+  expect(client.from).toHaveBeenCalledWith("user_blocks");
 });

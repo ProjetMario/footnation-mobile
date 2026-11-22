@@ -1,3 +1,4 @@
+import { ApplicationFollowup } from "../components/ApplicationFollowup";
 import React, { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
@@ -21,6 +22,8 @@ import {
   Screen,
   useUIStyles,
 } from "../components/ui";
+import { CompactForm, FormDetails } from "../components/CompactForm";
+import { ChoiceField } from "../components/ChoiceField";
 import { DateField } from "../components/DateField";
 import {
   opportunityListingKind,
@@ -103,7 +106,11 @@ export function Application({ offer }: { offer: Offer }) {
       if (error) throw error;
     },
     onSuccess: () =>
-      cache.invalidateQueries({ queryKey: ["application", offer.id, uid] }),
+      Promise.all([
+        cache.invalidateQueries({ queryKey: ["application", offer.id, uid] }),
+        cache.invalidateQueries({ queryKey: ["profile-applications"] }),
+        cache.invalidateQueries({ queryKey: ["applications", offer.id] }),
+      ]),
   });
   const deactivate = useMutation({
     mutationFn: async () => {
@@ -118,6 +125,7 @@ export function Application({ offer }: { offer: Offer }) {
     onSuccess: () =>
       Promise.all([
         cache.invalidateQueries({ queryKey: ["opportunities"] }),
+        cache.invalidateQueries({ queryKey: ["my-opportunity-requests"] }),
         cache.invalidateQueries({ queryKey: ["opportunity", offer.id] }),
       ]),
   });
@@ -152,7 +160,14 @@ export function Application({ offer }: { offer: Offer }) {
       ) : mine.isError ? (
         <ErrorState error={mine.error} />
       ) : mine.data ? (
-        <Text style={s.text}>Votre candidature a été transmise.</Text>
+        <>
+          <Text style={s.text}>Votre candidature a été transmise.</Text>
+          <Button
+            title="Retrouver mes candidatures"
+            secondary
+            onPress={() => router.push("/my-applications")}
+          />
+        </>
       ) : !offer.is_active ||
         (offer.expires_at && Date.parse(offer.expires_at) < Date.now()) ? (
         <Text style={s.text}>
@@ -288,6 +303,7 @@ export function OpportunityEditor() {
       return r.data.id as string;
     },
     onSuccess: (targetId) => {
+      void cache.invalidateQueries({ queryKey: ["my-opportunity-requests"] });
       void cache.invalidateQueries({ queryKey: ["opportunities"] });
       void cache.invalidateQueries({ queryKey: ["opportunity"] });
       router.replace(`/opportunity/${targetId}`);
@@ -301,138 +317,141 @@ export function OpportunityEditor() {
         ) : id && existing.isError ? (
           <ErrorState error={existing.error} />
         ) : (
-          <>
+          <CompactForm>
+            <View style={{ gap: 8 }}>
+              <View style={[s.row, { flexWrap: "wrap" }]}>
+                <Chip
+                  label="Offre"
+                  selected={listingKind === "offer"}
+                  onPress={() => setListingKind("offer")}
+                />
+                <Chip
+                  label="Demande"
+                  selected={listingKind === "request"}
+                  onPress={() => setListingKind("request")}
+                />
+              </View>
+              <Text style={s.small}>
+                {listingKind === "offer"
+                  ? "Je propose une place ou une mission."
+                  : "Je recherche un club ou une mission."}
+              </Text>
+            </View>
             <Field
               label="Titre"
               value={title}
               onChangeText={setTitle}
               maxLength={150}
+              placeholder={
+                listingKind === "offer"
+                  ? "Ex. Recherche gardien pour la saison"
+                  : "Ex. Joueur amateur cherche un club"
+              }
             />
             <Field
-              label="Description"
+              label="Description (facultative)"
               value={description}
               onChangeText={setDescription}
               multiline
               maxLength={10000}
+              placeholder="L’essentiel de votre annonce…"
+              style={{ minHeight: 88 }}
             />
-            <Text style={s.label}>Que veux-tu publier ?</Text>
-            <View style={[s.row, { flexWrap: "wrap" }]}>
-              <Chip
-                label="Une offre"
-                selected={listingKind === "offer"}
-                onPress={() => setListingKind("offer")}
-              />
-              <Chip
-                label="Une demande"
-                selected={listingKind === "request"}
-                onPress={() => setListingKind("request")}
-              />
-            </View>
-            <Text style={s.small}>
-              {listingKind === "offer"
-                ? "Tu proposes une place, un poste ou une mission."
-                : "Tu recherches un club, un poste ou une mission pour toi."}
-            </Text>
-            <Text style={s.label}>Type d’annonce</Text>
-            <View style={[s.row, { flexWrap: "wrap" }]}>
-              {creationTypes.map(([v, label]) => (
-                <Chip
-                  key={v}
-                  label={
-                    listingKind === "request" && v === "recherche_joueur"
-                      ? "Club pour jouer"
-                      : listingKind === "request" && v === "recherche_staff"
-                        ? "Poste dans un staff"
-                        : label
-                  }
-                  selected={type === v}
-                  onPress={() => setType(v)}
-                />
-              ))}
-            </View>
-            <Text style={s.label}>
-              {listingKind === "request" ? "Mon profil" : "Profil recherché"}
-            </Text>
-            <View style={[s.row, { flexWrap: "wrap" }]}>
-              {profiles.map(([v, label]) => (
-                <Chip
-                  key={v}
-                  label={label}
-                  selected={target === v}
-                  onPress={() => setTarget(v)}
-                />
-              ))}
-            </View>
-            <Field
-              label="Club / organisation"
-              value={club}
-              onChangeText={setClub}
-              maxLength={150}
+            <ChoiceField
+              label="Type d’annonce"
+              value={type}
+              onChange={setType}
+              optional={false}
+              options={creationTypes.map(([value, label]) => ({
+                value,
+                label:
+                  listingKind === "request" && value === "recherche_joueur"
+                    ? "Club pour jouer"
+                    : listingKind === "request" && value === "recherche_staff"
+                      ? "Poste dans un staff"
+                      : label,
+              }))}
+            />
+            <ChoiceField
+              label={
+                listingKind === "request" ? "Mon profil" : "Profil recherché"
+              }
+              value={target}
+              onChange={setTarget}
+              optional={false}
+              options={profiles.map(([value, label]) => ({ value, label }))}
             />
             <Field
-              label="Ville"
+              label="Ville (facultative)"
               value={city}
               onChangeText={setCity}
               maxLength={150}
+              placeholder="Ex. Lyon"
             />
-            <Field
-              label="Département"
-              value={department}
-              onChangeText={setDepartment}
-              maxLength={3}
-            />
-            <Text style={s.label}>Lieu de travail</Text>
-            <View style={[s.row, { flexWrap: "wrap" }]}>
-              {[
-                ["sur_site", "Sur site"],
-                ["hybride", "Hybride"],
-                ["a_distance", "À distance"],
-              ].map(([v, label]) => (
-                <Chip
-                  key={v}
-                  label={label}
-                  selected={locationType === v}
-                  onPress={() => setLocationType(v)}
-                />
-              ))}
-            </View>
-            <Text style={s.label}>Contact</Text>
-            <View style={[s.row, { flexWrap: "wrap" }]}>
-              {[
-                ["messagerie", "Messagerie"],
-                ["email", "Email"],
-                ["both", "Les deux"],
-              ].map(([v, label]) => (
-                <Chip
-                  key={v}
-                  label={label}
-                  selected={contact === v}
-                  onPress={() => setContact(v)}
-                />
-              ))}
-            </View>
-            {contact !== "messagerie" && (
+            <FormDetails title="Contact et options" defaultOpen={!!id}>
               <Field
-                label="Email de contact"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
+                label="Club / organisation (facultatif)"
+                value={club}
+                onChangeText={setClub}
+                maxLength={150}
               />
-            )}
-            <DateField
-              label="Expiration (facultative)"
-              value={expiry}
-              onChange={setExpiry}
-            />
+              <Field
+                label="Département (facultatif)"
+                value={department}
+                onChangeText={setDepartment}
+                maxLength={3}
+              />
+              <ChoiceField
+                label="Lieu"
+                value={locationType}
+                onChange={setLocationType}
+                optional={false}
+                options={[
+                  { value: "sur_site", label: "Sur site" },
+                  { value: "hybride", label: "Hybride" },
+                  { value: "a_distance", label: "À distance" },
+                ]}
+              />
+              <ChoiceField
+                label="Contact"
+                value={contact}
+                onChange={setContact}
+                optional={false}
+                options={[
+                  { value: "messagerie", label: "Messagerie" },
+                  { value: "email", label: "Email" },
+                  { value: "both", label: "Les deux" },
+                ]}
+              />
+              {contact !== "messagerie" && (
+                <Field
+                  label="Email de contact"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              )}
+              <DateField
+                label="Expiration (facultative)"
+                value={expiry}
+                onChange={setExpiry}
+              />
+            </FormDetails>
             {!!save.isError && <ErrorState error={save.error} />}
             <Button
-              title={id ? "Enregistrer" : "Publier"}
+              title={
+                id
+                  ? "Enregistrer"
+                  : listingKind === "offer"
+                    ? "Publier l’offre"
+                    : "Publier la demande"
+              }
               disabled={!title.trim()}
               busy={save.isPending}
               onPress={() => save.mutate()}
             />
-          </>
+          </CompactForm>
         )}
       </AuthGate>
     </Screen>
@@ -480,22 +499,7 @@ export function Applications() {
         ) : (
           q.data.pages.flat().map((a) => (
             <View key={a.id} style={s.card}>
-              <Text style={s.text}>
-                {a.message || "Candidature sans message"}
-              </Text>
-              {!!Array.isArray(a.screening_answers) &&
-                a.screening_answers.map(
-                  (answer: { question_id: string; answer: string }) => (
-                    <Text key={answer.question_id} style={s.text}>
-                      {answer.answer}
-                    </Text>
-                  ),
-                )}
-              <Button
-                title="Voir le candidat"
-                secondary
-                onPress={() => router.push(`/profile/${a.applicant_id}`)}
-              />
+              <ApplicationFollowup application={a} owner />
             </View>
           ))
         )}

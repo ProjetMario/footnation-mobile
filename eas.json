@@ -15,8 +15,44 @@
     "production": {
       "autoIncrement": true,
       "environment": "production",
+      "android": {
+        "credentialsSource": "local",
+        "buildType": "app-bundle"
+      },
       "ios": {
         "image": "macos-tahoe-26.5-xcode-26.6"
+      }
+    },
+    "direct-install": {
+      "extends": "production",
+      "distribution": "internal",
+      "autoIncrement": true,
+      "environment": "production",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "jersey-release": {
+      "extends": "direct-install",
+      "env": {
+        "EXPO_PUBLIC_SUPPORTERS_ENABLED": "false"
+      }
+    },
+    "jersey-store": {
+      "extends": "production",
+      "env": {
+        "EXPO_PUBLIC_SUPPORTERS_ENABLED": "false"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6803557829"
+      },
+      "android": {
+        "track": "production",
+        "releaseStatus": "draft"
       }
     }
   },

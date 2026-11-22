@@ -1,4 +1,6 @@
-import { AppState } from "react-native";
+import { readPublicPreviewPosts } from "./publicPostPreview";
+import { AppState, Platform } from "react-native";
+import { readPublicPreviewProfile } from "./publicPreviewData";
 import { clubSearchFilter, type ClubSearchType } from "./clubSearch";
 import { isSuspended } from "./validation";
 import { profileSearchFilter } from "./profileSearch";
@@ -13,6 +15,12 @@ import { useAuth } from "./auth";
 import type { Post, Profile, Club, Opportunity, Message } from "./models";
 import { opportunityKindFilter, type OpportunityKind } from "./opportunityKind";
 import { repostBackendMissing, type RepostFeedEntry } from "./postReposts";
+import { readFeedAccess } from "./feedAccess";
+import { blockedSocialAuthors } from "./socialVisibility";
+import { hiddenPostStore } from "./hiddenPostStorage";
+import { readPersonalizedPosts, socialFeedMigrationMissing, type SocialCursor } from "./personalizedPosts";
+import { optionalRpc } from "./optionalRpc";
+import { readLegacyConversationPage } from "./conversationFallback";
 
 export function useDebounced(value: string) {
   const [v, set] = useState(value);
@@ -32,6 +40,8 @@ export function useProfile(id?: string) {
     enabled: !!id,
     queryFn: async () => {
       requireBackend();
+      if (!uid && Platform.OS === "web")
+        return readPublicPreviewProfile(supabase, id!);
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
@@ -48,25 +58,60 @@ export function usePosts(
   media: "all" | "video" = "all",
 ) {
   const pageSize = 10;
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const uid = session?.user.id;
+  const affinityKey = mode === "all" && !authorId && media === "all"
+    ? JSON.stringify([profile?.club, profile?.department, profile?.position, profile?.favorite_pro_club, profile?.favorite_amateur_club])
+    : null;
   return useInfiniteQuery({
-    queryKey: ["posts", uid, mode, authorId, media, pageSize],
-    initialPageParam: 0,
+    queryKey: ["posts", uid, mode, authorId, media, pageSize, "balanced-v1", affinityKey],
+    initialPageParam: 0 as number | string | SocialCursor,
     staleTime: 60_000,
-    enabled: !!uid,
-    queryFn: async ({ pageParam }) => {
+    enabled: !!uid || Platform.OS === "web",
+    queryFn: async ({ pageParam, signal }) => {
       requireBackend();
-      const feed = await supabase.rpc("get_repost_feed", {
-        p_mode: mode,
-        p_author_id: authorId || null,
-        p_media: media,
-        p_offset: pageParam * pageSize,
-        p_limit: pageSize,
+      if (!uid) {
+        if (Platform.OS !== "web")
+          return { items: [] as Post[], next: undefined };
+        return readPublicPreviewPosts(supabase, {
+          authorId,
+          media,
+          before: typeof pageParam === "string" ? pageParam : undefined,
+          limit: pageSize,
+        });
+      }
+      if (mode === "all" && !authorId && media === "all" && (pageParam === 0 || typeof pageParam === "object")) {
+        const [blocked, hidden] = await Promise.all([blockedSocialAuthors(uid, signal), hiddenPostStore.list(uid)]);
+        try {
+          return await readPersonalizedPosts({ client: supabase, uid, profile, cursor: typeof pageParam === "object" ? pageParam : undefined, blocked, hidden, signal });
+        } catch (error) {
+          // Only a missing migration uses the existing feed while deployment is
+          // pending. Authorization, transport and database errors fail closed.
+          if (!socialFeedMigrationMissing(error)) throw error;
+          if (typeof pageParam === "object") throw error;
+        }
+      }
+      const offset = typeof pageParam === "number" ? pageParam : 0;
+      const resultPage = (items: Post[]) => ({
+        items,
+        next: items.length === pageSize ? offset + 1 : undefined,
       });
-      if (!feed.error) {
+      const { blocked: blockedIds, feed } = await readFeedAccess(
+        uid,
+        supabase
+          .rpc("get_repost_feed", {
+            p_mode: mode,
+            p_author_id: authorId || null,
+            p_media: media,
+            p_offset: offset * pageSize,
+            p_limit: pageSize,
+          })
+          .abortSignal(signal),
+        signal,
+      );
+      if (!feed.error && mode === "network") {
         const entries = feed.data as RepostFeedEntry[];
-        if (!entries.length) return [] as Post[];
+        if (!entries.length) return resultPage([]);
         const posts = await supabase
           .from("posts")
           .select(
@@ -75,40 +120,35 @@ export function usePosts(
           .in(
             "id",
             entries.map((entry) => entry.post_id),
-          );
+          )
+          .abortSignal(signal);
         if (posts.error) throw posts.error;
         const byId = new Map(
           (posts.data as Post[]).map((post) => [post.id, post]),
         );
-        return entries.flatMap((entry) => {
-          const post = byId.get(entry.post_id);
-          if (!post) return [];
-          return [
-            {
-              ...post,
-              repost:
-                entry.reposted_by && entry.reposted_at
-                  ? {
-                      userId: entry.reposted_by,
-                      name: entry.reposted_name || "Membre FootNation",
-                      createdAt: entry.reposted_at,
-                    }
-                  : undefined,
-            },
-          ];
-        });
+        return resultPage(
+          entries.flatMap((entry) => {
+            const post = byId.get(entry.post_id);
+            if (!post || blockedIds.includes(post.user_id)) return [];
+            return [
+              {
+                ...post,
+                repost:
+                  entry.reposted_by && entry.reposted_at
+                    ? {
+                        userId: entry.reposted_by,
+                        name: entry.reposted_name || "Membre FootNation",
+                        createdAt: entry.reposted_at,
+                      }
+                    : undefined,
+              },
+            ];
+          }),
+        );
       }
       // Keep the current feed usable while the additive migration is being activated.
       // A network/permission error must not silently bypass the new feed's checks.
-      if (!repostBackendMissing(feed.error)) throw feed.error;
-      const blocked = await supabase
-        .from("user_blocks")
-        .select("blocker_id,blocked_id")
-        .or(`blocker_id.eq.${uid},blocked_id.eq.${uid}`);
-      if (blocked.error) throw blocked.error;
-      const blockedIds = (blocked.data || []).map((b) =>
-        b.blocker_id === uid ? b.blocked_id : b.blocker_id,
-      );
+      if (feed.error && !repostBackendMissing(feed.error)) throw feed.error;
       let query = supabase
         .from("posts")
         .select(
@@ -116,7 +156,8 @@ export function usePosts(
         )
         .order("created_at", { ascending: false })
         .order("id")
-        .range(pageParam * pageSize, pageParam * pageSize + pageSize - 1);
+        .range(offset * pageSize, offset * pageSize + pageSize - 1)
+        .abortSignal(signal);
       if (authorId) query = query.eq("user_id", authorId);
       if (media === "video")
         query = query.not("video_url", "is", null).neq("video_url", "");
@@ -138,10 +179,13 @@ export function usePosts(
         query = query.not("user_id", "in", `(${blockedIds.join(",")})`);
       const { data, error } = await query;
       if (error) throw error;
-      return data as Post[];
+      return resultPage(data as Post[]);
     },
-    getNextPageParam: (last, _pages, lastParam) =>
-      last.length === pageSize ? lastParam + 1 : undefined,
+    getNextPageParam: (last) => last.next,
+    select: (data) => ({
+      ...data,
+      pages: data.pages.map((page) => page.items),
+    }),
   });
 }
 export function useClubs(
@@ -159,7 +203,7 @@ export function useClubs(
       let q = supabase
         .from("fff_clubs")
         .select(
-          "id,name,short_name,city,department_code,department_name,logo_url,type",
+          "id,name,short_name,city,department_code,department_name,metadata,logo_url,type",
           { count: "exact" },
         )
         .order("name")
@@ -359,29 +403,37 @@ export function useConversations(search = "", unreadOnly = false) {
     initialPageParam: 0,
     refetchInterval: 15000,
     queryFn: async ({ pageParam }) => {
-      let { data, error } = await supabase.rpc(
-        "get_native_conversations_filtered",
-        {
-          search_term: term,
-          page_offset: pageParam,
-          unread_only: unreadOnly,
-        },
-      );
+      let data, error;
+      try {
+        data = await optionalRpc("get_native_conversations_filtered", async () => {
+          const result = await supabase.rpc("get_native_conversations_filtered", {
+            search_term: term,
+            page_offset: pageParam,
+            unread_only: unreadOnly,
+          });
+          if (result.error) throw result.error;
+          return result.data;
+        });
+      } catch (failure) {
+        error = failure as { code: string; message: string };
+      }
       if (error && ["PGRST202", "42883"].includes(error.code)) {
-        if (unreadOnly)
-          throw new Error(
-            "Le filtre Non lues n’est pas encore disponible. Choisissez Tous pour retrouver vos messages.",
-          );
-        ({ data, error } = await supabase.rpc("get_native_conversations", {
-          search_term: term,
-          page_offset: pageParam,
-        }));
+        return readLegacyConversationPage<Message & { unread_count: number }>(
+          (offset) => supabase.rpc("get_native_conversations", {
+            search_term: term,
+            page_offset: offset,
+          }),
+          pageParam,
+          unreadOnly,
+        );
       }
       if (error) throw error;
-      return (data || []) as (Message & { unread_count: number })[];
+      if (!Array.isArray(data)) throw new Error("Impossible de charger les conversations.");
+      const items = data as (Message & { unread_count: number })[];
+      return { items, next: items.length === 30 ? pageParam + 30 : undefined };
     },
-    getNextPageParam: (last, pages) =>
-      last.length === 30 ? pages.length * 30 : undefined,
+    getNextPageParam: (last) => last.next,
+    select: (data) => ({ ...data, pages: data.pages.map((page) => page.items) }),
   });
 }
 export function useThread(peer: string) {

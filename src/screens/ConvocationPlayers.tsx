@@ -30,19 +30,20 @@ type Action =
   | { kind: "remove"; row: Record<string, any> }
   | { kind: "team"; teamId: string | null; expected: string | null };
 export default function ConvocationPlayers() {
-  const { id, convocation } = useLocalSearchParams<{
+  const { id, convocation, attendance } = useLocalSearchParams<{
     id: string;
     convocation: string;
+    attendance?: string;
   }>();
   const uid = useAuth().session?.user.id;
   return (
     <Screen title="Joueurs convoqués">
       <ClubAdminGate id={id}>
-        <Players
+        {attendance === "1" ? <ConvocationAttendance id={id} convocation={convocation} /> : <Players
           key={`${uid}:${id}:${convocation}`}
           id={id}
           convocation={convocation}
-        />
+        />}
       </ClubAdminGate>
     </Screen>
   );
@@ -396,4 +397,106 @@ function Players({ id, convocation }: { id: string; convocation: string }) {
       )}
     </>
   );
+}
+
+type AttendanceRow = {
+  convocation_player_id: string;
+  player_name: string;
+  response: string;
+  attendance: string | null;
+  updated_at: string | null;
+};
+function ConvocationAttendance({ id, convocation }: { id: string; convocation: string }) {
+  const styles = useUIStyles();
+  const uid = useAuth().session!.user.id;
+  const [search, setSearch] = useState("");
+  const term = useDebounced(search);
+  const cache = useQueryClient();
+  const key = ["convocation-attendance", id, convocation, uid];
+  const rows = useQuery({
+    queryKey: key,
+    queryFn: async () => {
+      const result = await supabase.rpc("get_native_convocation_attendance", { p_club_id: id, p_convocation_id: convocation });
+      if (result.error) throw result.error;
+      return result.data as AttendanceRow[];
+    },
+  });
+  const save = useMutation({
+    mutationFn: async ({ row, status }: { row: AttendanceRow; status: "present" | "absent" }) => {
+      const result = await supabase.rpc("set_native_convocation_attendance", {
+        p_club_id: id, p_convocation_player_id: row.convocation_player_id,
+        p_status: status, p_expected_updated_at: row.updated_at,
+      });
+      if (result.error) throw result.error;
+    },
+    onSettled: () => {
+      void cache.invalidateQueries({ queryKey: key });
+      void cache.invalidateQueries({ queryKey: ["coach-session-attendance", id] });
+      void cache.invalidateQueries({ queryKey: ["club-attendance-records", id] });
+      void cache.invalidateQueries({ queryKey: ["club-attendance-summary", id] });
+    },
+  });
+  const candidates = useInfiniteQuery({
+    queryKey: ["coach-convocation-candidates", id, convocation, uid, term],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const result = await supabase.rpc("get_native_coach_convocation_candidates", {
+        p_club_id: id, p_convocation_id: convocation, p_search: term, p_offset: pageParam,
+      });
+      if (result.error) throw result.error;
+      return result.data as Candidate[];
+    },
+    getNextPageParam: (last, pages) => last.length === 30 ? pages.length * 30 : undefined,
+  });
+  const invite = useMutation({
+    mutationFn: async (player: Candidate) => {
+      const result = await supabase.rpc("add_native_coach_convocation_player", {
+        p_club_id: id, p_convocation_id: convocation, p_player_id: player.id, p_id: randomUUID(),
+      });
+      if (result.error) throw result.error;
+    },
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: key });
+      void cache.invalidateQueries({ queryKey: ["coach-convocation-candidates", id, convocation] });
+    },
+  });
+  const remind = useMutation({
+    mutationFn: async () => {
+      const result = await supabase.rpc("remind_native_convocation_members", { p_club_id: id, p_convocation_id: convocation });
+      if (result.error) throw result.error;
+      return result.data as number;
+    },
+  });
+  return <>
+    <Text style={styles.h2}>Présences effectives</Text>
+    <Text style={styles.text}>Le pointage est distinct de la réponse du joueur.</Text>
+    <Button title="Relancer les membres sans réponse" secondary busy={remind.isPending} onPress={() => remind.mutate()} />
+    <Text style={styles.small}>Une relance par membre au maximum toutes les 24 heures.</Text>
+    {remind.isSuccess && <Text style={styles.text}>{remind.data} notification(s) créée(s).</Text>}
+    {!!remind.error && <ErrorState error={remind.error} />}
+    {!!rows.isPending && <Loading />}
+    {!!rows.error && <ErrorState error={rows.error} retry={() => void rows.refetch()} />}
+    {!!save.error && <ErrorState error={save.error} />}
+    {rows.data?.map((row) => <View key={row.convocation_player_id} style={styles.card}>
+      <Text style={styles.h2}>{row.player_name}</Text>
+      <Text style={styles.text}>Réponse : {({ accepted: "Disponible", declined: "Indisponible", pending: "En attente" } as Record<string, string>)[row.response] || row.response}</Text>
+      <Text style={styles.text}>Pointage : {({ present: "Présent", absent: "Absent", late: "En retard", excused: "Excusé", injured: "Blessé" } as Record<string, string>)[row.attendance || ""] || "Non renseigné"}</Text>
+      <View style={styles.row}>
+        <Button title="Présent" secondary={row.attendance !== "present"} disabled={save.isPending || rows.isFetching} onPress={() => save.mutate({ row, status: "present" })} />
+        <Button title="Absent" secondary={row.attendance !== "absent"} disabled={save.isPending || rows.isFetching} onPress={() => save.mutate({ row, status: "absent" })} />
+      </View>
+    </View>)}
+    {!!rows.data && !rows.data.length && <Empty title="Aucun joueur admissible dans cette convocation" />}
+    <Text style={styles.h2}>Convoquer des membres</Text>
+    <SearchField value={search} onChangeText={(value) => setSearch(value.slice(0, 100))} placeholder="Rechercher un joueur" />
+    {!!candidates.isPending && <Loading />}
+    {!!candidates.error && <ErrorState error={candidates.error} retry={() => void candidates.refetch()} />}
+    {!!invite.error && <ErrorState error={invite.error} />}
+    {candidates.data?.pages.flat().map((player) => <View style={styles.card} key={player.id}>
+      <Text style={styles.text}>{player.name}</Text>
+      <Button title="Convoquer" disabled={invite.isPending} onPress={() => invite.mutate(player)} />
+    </View>)}
+    {!!candidates.data && !candidates.data.pages.flat().length && <Empty title="Aucun membre à convoquer" />}
+    {!!candidates.hasNextPage && <Button title="Charger la suite" busy={candidates.isFetchingNextPage} onPress={() => void candidates.fetchNextPage()} />}
+  </>;
 }

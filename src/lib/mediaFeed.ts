@@ -1,3 +1,13 @@
+// Adjacent full-screen cards must overlap in eligibility. Thresholds above
+// 50% leave both paused in the middle of a swipe; a minimum view time creates
+// the same gap after the outgoing card is removed. Keep the current eligible
+// card in visibleMediaId so the overlap does not cause rapid player switches.
+export const FEED_MEDIA_VISIBLE_PERCENT = 45;
+export const feedMediaViewability = {
+  viewAreaCoveragePercentThreshold: FEED_MEDIA_VISIBLE_PERCENT,
+  minimumViewTime: 0,
+};
+
 /** Keep list keys stable when offset pages overlap after a new publication. */
 export function uniqueFeedItems<T extends { id: string }>(
   pages: readonly (readonly T[])[] = [],

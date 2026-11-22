@@ -1,5 +1,6 @@
 import XCTest
 import UIKit
+import Vision
 
 // This runner controls the already installed Release app. It has no application
 // source dependency, authentication shortcut, or synthetic content.
@@ -7,63 +8,100 @@ import UIKit
 final class FootNationCaptureTests: XCTestCase {
     private let app = XCUIApplication(bundleIdentifier: "com.footnation.app")
     private let profileName = "Démo FootNation"
+    // A system Passwords sheet can appear well after authentication, including
+    // after this runner has reattached. Keep watching until it is observed.
+    private var passwordPromptMayBePending = true
+    private var passwordPromptReceipt: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("FootNationPasswordPromptDeclined")
+    }
 
     override func setUpWithError() throws {
         continueAfterFailure = false
         executionTimeAllowance = 420
-
+        // The login and audit run in separate XCTest processes on the same
+        // disposable device. Preserve only a verified system-sheet dismissal.
+        passwordPromptMayBePending = !FileManager.default.fileExists(atPath: passwordPromptReceipt.path)
+        // The iOS 26 Passwords sheet is hosted by a separate system process.
+        // Let XCTest resolve the actual interrupting element before inspecting
+        // the application tree, which can otherwise time out on that process.
+        addUIInterruptionMonitor(withDescription: "Decline saving the review password") { alert in
+            let title = NSPredicate(format: "label CONTAINS[c] 'Save Password' OR label CONTAINS[c] 'mot de passe'")
+            guard title.evaluate(with: alert) || alert.staticTexts.matching(title).firstMatch.exists else { return false }
+            for label in ["Not Now", "Pas maintenant", "Plus tard"] {
+                let decline = alert.buttons[label].firstMatch
+                if decline.exists { decline.tap(); return true }
+            }
+            return false
+        }
     }
 
     private func wait(_ seconds: TimeInterval) {
         RunLoop.current.run(until: Date().addingTimeInterval(seconds))
     }
 
-    @discardableResult
-    private func dismissPasswordSavePrompt() -> Bool {
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        for context in [springboard, app] {
-            let alert = context.alerts.firstMatch
-            let passwordTitle = NSPredicate(format: "label CONTAINS[c] 'Save Password' OR label CONTAINS[c] 'mot de passe'")
-            let matches = alert.exists && (passwordTitle.evaluate(with: alert)
-                || alert.staticTexts.matching(passwordTitle).count > 0)
-            let exactTitle = context.staticTexts.matching(NSPredicate(format: "label IN %@", ["Save Password?", "Enregistrer le mot de passe ?", "Enregistrer ce mot de passe ?"])).firstMatch
-            let isObservedSheet = exactTitle.exists && exactTitle.isHittable
-            guard matches || isObservedSheet else { continue }
-            for label in ["Not Now", "Pas maintenant", "Plus tard"] {
-                let button = (matches ? alert.buttons : context.buttons)[label].firstMatch
-                if button.exists && button.isHittable {
-                    // Decline only this observed native password-save prompt.
-                    // Never select Save or any sharing action.
-                    button.tap()
-                    wait(1)
-                    return true
+    private func passwordPromptOnScreen() -> (visible: Bool, decline: CGPoint?) {
+        // iOS 26 can expose the Passwords sheet visually while its remote AX
+        // process no longer answers queries. Recognize only the observed system
+        // prompt and its explicit decline button in the current framebuffer.
+        // This never guesses a coordinate or selects Save.
+        if let image = XCUIScreen.main.screenshot().image.cgImage {
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            request.recognitionLanguages = ["en-US", "fr-FR"]
+            if (try? VNImageRequestHandler(cgImage: image).perform([request])) != nil {
+                let observations = request.results ?? []
+                let normalized: (VNRecognizedTextObservation) -> String = {
+                    ($0.topCandidates(1).first?.string ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
                 }
+                let recognizedPrompt = observations.contains {
+                    ["save password?", "save password ?", "enregistrer le mot de passe ?", "enregistrer ce mot de passe ?"].contains(normalized($0))
+                }
+                let decline = observations.first(where: {
+                    ["not now", "pas maintenant", "plus tard"].contains(normalized($0))
+                })
+                return (recognizedPrompt, recognizedPrompt ? decline.map {
+                    CGPoint(x: $0.boundingBox.midX, y: 1 - $0.boundingBox.midY)
+                } : nil)
             }
         }
+        return (false, nil)
+    }
+
+    @discardableResult
+    private func dismissPasswordSavePrompt() -> Bool {
+        guard passwordPromptMayBePending else { return false }
+        if let decline = passwordPromptOnScreen().decline {
+            app.coordinate(withNormalizedOffset: CGVector(dx: decline.x, dy: decline.y)).tap()
+            wait(1)
+            // Do not disarm if the observed sheet has not actually disappeared.
+            passwordPromptMayBePending = passwordPromptOnScreen().visible
+            if !passwordPromptMayBePending {
+                try? Data("declined".utf8).write(to: passwordPromptReceipt, options: .atomic)
+            }
+            return true
+        }
+        // Do not query the remote Passwords accessibility process after the
+        // framebuffer proved no matching prompt. iOS 26 can leave its AX server
+        // unavailable after dismissal and stall unrelated controls for minutes.
         return false
     }
 
     private func passwordSavePromptVisible() -> Bool {
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let title = NSPredicate(format: "label CONTAINS[c] 'Save Password' OR label CONTAINS[c] 'mot de passe'")
-        for context in [springboard, app] {
-            let alert = context.alerts.firstMatch
-            if alert.exists && (title.evaluate(with: alert) || alert.staticTexts.matching(title).count > 0) { return true }
-            let exactTitle = context.staticTexts.matching(NSPredicate(format: "label IN %@", ["Save Password?", "Enregistrer le mot de passe ?", "Enregistrer ce mot de passe ?"])).firstMatch
-            if exactTitle.exists && exactTitle.isHittable { return true }
-        }
-        return false
+        // The remote Passwords AX process can be unavailable even while the
+        // sheet is plainly visible. Its actual pixels are authoritative here.
+        return passwordPromptOnScreen().visible
     }
 
     private func clearPasswordPromptBeforeNavigation() {
-        let deadline = Date().addingTimeInterval(12)
-        var absentSince: Date? = nil
+        guard passwordPromptMayBePending else { return }
+        let deadline = Date().addingTimeInterval(30)
         repeat {
             dismissPasswordSavePrompt()
-            if passwordSavePromptVisible() { absentSince = nil }
-            else {
-                if absentSince == nil { absentSince = Date() }
-                if Date().timeIntervalSince(absentSince!) >= 0.7 { return }
+            if !passwordSavePromptVisible() {
+                // Absence now does not prove that the delayed system prompt
+                // cannot arrive during the next navigation action.
+                return
             }
             wait(0.3)
         } while Date() < deadline
@@ -73,7 +111,7 @@ final class FootNationCaptureTests: XCTestCase {
     private func open(_ route: String) {
         // All navigation is ordinary UI interaction. No URL opening, host IPC,
         // authentication storage writes, app changes or generated screenshots.
-        let allowed = ["login?next=%2Fsearch", "home", "search", "clubs", "matches", "opportunities", "my-profile", "matching"]
+        let allowed = ["login?next=%2Fsearch", "home", "search", "shorts", "clubs", "matches", "opportunities", "my-profile", "matching"]
         guard allowed.contains(route) else { XCTFail("Unsupported UI capture destination"); return }
 
         app.activate()
@@ -116,21 +154,47 @@ final class FootNationCaptureTests: XCTestCase {
         }
 
         if route == "login?next=%2Fsearch" {
+            // Cover a plain Pressable before a Link/asChild and before any
+            // authentication/onboarding modal. This separates cold-launch
+            // touch failures from post-login transition regressions.
+            // Exercise the first tap after the automatic ticker has started,
+            // independent of how quickly the test harness inspects the screen.
+            wait(20)
+            requireTap("Changer la langue")
+            requireTap("Fermer le choix de langue")
+            print("Native guest language control opened and closed")
             // Normal landing navigation intentionally has no synthetic `next`.
             // The app's normal successful-login destination is Shorts; the
             // subsequent profile proof uses the real bottom tab from there.
             let deadline = Date().addingTimeInterval(35)
+            var loginAttempts = 0
             while Date() < deadline {
                 let email = app.textFields["Adresse e-mail"].firstMatch
                 let password = app.secureTextFields["Mot de passe"].firstMatch
                 if email.exists && password.exists { return }
-                if tap(["Se connecter", "Log in", "Se connecter à FootNation"]) {
+                if let loginLink = control(["Se connecter", "Log in", "Se connecter à FootNation"]) {
+                    if loginAttempts == 0 {
+                        loginLink.tap()
+                    } else if loginAttempts == 1 {
+                        // Compare a normal tap with a brief deliberate press on
+                        // the same observed control. No accessibility action or
+                        // route injection bypasses the app's real touch path.
+                        print("Landing touch diagnostic: frame \(loginLink.frame)")
+                        loginLink.press(forDuration: 0.15)
+                    } else if loginAttempts == 2 {
+                        print("Landing hierarchy before scroll: \(app.debugDescription)")
+                        app.swipeUp()
+                    } else {
+                        loginLink.tap()
+                    }
+                    loginAttempts += 1
                     wait(2)
                     continue
                 }
                 app.swipeUp()
                 wait(1)
             }
+            print("Landing hierarchy after touches: \(app.debugDescription)")
             XCTFail("Native login controls were not reachable from the landing page")
             return
         }
@@ -140,8 +204,8 @@ final class FootNationCaptureTests: XCTestCase {
             XCTAssertTrue(home(), "Home tab was not reachable through the native UI")
             return
         }
-        if route == "my-profile" || route == "search" {
-            let labels = route == "my-profile" ? ["Mon profil", "My profile"] : ["Rechercher", "Search"]
+        if route == "my-profile" || route == "search" || route == "shorts" {
+            let labels = route == "my-profile" ? ["Mon profil", "My profile"] : route == "shorts" ? ["Shorts"] : ["Rechercher", "Search"]
             if tap(labels, bottomOnly: true) { return }
             guard home() else { XCTFail("Could not return to the native tab bar"); return }
             XCTAssertTrue(tap(labels, bottomOnly: true), "Required native bottom tab was unavailable")
@@ -182,10 +246,19 @@ final class FootNationCaptureTests: XCTestCase {
 
 
     private func dismissInvitations() {
-        dismissPasswordSavePrompt()
-        for label in ["Fermer l’invitation", "Plus tard", "Close invitation", "Later"] {
-            let button = app.buttons[label].firstMatch
-            if button.exists && button.isHittable { button.tap(); wait(1) }
+        if dismissPasswordSavePrompt() { return }
+        // A dismissal can immediately replace the screen underneath. Avoid
+        // querying stale modal descendants during that navigation transition.
+        let invitation = app.buttons.matching(NSPredicate(format: "label IN %@", ["Fermer l’invitation", "Close invitation"])).firstMatch
+        if invitation.exists && invitation.isHittable {
+            invitation.tap(); wait(4); return
+        }
+        let welcome = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Bienvenue' OR label BEGINSWITH 'Welcome' OR label BEGINSWITH 'Salut' OR label BEGINSWITH 'Hello' ")).firstMatch
+        if welcome.exists {
+            let close = app.buttons.matching(NSPredicate(format: "label IN %@", ["Fermer", "Close"])).firstMatch
+            if close.exists && close.isHittable { close.tap(); wait(4); return }
+            let later = app.buttons.matching(NSPredicate(format: "label IN %@", ["Plus tard", "Later"])).firstMatch
+            if later.exists && later.isHittable { later.tap(); wait(4); return }
         }
     }
 
@@ -201,6 +274,9 @@ final class FootNationCaptureTests: XCTestCase {
         let deadline = Date().addingTimeInterval(65)
         repeat {
             dismissInvitations()
+            // Closing the first-login presentation intentionally returns home.
+            // Restore the requested destination after that real UI action.
+            if !profileVisible() { open("my-profile") }
             if profileVisible() {
                 wait(1)
                 dismissInvitations()
@@ -298,6 +374,8 @@ final class FootNationCaptureTests: XCTestCase {
     }
 
     func testAuthenticate() throws {
+        try? FileManager.default.removeItem(at: passwordPromptReceipt)
+        passwordPromptMayBePending = true
         let bundle = Bundle(for: FootNationCaptureTests.self)
         guard let url = bundle.url(forResource: "private-demo", withExtension: "json"),
               let object = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
@@ -312,6 +390,7 @@ final class FootNationCaptureTests: XCTestCase {
         let passwordField = app.secureTextFields["Mot de passe"].firstMatch
         paste(email, into: emailField, advanceToPassword: true)
         paste(password, into: passwordField)
+        passwordPromptMayBePending = true
         let submit = app.buttons["Se connecter"].firstMatch
         if submit.exists && submit.isHittable {
             submit.tap()
@@ -320,6 +399,10 @@ final class FootNationCaptureTests: XCTestCase {
             passwordField.typeText("\n")
         }
         wait(10)
+        // Dismiss only a recognized password prompt. A generic centre tap
+        // would pause the first short and invalidate the later autoplay test.
+        dismissPasswordSavePrompt()
+        wait(2)
         requireProfile()
         try saveCapture("authenticated-profile.png")
     }
@@ -336,11 +419,24 @@ final class FootNationCaptureTests: XCTestCase {
         try XCUIScreen.main.screenshot().pngRepresentation.write(to: folder.appendingPathComponent(fileName), options: .atomic)
     }
 
-    private func requireTap(_ label: String, prefix: Bool = false, scroll: Bool = false) {
-        let predicate = NSPredicate(format: prefix ? "label BEGINSWITH %@" : "label == %@", label)
-        for attempt in 0..<8 {
-            let candidates = app.buttons.matching(predicate).allElementsBoundByIndex
-            if let button = candidates.first(where: { $0.exists && $0.isHittable }) {
+    private func requireTap(_ label: String, contains: Bool = false, scroll: Bool = false) {
+        let predicate = NSPredicate(format: contains ? "label CONTAINS %@" : "label == %@", label)
+        let uniqueControls: Set<String> = [
+            "Changer la langue", "Ouvrir mon espace", "Messagerie",
+            "Voir tous les matchs", "Mettre le short en pause", "Reprendre le short"
+        ]
+        for attempt in 0..<(scroll ? 22 : 8) {
+            dismissPasswordSavePrompt()
+            // Stop at the unique control rather than enumerating every button
+            // in the animated home feed. All taps and result assertions remain
+            // native; no animation or application behavior is disabled.
+            let query = app.buttons.matching(predicate)
+            let candidates = uniqueControls.contains(label) && !contains
+                ? [query.firstMatch] : query.allElementsBoundByIndex
+            // A labelled backdrop may share the X button's close label. Its
+            // centre is covered by the sheet, so prefer the compact control.
+            if let button = candidates.filter({ $0.exists && $0.isHittable })
+                .min(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) {
                 button.tap()
                 wait(1.5)
                 return
@@ -348,25 +444,157 @@ final class FootNationCaptureTests: XCTestCase {
             if scroll && attempt > 0 { app.swipeUp(); wait(1) }
             else { wait(1) }
         }
+        // Private, encrypted diagnostics distinguish a missing modal from a
+        // changed accessibility label. No credentials are written here.
+        let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("FootNationNativeCaptures", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? app.debugDescription.write(to: folder.appendingPathComponent("control-failure.txt"), atomically: true, encoding: .utf8)
+        try? XCUIScreen.main.screenshot().pngRepresentation.write(to: folder.appendingPathComponent("control-failure.png"))
         XCTFail("Native control did not respond: " + label)
     }
 
-    private func verifyReadOnlyPublicationControls() {
+    func testHeaderControls() throws {
         open("home")
         // Repeated modal/tab transitions exercise the iOS hit-testing regression.
         // Nothing is liked, published, sent to another person, or commented.
         for _ in 0..<2 {
             requireTap("Changer la langue")
             requireTap("Fermer le choix de langue")
+            requireTap("Ouvrir mon espace")
+            requireTap("Fermer le menu du compte")
         }
+        requireTap("Messagerie")
+        XCTAssertTrue(app.buttons["Voir mon profil"].firstMatch.waitForExistence(timeout: 20), "Messaging screen did not open")
+        open("home")
+        requireTap("Notifications", contains: true)
+        XCTAssertTrue(app.staticTexts["Activité récente FootNation"].firstMatch.waitForExistence(timeout: 20), "Notifications screen did not open")
+        open("home")
+    }
+
+    func testPublicationControls() throws {
+        open("home")
         for _ in 0..<2 {
             requireTap("Partager", scroll: true)
             requireTap("Fermer le partage")
-            requireTap("Ouvrir les commentaires", prefix: true, scroll: true)
-            requireTap("Fermer les commentaires")
+            requireTap("Ouvrir les commentaires", contains: true, scroll: true)
+            XCTAssertTrue(app.buttons["Publier le commentaire"].firstMatch.waitForExistence(timeout: 20), "Comments sheet did not open")
+            wait(3)
+            XCTAssertFalse(app.staticTexts["Les réactions aux commentaires sont temporairement indisponibles."].firstMatch.exists, "Comment reactions are unavailable")
+            // The compact close button is labelled "Fermer". The longer
+            // label belongs to the backdrop behind the preview and sheet.
+            requireTap("Fermer")
+            let closeDeadline = Date().addingTimeInterval(10)
+            while app.buttons["Publier le commentaire"].firstMatch.exists && Date() < closeDeadline { wait(0.5) }
+            XCTAssertFalse(app.buttons["Publier le commentaire"].firstMatch.exists, "Comments sheet did not close")
         }
         open("my-profile")
         requireProfile()
+    }
+
+    func testMatchControls() throws {
+        open("home")
+        let match = app.buttons.matching(NSPredicate(format: "label CONTAINS ' contre ' AND label CONTAINS ' pour '")).allElementsBoundByIndex.first { $0.exists && $0.isHittable }
+        guard let match else { XCTFail("No visible match card to verify"); return }
+        match.tap()
+        XCTAssertTrue(app.staticTexts["Match"].firstMatch.waitForExistence(timeout: 20), "Match card did not open its detail")
+        XCTAssertFalse(app.buttons["Changer la langue"].firstMatch.isHittable, "Home remained over match detail")
+        XCTAssertFalse(app.staticTexts["Match introuvable pour cette date"].firstMatch.exists, "Selected match preview was lost")
+        open("home")
+        requireTap("Voir tous les matchs")
+        XCTAssertTrue(app.staticTexts["Compétitions"].firstMatch.waitForExistence(timeout: 25), "All matches did not open")
+        open("home")
+    }
+
+    private func requireVideoProgress() {
+        let progress = app.sliders["Position de la vidéo"].firstMatch
+        XCTAssertTrue(progress.waitForExistence(timeout: 35), "The native video did not become ready")
+        var values = Set<String>()
+        for _ in 0..<4 {
+            if let value = progress.value as? String { values.insert(value) }
+            wait(1.2)
+        }
+        XCTAssertGreaterThan(values.count, 1, "The native video timeline did not advance")
+    }
+
+    func testVideoPlayback() throws {
+        open("shorts")
+        requireVideoProgress()
+        requireTap("Mettre le short en pause")
+        let progress = app.sliders["Position de la vidéo"].firstMatch
+        wait(1)
+        let paused = progress.value as? String
+        wait(2)
+        XCTAssertEqual(progress.value as? String, paused, "Manual pause was not preserved")
+        requireTap("Reprendre le short")
+        requireVideoProgress()
+        // A short drag stays below the card-switch threshold. Then a full
+        // swipe checks that the next card resumes native playback.
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.55))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.42))
+        start.press(forDuration: 0.1, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 1)
+        requireVideoProgress()
+        app.swipeUp()
+        requireVideoProgress()
+        open("search")
+        open("shorts")
+        requireVideoProgress()
+    }
+
+    func testProfileShortGrid() throws {
+        requireProfile()
+        let profileTabDeadline = Date().addingTimeInterval(45)
+        var profileShortsTab: XCUIElement?
+        repeat {
+            let predicate = NSPredicate(format: "label == 'Shorts'")
+            let candidates = [app.buttons, app.otherElements]
+                .flatMap { $0.matching(predicate).allElementsBoundByIndex }
+                .filter {
+                    $0.exists && $0.isHittable &&
+                    $0.frame.midY < app.frame.minY + app.frame.height * 0.82
+                }
+            if let candidate = candidates.max(by: { $0.frame.midY < $1.frame.midY }) {
+                profileShortsTab = candidate
+                break
+            }
+            app.swipeUp()
+            wait(1)
+        } while Date() < profileTabDeadline
+        guard let profileShortsTab else {
+            XCTFail("The profile Shorts tab was not reachable")
+            return
+        }
+        profileShortsTab.tap()
+        let tile = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH 'Ouvrir le Short'")
+        ).firstMatch
+        XCTAssertTrue(tile.waitForExistence(timeout: 45), "No playable Short thumbnail appeared on the profile")
+        XCTAssertTrue(tile.isHittable, "The first profile Short thumbnail cannot be opened")
+        tile.tap()
+        XCTAssertTrue(app.buttons["Retour"].firstMatch.waitForExistence(timeout: 20), "The profile Short viewer did not open")
+        requireVideoProgress()
+        requireTap("Retour")
+    }
+
+    func testReleaseAudit() throws {
+        // One UI-test session avoids repeatedly interrupting the native app
+        // between related checks. Every check still uses real touch input.
+        executionTimeAllowance = 900
+        var completed: [String] = []
+        let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("FootNationNativeCaptures", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        func record(_ name: String) throws {
+            completed.append(name)
+            try JSONSerialization.data(withJSONObject: ["completed": completed, "native": true])
+                .write(to: directory.appendingPathComponent("native-checks.json"), options: .atomic)
+        }
+        try testHeaderControls(); try record("header")
+        try testMatchControls(); try record("matches")
+        try testPublicationControls(); try record("publication")
+        try testVideoPlayback(); try record("video")
+        try testProfileShortGrid(); try record("profile-shorts")
+        try testCapture(); try record("captures")
     }
 
     func testCapture() throws {
@@ -378,7 +606,8 @@ final class FootNationCaptureTests: XCTestCase {
         requireProfile()
         let routes = [
             ("06-profil", "my-profile"), ("02-recherche", "search"),
-            ("03-clubs", "clubs"), ("01-accueil", "home")
+            ("03-clubs", "clubs"), ("04-opportunites", "opportunities"),
+            ("05-matchs", "matches"), ("01-accueil", "home")
         ]
         for (name, route) in routes {
             open(route)
@@ -386,10 +615,30 @@ final class FootNationCaptureTests: XCTestCase {
             dismissInvitations()
             wait(3)
             XCTAssertTrue(app.state == .runningForeground, "App left foreground before screenshot")
+            // A successful tap is not evidence of successful navigation.
+            let destinationText: String?
+            switch route {
+            case "clubs": destinationText = "Trouver un club"
+            case "matches": destinationText = "Compétitions"
+            // The opportunity deck is full-screen and identifies each listing
+            // by its author/title. It intentionally has no page-title heading.
+            case "opportunities": destinationText = nil
+            default: destinationText = nil
+            }
+            if let expected = destinationText {
+                let homeLanguage = app.buttons["Changer la langue"].firstMatch
+                XCTAssertFalse(homeLanguage.exists && homeLanguage.isHittable, "Home remained visible after route selection")
+                XCTAssertTrue(app.staticTexts[expected].firstMatch.waitForExistence(timeout: 15), "Destination heading did not appear")
+            }
+            if route == "opportunities" {
+                let publish = app.buttons["Publier une annonce"].firstMatch
+                XCTAssertTrue(publish.waitForExistence(timeout: 25) && publish.isHittable, "The opportunity deck did not open")
+                XCTAssertTrue(app.buttons["Voir l’annonce"].firstMatch.isHittable, "The opportunity listing action is missing")
+            }
             // This is a genuine device framebuffer. Human review remains required
             // for asynchronous content errors, localization and empty states.
             try saveCapture(locale + "-" + device + "-" + name + ".png")
         }
-        if locale == "fr-FR" { verifyReadOnlyPublicationControls() }
+
     }
 }

@@ -42,17 +42,25 @@ import {
   PlaySquare,
   Radio,
 } from "lucide-react-native";
+import CreationStudio from "./CreationStudio";
+
+// Compatibility entry point for older navigation stacks. The historical
+// composer remains below for old imports, but opening Compose must expose the
+// new Choose → Edit → Publish studio.
 export default function Compose() {
-  const { session } = useAuth();
-  return <ComposeAccount key={session?.user.id || "guest"} />;
+  return <CreationStudio defaultMode="post" />;
 }
-function ComposeAccount() {
+export function TextPublication() {
+  const { session } = useAuth();
+  return <AuthGate><ComposeAccount key={session?.user.id || "guest"} textEntry /></AuthGate>;
+}
+function ComposeAccount({ textEntry = false }: { textEntry?: boolean }) {
   const { colors } = useTheme();
   const s = useUIStyles();
   const styles = useThemedStyles(createComposeStyles);
 
   const { session, profile } = useAuth();
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(textEntry);
   const cache = useQueryClient();
   const userId = session?.user.id;
   const [draft, setDraft] = useState<PostDraft | null>(null);
@@ -456,7 +464,7 @@ function ComposeAccount() {
       </Screen>
     );
   return (
-    <Screen title="Publier un post">
+    <Screen title="Publication">
       <AuthGate>
         <View style={s.row}>
           <Avatar name={displayName(profile)} uri={profile?.avatar_url} />
@@ -498,8 +506,9 @@ function ComposeAccount() {
             />
           </>
         )}
+        <Text style={s.small}>Un texte suffit pour publier. Les photos et vidéos sont facultatives.</Text>
         <Button
-          title="Ajouter une photo ou une vidéo"
+          title="Ajouter une photo ou une vidéo (facultatif)"
           secondary
           onPress={() => void pick()}
           disabled={!ready || locked || picking}
@@ -510,6 +519,7 @@ function ComposeAccount() {
           onPress={() => void pick(true)}
           disabled={!ready || locked || picking}
         />
+        <Text style={s.small}>Photos : JPEG, PNG, WebP, HEIC/HEIF · 10 Mo maximum. Vidéos : MP4, MOV, WebM · 50 Mo maximum. La durée est limitée par la taille du fichier.</Text>
         <Field
           label="Lieu"
           value={draft?.location || ""}
@@ -602,7 +612,7 @@ function ComposeAccount() {
           title="Revenir aux choix de création"
           secondary
           disabled={publish.isPending || picking}
-          onPress={() => setEditorOpen(false)}
+          onPress={() => textEntry ? router.replace("/compose") : setEditorOpen(false)}
         />
       </AuthGate>
     </Screen>

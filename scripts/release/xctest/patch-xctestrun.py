@@ -1,6 +1,6 @@
 import plistlib, sys
 source, output, mode, locale, device = sys.argv[1:]
-assert mode in ('login', 'capture') and locale in ('fr-FR', 'en-US') and device in ('iphone', 'ipad')
+assert mode in ('login', 'capture', 'header', 'publication', 'matches', 'video', 'audit') and locale in ('fr-FR', 'en-US') and device in ('iphone', 'ipad')
 with open(source, 'rb') as f:
     data = plistlib.load(f)
 targets = []
@@ -15,7 +15,7 @@ assert target.get('IsUITestBundle'), 'Expected UI test runner'
 target.setdefault('EnvironmentVariables', {}).update({'FN_CAPTURE_LOCALE': locale, 'FN_CAPTURE_DEVICE': device})
 # UI test bundle is not bound to an app build. Explicit bundleIdentifier in Swift
 # launches the existing installed Release app, as supported by XCUIApplication.
-target['OnlyTestIdentifiers'] = ['FootNationCaptureTests/testAuthenticate' if mode == 'login' else 'FootNationCaptureTests/testCapture']
+target['OnlyTestIdentifiers'] = ['FootNationCaptureTests/' + {'login':'testAuthenticate','capture':'testCapture','header':'testHeaderControls','publication':'testPublicationControls','matches':'testMatchControls','video':'testVideoPlayback','audit':'testReleaseAudit'}[mode]]
 target['UITargetAppBundleIdentifier'] = 'com.footnation.app'
 target.pop('UITargetAppPath', None)
 target['SystemAttachmentLifetime'] = 'keepNever'

@@ -7,11 +7,12 @@ import { LocateFixed, MapPin } from "lucide-react-native";
 import { supabase } from "../lib/supabase";
 import { useDebounced } from "../lib/data";
 import { useClubMap } from "../lib/useClubMap";
+import { clubLocationLabel } from "../lib/clubLocation";
 import { distanceKm, filterClubMap, type MapLocation } from "../lib/clubMap";
 import type { ClubSearchType } from "../lib/clubSearch";
 import { useTheme } from "../theme";
 import { Avatar, Button, Chip, Loading, useUIStyles } from "./ui";
-import ClubMapCanvas from "./ClubMapCanvas";
+import ClubMapCanvas from "./ClubMapCanvasLoader";
 import { ClubDirectorySuggestions } from "./ClubDirectorySuggestions";
 
 export function ClubDirectoryMap({
@@ -247,7 +248,7 @@ export function ClubDirectoryMap({
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={[s.text, { fontWeight: "700" }]}>{club.name}</Text>
             <Text style={s.small}>
-              {club.city}
+              {clubLocationLabel(club)}
               {location ? ` · ${distanceKm(location, club).toFixed(1)} km` : ""}
             </Text>
             <Text style={{ color: colors.blue }}>Voir le club →</Text>
@@ -281,7 +282,7 @@ export function ClubDirectoryMap({
                 <Text style={[s.text, { fontWeight: "600" }]}>
                   {p.short_name || p.name}
                 </Text>
-                <Text style={s.small}>{p.city}</Text>
+                <Text style={s.small}>{clubLocationLabel(p)}</Text>
               </View>
               <Text style={{ color: colors.blue, fontWeight: "700" }}>
                 {distanceKm(location, p).toFixed(1)} km

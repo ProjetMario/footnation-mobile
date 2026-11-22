@@ -2,6 +2,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { supportsClubMatching } from "../lib/matchingSchema";
 import { useAuth } from "../lib/auth";
+import { displayName } from "../lib/models";
 import {
   MatchableItem,
   MatchingProfile,
@@ -17,7 +18,7 @@ function matchingProfile(profile: any): MatchingProfile {
   return {
     ...profile,
     entity_type: "profile",
-    name: profile.full_name || "Anonyme",
+    name: displayName(profile),
     location: {
       city: profile.city,
       department: profile.department,
@@ -28,10 +29,10 @@ function matchingProfile(profile: any): MatchingProfile {
   };
 }
 export function useMatchingEntities(filters: MatchFilters = {}) {
-  const { session } = useAuth();
+  const { session, profileStatus } = useAuth();
   const uid = session?.user.id;
   return useInfiniteQuery({
-    queryKey: ["matching-entities", uid, filters],
+    queryKey: ["matching-entities", uid, profileStatus, filters],
     enabled: !!uid,
     initialPageParam: 0,
     staleTime: 60_000,
@@ -51,7 +52,7 @@ export function useMatchingEntities(filters: MatchFilters = {}) {
         let query = supabase
           .from("profiles")
           .select(
-            "id,full_name,avatar_url,primary_role,department,city,highest_level,bio,position,created_at,is_premium,birthdate,is_suspended,suspended_until",
+            "id,full_name,first_name,last_name,username,avatar_url,primary_role,department,city,highest_level,bio,position,created_at,is_premium,birthdate,is_suspended,suspended_until",
           )
           .neq("id", uid!)
           .order("id");

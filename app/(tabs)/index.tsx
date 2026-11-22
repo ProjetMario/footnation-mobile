@@ -1,1 +1,5 @@
-export { default } from "../../src/screens/Home";
+import { Redirect } from "expo-router";
+
+export default function Start() {
+  return <Redirect href="/home" />;
+}

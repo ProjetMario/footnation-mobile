@@ -6,7 +6,7 @@
       "com.footnation.app",
       "footnation"
     ],
-    "version": "1.0.1",
+    "version": "1.0.5",
     "orientation": "default",
     "icon": "./assets/brand/app-icon.png",
     "userInterfaceStyle": "automatic",
@@ -21,7 +21,8 @@
       }
     },
     "android": {
-      "package": "com.footnation.app"
+      "package": "com.footnation.app",
+      "versionCode": 4
     },
     "web": {
       "bundler": "metro",

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   Keyboard,
   Pressable,
@@ -19,10 +19,15 @@ import {
   Share2,
   Shield,
 } from "lucide-react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "../lib/auth";
+import { loadClubAdminStatus } from "../lib/clubAccess";
 import { useTheme } from "../theme";
 import { findClubEnrichment } from "../lib/clubPublicInformation";
 import { publicClubUrl } from "../lib/professionalContact";
+import { effectiveClubLogo } from "../lib/clubLogoPolicy.mjs";
+import { clubLocationLabel } from "../lib/clubLocation";
 import { ClubLogo, useClubBrand, useClubReducedMotion } from "./ClubDesign";
 import { ClubFollow } from "./ClubFollow";
 import { ClubWebNavigation, ClubSectionNavigation } from "./ClubWebNavigation";
@@ -41,6 +46,26 @@ export function ClubProfileLayout({
   children: React.ReactNode;
 }) {
   const { colors } = useTheme();
+  const { session } = useAuth();
+  const uid = session?.user.id;
+  const access = useQuery({
+    queryKey: ["club-management-status", club.id, uid],
+    enabled: !!uid && !!club.id,
+    queryFn: () => loadClubAdminStatus(club.id, uid!),
+    refetchInterval: 30_000,
+    retry: false,
+  });
+  useFocusEffect(useCallback(() => {
+    if (uid && club.id) void access.refetch();
+  }, [uid, club.id, access.refetch]));
+  const accessPending = !!uid && access.isPending;
+  const accessFailed = !!uid && access.isError;
+  const canAdmin = !!uid && access.data === true;
+  const managementLabel = accessFailed
+    ? "Réessayer la vérification de mes droits"
+    : accessPending
+      ? "Vérification de mes droits…"
+      : canAdmin ? "Administrer le club" : "Je représente ce club";
   const brand = useClubBrand();
   const reduced = useClubReducedMotion();
   const { width, height } = useWindowDimensions();
@@ -54,9 +79,7 @@ export function ClubProfileLayout({
   const displayName = club.short_name || club.name;
   const district =
     findClubEnrichment(club)?.data?.club?.district || club.district;
-  const location = [club.city || district, club.department_code]
-    .filter(Boolean)
-    .join(" · ");
+  const location = clubLocationLabel({ ...club, city: club.city || district });
   const selectSection = (key: string) => {
     Keyboard.dismiss();
     onSelect(key);
@@ -109,7 +132,7 @@ export function ClubProfileLayout({
             }}
           >
             {compact && (
-              <ClubLogo uri={club.logo_url} name={club.name} size={32} />
+              <ClubLogo uri={effectiveClubLogo(club)} name={club.name} size={32} />
             )}
             <Text
               numberOfLines={1}
@@ -232,7 +255,7 @@ export function ClubProfileLayout({
             >
               <View style={styles.logoFrame}>
                 <ClubLogo
-                  uri={club.logo_url}
+                  uri={effectiveClubLogo(club)}
                   name={club.name}
                   size={wide ? 104 : 84}
                 />
@@ -297,14 +320,19 @@ export function ClubProfileLayout({
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Je représente ce club"
-                onPress={() => router.push(`/club-claim?clubId=${club.id}`)}
+                accessibilityLabel={managementLabel}
+                disabled={accessPending}
+                onPress={() => accessFailed
+                  ? void access.refetch()
+                  : router.push(canAdmin
+                    ? `/club-admin/${club.id}`
+                    : `/club-claim?clubId=${club.id}`)}
                 style={({ pressed }) => [
                   styles.claim,
                   { opacity: pressed ? 0.7 : 1 },
                 ]}
               >
-                <Text style={styles.claimText}>Je représente ce club</Text>
+                <Text style={styles.claimText}>{managementLabel}</Text>
                 <ArrowUpRight size={17} color="#D4DFE9" />
               </Pressable>
             </View>

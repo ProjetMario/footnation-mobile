@@ -1,9 +1,9 @@
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -30,9 +30,10 @@ import {
   VolumeX,
   X,
 } from "lucide-react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Avatar } from "./ui";
 import { NativeVideo } from "./Video";
+import { resolveVideoSource } from "../lib/videoSource";
 import { useAuth } from "../lib/auth";
 import { useConnections } from "../lib/data";
 import { displayName, type Post, type Profile } from "../lib/models";
@@ -63,7 +64,13 @@ export function PostShareSheet({
     }
   | { profile: Profile; post?: never; link?: never; playbackMemory?: never }
   | {
-      link: { url: string; title: string; description?: string; imageUrl?: string | null; kind?: string };
+      link: {
+        url: string;
+        title: string;
+        description?: string;
+        imageUrl?: string | null;
+        kind?: string;
+      };
       post?: never;
       profile?: never;
       playbackMemory?: never;
@@ -82,7 +89,6 @@ export function PostShareSheet({
       account.current = undefined;
     };
   }, [uid]);
-  const insets = useSafeAreaInsets();
   const cache = useQueryClient();
   const [search, setSearch] = useState("");
   const contacts = useConnections("connections", search);
@@ -110,8 +116,11 @@ export function PostShareSheet({
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [externalBusy, setExternalBusy] = useState(false);
-  const url = link?.url || (profile ? profileShareUrl(profile.id) : postShareUrl(post!.id));
-  const shareTitle = link?.title || (profile ? "Profil FootNation" : "Publication FootNation");
+  const url =
+    link?.url ||
+    (profile ? profileShareUrl(profile.id) : postShareUrl(post!.id));
+  const shareTitle =
+    link?.title || (profile ? "Profil FootNation" : "Publication FootNation");
   const linkKindLabel = link?.kind === "live" ? "le live" : "l’actualité";
   const linkHelpLabel = link?.kind === "live" ? "ce live" : "cette actualité";
   const linkHelpText = `Utilise les options de partage ci-dessous pour envoyer ${linkHelpLabel}.`;
@@ -166,7 +175,8 @@ export function PostShareSheet({
           };
           attempts.current.set(peer, message);
         }
-        if (!canSendToContacts) throw new Error(`Ce lien se partage avec les options externes.`);
+        if (!canSendToContacts)
+          throw new Error(`Ce lien se partage avec les options externes.`);
         await (profile ? sendProfileShare : sendPostShare)(
           supabase,
           profile?.id || post!.id,
@@ -200,7 +210,7 @@ export function PostShareSheet({
   };
   return (
     <Modal visible transparent animationType="slide" onRequestClose={close}>
-      <View
+      <SafeAreaView
         style={styles.overlay}
         accessibilityViewIsModal
         onAccessibilityEscape={close}
@@ -212,7 +222,7 @@ export function PostShareSheet({
           style={StyleSheet.absoluteFill}
         />
         <KeyboardAvoidingView
-          style={[styles.content, { paddingTop: insets.top }]}
+          style={styles.content}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <View style={styles.preview}>
@@ -264,8 +274,7 @@ export function PostShareSheet({
                 >
                   {post?.video_url ? (
                     <NativeVideo
-                      uri={post?.video_url}
-                      posterUri={post?.image_url}
+                      {...resolveVideoSource(post, post.image_url)}
                       active
                       muted={muted}
                       controls={false}
@@ -321,11 +330,15 @@ export function PostShareSheet({
               </>
             )}
           </View>
-          <View style={[styles.sheet, { paddingBottom: insets.bottom }]}>
+          <View style={styles.sheet}>
             <View style={styles.handle} />
             <View style={styles.heading}>
               <Text accessibilityRole="header" style={styles.title}>
-                {link ? `Partager ${linkKindLabel}` : profile ? "Partager le profil" : "Partager la publication"}
+                {link
+                  ? `Partager ${linkKindLabel}`
+                  : profile
+                    ? "Partager le profil"
+                    : "Partager la publication"}
               </Text>
               <Pressable
                 disabled={busy}
@@ -368,9 +381,7 @@ export function PostShareSheet({
             >
               {!canSendToContacts ? (
                 <View style={styles.empty}>
-                  <Text style={styles.muted}>
-                    {linkHelpText}
-                  </Text>
+                  <Text style={styles.muted}>{linkHelpText}</Text>
                 </View>
               ) : !uid ? (
                 <View style={styles.empty}>
@@ -568,7 +579,7 @@ export function PostShareSheet({
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }

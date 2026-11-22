@@ -94,6 +94,29 @@ npm run export:all
 
 L’export produit les bundles JavaScript/Hermes des plateformes ; il ne produit pas un APK signé ou une archive iOS.
 
+## Studio de création
+
+Les entrées `compose`, `stories/create` et `shorts/create` ouvrent le parcours
+**Choisir → Monter → Publier**. Le sélecteur accepte jusqu’à dix photos/vidéos ;
+les brouillons et médias sont conservés par compte dans IndexedDB sur le web,
+dans les fichiers de l’application sur iOS/Android. Les anciens brouillons restent
+accessibles depuis le dossier du studio. Une nouvelle build native est nécessaire
+pour embarquer les permissions de photothèque et `expo-media-library`.
+
+Une photo ou vidéo sans montage utilise la publication existante. Auto Cut,
+les titres intégrés, la musique, le rendu des cadrages et les sous-titres
+automatiques utilisent le [backend Media Studio](../backend/media-studio/README.md).
+Il est préparé et testé localement, pas déployé. Renseigner
+`EXPO_PUBLIC_MEDIA_STUDIO_URL` uniquement après son activation ; aucune clé de
+service ne doit entrer dans le bundle Expo. Un rendu réussi demande toujours
+une action explicite de publication. Les exports Expo ne valident pas l’accès
+à la photothèque, la caméra ou la lecture sur un appareil réel.
+
+```sh
+npx vitest run tests/creationProject.test.ts tests/creationClient.test.ts tests/creationPublication.test.ts
+npm run typecheck
+```
+
 ## Organisation
 
 - `app/` : navigation et liens internes Expo Router.

@@ -9,6 +9,7 @@ import {
   User,
   Users,
 } from "lucide-react-native";
+import { SUPPORTERS_ENABLED } from "../lib/supportersConfig";
 export const spaceCategories = [
   {
     id: "profile",
@@ -19,12 +20,7 @@ export const spaceCategories = [
       { title: "Mon CV", path: "/cv-football", Icon: User },
       { title: "Mon parcours", path: "/experience", Icon: User },
       { title: "Diplômes et formations", path: "/education", Icon: BookOpen },
-      {
-        title: "Mes objectifs carrière",
-        path: "/career-preferences",
-        Icon: User,
-      },
-      { title: "Opportunités", path: "/opportunities", Icon: Briefcase },
+      { title: "Mes opportunités", path: "/my-opportunities", Icon: Briefcase },
       { title: "Recherche de club", path: "/career", Icon: Shield },
       { title: "Matching", path: "/matching", Icon: Users },
       { title: "Mon QR code", path: "/profile-qr", Icon: User },
@@ -43,6 +39,7 @@ export const spaceCategories = [
       { title: "Inviter mon réseau", path: "/invite", Icon: Users },
       { title: "Parrainage", path: "/referral", Icon: Users },
       { title: "Groupes", path: "/groups", Icon: Users },
+      ...(SUPPORTERS_ENABLED ? [{ title: "Supporters", path: "/supporters", Icon: Users }] : []),
       { title: "Organisations", path: "/organizations", Icon: Users },
       { title: "Mes Pages Pro", path: "/pro-pages", Icon: Users },
       { title: "Rechercher sur FootNation", path: "/search", Icon: Users },

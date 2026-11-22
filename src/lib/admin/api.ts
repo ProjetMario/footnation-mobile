@@ -11,6 +11,17 @@ import {
   type Receipt,
 } from "./contracts";
 
+// The deployed account service uses this specific refusal before claiming any
+// operation. Keep other 403s (revoked access, self-deletion) distinct.
+const reauthenticationMessage =
+  "Reconnectez-vous pour confirmer cette action sensible.";
+export class AdminReauthenticationRequiredError extends Error {
+  constructor() {
+    super(reauthenticationMessage);
+    this.name = "AdminReauthenticationRequiredError";
+  }
+}
+
 // Every request uses the captured account's token. A session change never sends
 // an old administrator's intent using the new account's credentials.
 export function createAdminApi(uid: string, client = supabase) {
@@ -89,6 +100,11 @@ export function createAdminApi(uid: string, client = supabase) {
             .clone()
             .json()
             .catch(() => null);
+          if (
+            body?.error === reauthenticationMessage &&
+            result.error.context.status === 403
+          )
+            throw new AdminReauthenticationRequiredError();
           if (typeof body?.error === "string" && body.error.length <= 500)
             throw new Error(body.error);
         }

@@ -10,9 +10,15 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { router, usePathname } from "expo-router";
 import {
   Briefcase,
+  ArrowLeft,
+  ArrowUpRight,
+  SlidersHorizontal,
+  Plus,
   Building2,
   MapPin,
   Megaphone,
@@ -55,7 +61,6 @@ export const opportunityTypes = [
   ["professional", "Opportunité pro"],
 ];
 
-
 function opportunityTypeLabel(type: string | null | undefined) {
   return (
     opportunityTypes.find(([id]) => id === type)?.[1] ||
@@ -66,8 +71,15 @@ function opportunityTypeLabel(type: string | null | undefined) {
 }
 
 function OpportunityHighlightBadge({ item }: { item: Opportunity }) {
-  const kind = opportunityListingKind(item.opportunity_type, item.listing_kind) === "offer" ? "Offre" : "Demande";
-  const target = (item.target_profile_type ? profileLabel(item.target_profile_type) : opportunityTypeLabel(item.opportunity_type)).toUpperCase();
+  const kind =
+    opportunityListingKind(item.opportunity_type, item.listing_kind) === "offer"
+      ? "Offre"
+      : "Demande";
+  const target = (
+    item.target_profile_type
+      ? profileLabel(item.target_profile_type)
+      : opportunityTypeLabel(item.opportunity_type)
+  ).toUpperCase();
   return (
     <LinearGradient
       colors={["#0967FF", "#7C3AED", "#FF2D55"]}
@@ -75,9 +87,9 @@ function OpportunityHighlightBadge({ item }: { item: Opportunity }) {
       end={{ x: 1, y: 1 }}
       style={deckStyles.highlightBadge}
     >
-      <Text style={deckStyles.highlightKicker}>{kind}</Text>
-      <Text style={deckStyles.highlightTarget} numberOfLines={1}>{target}</Text>
-      <Text style={deckStyles.highlightHint}>C’est le profil recherché</Text>
+      <Text style={deckStyles.highlightLabel} numberOfLines={1}>
+        {kind} · {target}
+      </Text>
     </LinearGradient>
   );
 }
@@ -901,7 +913,9 @@ function OpportunityDeck() {
   );
   const openAuthor = () => {
     if (!item) return;
-    router.push(item.club_id ? `/club/${item.club_id}` : `/profile/${item.user_id}`);
+    router.push(
+      item.club_id ? `/club/${item.club_id}` : `/profile/${item.user_id}`,
+    );
   };
   return (
     <>
@@ -981,92 +995,115 @@ function OpportunityDeck() {
             router.canGoBack() ? router.back() : router.replace("/")
           }
           animationType="fade"
+          presentationStyle="fullScreen"
         >
-          <FootballMatchCard
-            key={`${item.id}:${author.data?.image || "default"}`}
-            fullscreen
-            opportunity
-            showScore={false}
-            canLike
-            busy={false}
-            item={{
-              id: item.id,
-              entity_type: "club",
-              name: item.title,
-              avatar_url: author.data?.image || null,
-              logo_url: author.data?.image || null,
-              location: {
-                city: item.location_city,
-                department: item.location_department,
-              },
-              compatibility_score: 0,
-              division:
-                opportunityTypes.find(
-                  ([id]) => id === item.opportunity_type,
-                )?.[1] || item.opportunity_type,
-              competition_level: null,
-              recruiting_status: false,
-              recruiting_positions: [],
-              age_category: null,
-              stadium_name: null,
-              youth_academy: false,
-              women_team: false,
-              project_description: item.description,
-            }}
-            onOpen={() => router.push(`/opportunity/${item.id}`)}
-            onChoose={(direction) => {
-              if (direction !== "left") {
-                router.push(`/opportunity/${item.id}`);
-                return;
-              }
-              if (review) {
+          <SafeAreaProvider style={{ flex: 1, backgroundColor: "#040f1f" }}>
+            {focused && !filtersOpen && <StatusBar style="light" />}
+            <FootballMatchCard
+              key={`${item.id}:${author.data?.image || "default"}`}
+              fullscreen
+              opportunity
+              compact
+              eyebrow={<OpportunityHighlightBadge item={item} />}
+              canReview={passed.length > 0}
+              onReview={() => {
                 setReview(null);
-                return;
-              }
-              setPassed((list) => [...list, item]);
-            }}
-            overlay={
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {!!author.data?.name && (
+                setPassed((list) => list.slice(0, -1));
+              }}
+              showScore={false}
+              canLike
+              busy={false}
+              item={{
+                id: item.id,
+                entity_type: "club",
+                name: item.title,
+                avatar_url: author.data?.image || null,
+                logo_url: author.data?.image || null,
+                location: {
+                  city: item.location_city,
+                  department: item.location_department,
+                },
+                compatibility_score: 0,
+                division:
+                  opportunityTypes.find(
+                    ([id]) => id === item.opportunity_type,
+                  )?.[1] || item.opportunity_type,
+                competition_level: null,
+                recruiting_status: false,
+                recruiting_positions: [],
+                age_category: null,
+                stadium_name: null,
+                youth_academy: false,
+                women_team: false,
+                project_description: item.description,
+              }}
+              onOpen={() => router.push(`/opportunity/${item.id}`)}
+              onChoose={(direction) => {
+                if (direction !== "left") {
+                  router.push(`/opportunity/${item.id}`);
+                  return;
+                }
+                if (review) {
+                  setReview(null);
+                  return;
+                }
+                setPassed((list) => [...list, item]);
+              }}
+              overlay={
+                <View style={deckStyles.toolbar}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Voir ${item.club_id ? "le club" : "le profil"} ${author.data.name}`}
-                    onPress={openAuthor}
-                    style={deckStyles.authorLink}
+                    accessibilityLabel="Retour"
+                    onPress={() =>
+                      router.canGoBack() ? router.back() : router.replace("/")
+                    }
+                    style={({ pressed }) => [
+                      deckStyles.iconButton,
+                      pressed && { opacity: 0.6 },
+                    ]}
                   >
-                    <Text style={deckStyles.authorLinkText}>
-                      {author.data.name}
-                      {author.data.role ? ` · ${author.data.role}` : ""}
-                    </Text>
-                    <Text style={deckStyles.authorLinkHint}>Voir {item.club_id ? "le club" : "le profil"}</Text>
+                    <ArrowLeft size={22} color="white" />
                   </Pressable>
-                )}
-                {control("Retour", () =>
-                  router.canGoBack() ? router.back() : router.replace("/"),
-                )}
-                {control("Filtres", () => setFiltersOpen(true))}
-                {control(
-                  "Précédente",
-                  () => {
-                    setReview(null);
-                    setPassed((list) => list.slice(0, -1));
-                  },
-                  !passed.length,
-                )}
-                {control("Publier", () => router.push("/opportunity/new"))}
-                <Text style={deckStyles.instructionText}>
-                  {opportunityListingKind(
-                    item.opportunity_type,
-                    item.listing_kind,
-                  ) === "offer"
-                    ? "Offre"
-                    : "Demande"}{" "}
-                  · Glisse à droite pour consulter l’annonce et y répondre
-                </Text>
-                <OpportunityHighlightBadge item={item} />
-              </View>
-            }
-          />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Voir ${item.club_id ? "le club" : "le profil"} ${author.data?.name || "de l’auteur"}`}
+                    onPress={openAuthor}
+                    style={({ pressed }) => [
+                      deckStyles.authorLink,
+                      pressed && { opacity: 0.6 },
+                    ]}
+                  >
+                    <Text style={deckStyles.authorLinkText} numberOfLines={1}>
+                      {author.data?.name || "Voir l’auteur"}
+                    </Text>
+                    <ArrowUpRight size={16} color="#b7c8de" />
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Filtres"
+                    onPress={() => setFiltersOpen(true)}
+                    style={({ pressed }) => [
+                      deckStyles.iconButton,
+                      pressed && { opacity: 0.6 },
+                    ]}
+                  >
+                    <SlidersHorizontal size={20} color="white" />
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Publier une annonce"
+                    onPress={() => router.push("/opportunity/new")}
+                    style={({ pressed }) => [
+                      deckStyles.iconButton,
+                      pressed && { opacity: 0.6 },
+                    ]}
+                  >
+                    <Plus size={22} color="white" />
+                  </Pressable>
+                </View>
+              }
+            />
+          </SafeAreaProvider>
         </Modal>
       )}
     </>
@@ -1074,23 +1111,35 @@ function OpportunityDeck() {
 }
 
 const deckStyles = StyleSheet.create({
-  authorLink: { width: "100%", alignSelf: "flex-start", gap: 2 },
-  authorLinkText: { color: "white", fontWeight: "900", fontSize: 16 },
-  authorLinkHint: { color: "rgba(255,255,255,0.82)", fontWeight: "800", fontSize: 12, textDecorationLine: "underline" },
-  instructionText: { color: "white", width: "100%", fontSize: 16, fontWeight: "800", lineHeight: 22 },
-  highlightBadge: {
-    width: "100%",
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    marginTop: 6,
-    shadowColor: "#FF2D55",
-    shadowOpacity: 0.38,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+  toolbar: { flexDirection: "row", alignItems: "center", gap: 8 },
+  iconButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+    backgroundColor: "#ffffff0d",
   },
-  highlightKicker: { color: "rgba(255,255,255,0.82)", fontSize: 12, fontWeight: "900", letterSpacing: 1.2, textTransform: "uppercase" },
-  highlightTarget: { color: "#FFFFFF", fontSize: 34, lineHeight: 39, fontWeight: "900", letterSpacing: 0.4, textTransform: "uppercase", marginTop: 2 },
-  highlightHint: { color: "rgba(255,255,255,0.88)", fontSize: 13, fontWeight: "800", marginTop: 3 },
+  authorLink: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  authorLinkText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 14,
+    flexShrink: 1,
+  },
+  highlightBadge: {
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  highlightLabel: { color: "white", fontSize: 12, fontWeight: "800" },
 });

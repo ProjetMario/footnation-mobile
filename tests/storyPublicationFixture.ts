@@ -13,6 +13,7 @@ export function storyDraft(): StoryPublicationDraft {
     version: 1,
     base64: "/9j/4AAA",
     mime: "image/jpeg",
+    mediaKind: "image",
     path,
     createdAt,
     record: {

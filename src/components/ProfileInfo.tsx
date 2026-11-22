@@ -1,7 +1,8 @@
+import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, { createContext, useContext, useState } from "react";
 import {
   Linking,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -94,7 +95,7 @@ export function ProfileInfoProvider({
         animationType="fade"
         onRequestClose={close}
       >
-        <View style={styles.backdrop}>
+        <SafeAreaView style={styles.backdrop}>
           <Pressable
             style={StyleSheet.absoluteFill}
             accessibilityRole="button"
@@ -155,7 +156,7 @@ export function ProfileInfoProvider({
               )}
             </ScrollView>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
     </InfoContext.Provider>
   );
@@ -165,10 +166,12 @@ export function ProfileInfoLink({
   info,
   children,
   style,
+  showIndicator = true,
 }: {
   info: ProfileInfo;
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
+  showIndicator?: boolean;
 }) {
   const context = useContext(InfoContext);
   const styles = useThemedStyles(createStyles);
@@ -187,11 +190,12 @@ export function ProfileInfoLink({
       style={({ pressed }) => [styles.link, style, pressed && styles.pressed]}
     >
       <View style={styles.linkContent}>{children}</View>
-      {context.canEdit(info.label) ? (
-        <Edit3 size={16} color={colors.blue} />
-      ) : (
-        <ChevronRight size={17} color={colors.muted} />
-      )}
+      {showIndicator &&
+        (context.canEdit(info.label) ? (
+          <Edit3 size={16} color={colors.blue} />
+        ) : (
+          <ChevronRight size={17} color={colors.muted} />
+        ))}
     </Pressable>
   );
 }

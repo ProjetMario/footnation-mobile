@@ -5,3 +5,9 @@ Utiliser `app-icon.png` pour le ballon FootNation : c’est le logo avec le drap
 Ce logo sert également aux avatars par défaut, aux QR codes sans photo de profil et aux effets de réaction. Les photos personnelles des utilisateurs restent prioritaires.
 
 `ball.png` et `logo.png` sont d’anciens visuels et ne doivent plus servir de référence au logo officiel.
+
+Pour l'affichage Web, `app-icon-display.webp` (512 px) et `hero-display.webp`
+(1280 px) sont des versions compressées des PNG originaux. Importer
+`src/lib/brandAssets` sélectionne automatiquement les variantes Web ; les builds
+natifs conservent les originaux. Régénération :
+`node scripts/web/prepare-brand-assets.mjs` depuis la racine du projet.

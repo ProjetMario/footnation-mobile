@@ -8,6 +8,20 @@ on:
       payload_sha256:
         required: true
         type: string
+      candidate_aab_url:
+        required: true
+        type: string
+      candidate_build_id:
+        required: true
+        type: string
+      candidate_version:
+        required: true
+        default: "1.0.5"
+        type: string
+      candidate_build:
+        required: true
+        default: "24"
+        type: string
 permissions:
   contents: read
 jobs:
@@ -19,6 +33,10 @@ jobs:
       FN_ANDROID_AUDIT_KEY: ${{ secrets.FN_ANDROID_AUDIT_KEY }}
       FN_PAYLOAD_PATH: ${{ inputs.payload_path }}
       FN_PAYLOAD_SHA256: ${{ inputs.payload_sha256 }}
+      FN_CANDIDATE_AAB_URL: ${{ inputs.candidate_aab_url }}
+      FN_CANDIDATE_BUILD_ID: ${{ inputs.candidate_build_id }}
+      FN_CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+      FN_CANDIDATE_BUILD: ${{ inputs.candidate_build }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:

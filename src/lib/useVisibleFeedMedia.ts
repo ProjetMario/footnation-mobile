@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { ViewabilityConfig } from "react-native";
-import { visibleMediaId } from "./mediaFeed";
+import { feedMediaViewability, visibleMediaId } from "./mediaFeed";
 
 export function useVisibleFeedMedia<
   T extends { id: string; video_url?: string | null },
@@ -14,10 +14,7 @@ export function useVisibleFeedMedia<
     id: string | null;
   }>({ scope, id: null });
   const viewabilityConfig = useRef(
-    configuration ?? {
-      viewAreaCoveragePercentThreshold: 35,
-      minimumViewTime: 180,
-    },
+    configuration ?? feedMediaViewability,
   ).current;
   const onViewableItemsChanged = useCallback(
     ({

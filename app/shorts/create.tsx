@@ -1,1 +1,5 @@
-export { ShortCreate as default } from "../../src/screens/Shorts";
+import React from "react";
+import CreationStudio from "../../src/screens/CreationStudio";
+export default function ShortCreateRoute() {
+  return <CreationStudio defaultMode="short" />;
+}

@@ -5,7 +5,7 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { Camera, Check } from "lucide-react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import * as AuthSession from "expo-auth-session";
+import { authRedirectUri } from "../lib/authRedirectUri";
 import { useMutation } from "@tanstack/react-query";
 import { supabase, requireBackend } from "../lib/supabase";
 import { uploadPhoto } from "../lib/media";
@@ -19,6 +19,10 @@ import { latestAllowedBirthdate } from "../lib/calendarDate";
 import { signupBirthdateError } from "../lib/memberAccess";
 import { SocialAuthButtons } from "../components/SocialAuthButtons";
 import { socialAuthAttempts } from "../lib/socialAuthAttempt";
+import {
+  postSocialCallbackRoute,
+  socialSignupPath,
+} from "../lib/socialOnboarding";
 type AccountType = "personal" | "club" | "business" | "institution";
 type SignupStep = "credentials" | "account" | "profile" | "identity";
 
@@ -261,11 +265,7 @@ export default function Signup() {
     number: /\d/.test(password),
   };
   function signupRedirectTo() {
-    return AuthSession.makeRedirectUri({
-      scheme: "com.footnation.app",
-      path: "auth/callback",
-      queryParams: { invite: "1", ...(next ? { next } : {}) },
-    });
+    return authRedirectUri({ invite: "1", ...(next ? { next } : {}) });
   }
   async function resendConfirmationEmail() {
     if (resendingConfirmation || !validEmail(email)) return;
@@ -316,8 +316,12 @@ export default function Signup() {
         const current = await supabase.auth.getSession();
         if (current.error) throw current.error;
         if (current.data.session?.user.id !== data.session.user.id) return;
-        if (next !== "/suppression-compte") requestNetworkInvite(data.session);
-        router.replace(next || "/");
+        const destination = await postSocialCallbackRoute(data.session, {
+          next,
+          referral: normalizeReferral(referral),
+        });
+        if (destination.inviteNetwork) requestNetworkInvite(data.session);
+        router.replace(destination.route);
         return;
       }
       if (error) {
@@ -335,7 +339,46 @@ export default function Signup() {
           return;
         }
       }
-      setStep("account");
+      const { data: created, error: signupError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: signupRedirectTo(),
+          data: {
+            signup_flow: "expo-v1",
+            cgu_accepted: true,
+            cgu_version: "1.0",
+            ...(normalizeReferral(referral)
+              ? { referrer_id: normalizeReferral(referral) }
+              : {}),
+          },
+        },
+      });
+      if (signupError) {
+        const message = signupError.message.toLowerCase();
+        if (
+          message.includes("already registered") ||
+          message.includes("already exists") ||
+          message.includes("user already")
+        ) {
+          setCredentialError(
+            "Ce compte existe déjà. Connectez-vous avec cet e-mail ou utilisez mot de passe oublié.",
+          );
+          return;
+        }
+        throw signupError;
+      }
+      if (created.session) {
+        const current = await supabase.auth.getSession();
+        if (current.error) throw current.error;
+        if (current.data.session?.user.id !== created.session.user.id) return;
+        router.replace(socialSignupPath(next, normalizeReferral(referral)));
+        return;
+      }
+      setEmailConfirmationSent(true);
+      setConfirmationFeedback(
+        "Nous venons d’envoyer un lien de confirmation. Ouvrez votre boîte mail pour continuer le tunnel de profil.",
+      );
     } catch (e) {
       setCredentialError(
         e instanceof Error
@@ -600,7 +643,9 @@ export default function Signup() {
               returnKeyType="next"
               submitBehavior="submit"
               onSubmitEditing={() => referralRef.current?.focus()}
-              style={signupStyles.passwordInput}
+              selectionColor={colors.blue}
+              placeholderTextColor={colors.muted}
+              style={[signupStyles.passwordInput, { color: colors.ink }]}
             />
             <Pressable
               accessibilityRole="button"

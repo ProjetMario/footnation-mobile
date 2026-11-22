@@ -5,6 +5,7 @@ import { ProfileAbout } from "../components/ProfileAbout";
 import { ProfileCoverEditor } from "../components/ProfileCoverEditor";
 import { ProfileStoryAvatar } from "../components/ProfileStoryAvatar";
 import { ProfileStoryBubbles } from "../components/ProfileStoryBubbles";
+import { ProfileJerseyNumber } from "../components/ProfileJerseyNumber";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useState } from "react";
@@ -19,6 +20,8 @@ import {
 } from "react-native";
 import {
   Building2,
+  Briefcase,
+  FileText,
   Camera,
   ChevronRight,
   QrCode,
@@ -34,6 +37,7 @@ import {
   Shirt,
   Sparkles,
   SquareUserRound,
+  Tag,
 } from "lucide-react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../lib/auth";
@@ -75,15 +79,18 @@ import {
 } from "../theme";
 import { displayName, type Profile as ProfileModel } from "../lib/models";
 
-
 function latestIsoDate(values: (string | null | undefined)[]) {
-  return values
-    .filter((value): value is string => Boolean(value))
-    .sort((a, b) => Date.parse(b) - Date.parse(a))[0] || null;
+  return (
+    values
+      .filter((value): value is string => Boolean(value))
+      .sort((a, b) => Date.parse(b) - Date.parse(a))[0] || null
+  );
 }
 
 async function readLatestPublicProfileActivity(profileId: string) {
-  const latestFrom = async (table: "posts" | "shorts" | "stories" | "opportunities") => {
+  const latestFrom = async (
+    table: "posts" | "shorts" | "stories" | "opportunities",
+  ) => {
     const result = await supabase
       .from(table)
       .select("created_at")
@@ -92,7 +99,9 @@ async function readLatestPublicProfileActivity(profileId: string) {
       .limit(1)
       .maybeSingle();
     if (result.error) return null;
-    return (result.data as { created_at?: string | null } | null)?.created_at || null;
+    return (
+      (result.data as { created_at?: string | null } | null)?.created_at || null
+    );
   };
   const rows = await Promise.all([
     latestFrom("posts"),
@@ -103,6 +112,15 @@ async function readLatestPublicProfileActivity(profileId: string) {
   return latestIsoDate(rows);
 }
 export default function Profile({ tab = false }: { tab?: boolean } = {}) {
+  const params = useLocalSearchParams<{ id: string }>();
+  return (
+    <AuthGate publicPreview={!tab && !!params.id}>
+      <ProfileContent tab={tab} />
+    </AuthGate>
+  );
+}
+
+function ProfileContent({ tab }: { tab: boolean }) {
   const { colors } = useTheme();
   const s = useUIStyles();
   const profileStyles = useThemedStyles(createProfileStyles);
@@ -147,27 +165,65 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
     profile.data ?? (ownProfile ? (authProfile ?? sessionProfile) : null);
   const visibleProfileId = profileData?.id ?? id;
   const [selectedSection, setSelectedSection] = useState<
-    "posts" | "videos" | "clubs" | "about"
+    "posts" | "videos" | "clubs" | "tags" | "about"
   >("posts");
   const posts = usePosts(
     "all",
     visibleProfileId,
     selectedSection === "videos" ? "video" : "all",
   );
-  const { counts, views } = useProfileOverview(visibleProfileId, !!profileData);
+  const taggedPosts = useQuery({
+    queryKey: [
+      "profile-tagged-posts",
+      session?.user.id || "public",
+      visibleProfileId,
+      profileData?.username,
+    ],
+    enabled: !!session && !!visibleProfileId && !!profileData?.username,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const username = profileData?.username;
+      if (!username) return [];
+      let request = supabase
+        .from("posts")
+        .select("id,content,image_url,video_url,created_at,user_id")
+        .neq("user_id", visibleProfileId!)
+        .ilike("content", `%@${username}%`)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (!session)
+        request = request.or(
+          "moderation_hidden.is.null,moderation_hidden.eq.false",
+        );
+      const result = await request;
+      if (result.error) throw result.error;
+      return result.data || [];
+    },
+  });
+  const { counts, views } = useProfileOverview(
+    visibleProfileId,
+    !!session && !!profileData,
+  );
   const showPosts = selectedSection === "posts";
+  const showTags = selectedSection === "tags";
   const profileClubs = useProfileClubs(id, profileData?.linked_club_id);
   const activity = useProfileActivity(visibleProfileId, !!profileData);
   const publicActivity = useQuery({
-    queryKey: ["profile-public-activity", visibleProfileId],
-    enabled: !!profileData && !!visibleProfileId,
+    queryKey: [
+      "profile-public-activity",
+      session?.user.id || "public",
+      visibleProfileId,
+    ],
+    enabled: !!session && !!profileData && !!visibleProfileId,
     staleTime: 60000,
     queryFn: () => readLatestPublicProfileActivity(visibleProfileId!),
   });
   const online = isActivityOnline(activity.data, activity.dataUpdatedAt);
-  const profileDataDates = profileData as
-    | { last_seen_at?: string | null; updated_at?: string | null; created_at?: string | null }
-    | null;
+  const profileDataDates = profileData as {
+    last_seen_at?: string | null;
+    updated_at?: string | null;
+    created_at?: string | null;
+  } | null;
   const profileLastActivitySource = latestIsoDate([
     activity.data?.last_seen_at,
     publicActivity.data,
@@ -177,14 +233,21 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
   ]);
   const profileActivityLabel = online
     ? "En ligne"
-    : lastActivityLabel(profileLastActivitySource) || "Dernière activité inconnue";
+    : lastActivityLabel(profileLastActivitySource) ||
+      "Dernière activité inconnue";
   const hasClub =
     !!profileData?.linked_club_id ||
     !!profileClubs.data?.club ||
     !!profileClubs.data?.teams.length;
   useEffect(() => {
     const viewerId = session?.user.id;
-    if (!viewerId || !visibleProfileId || viewerId === visibleProfileId || !profileData) return;
+    if (
+      !viewerId ||
+      !visibleProfileId ||
+      viewerId === visibleProfileId ||
+      !profileData
+    )
+      return;
     void notifyProfileView({
       profileId: visibleProfileId,
       viewerId,
@@ -193,12 +256,17 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
   }, [authProfile, profileData, session?.user.id, visibleProfileId]);
   useEffect(() => {
     if (selectedSection === "clubs" && !hasClub) setSelectedSection("posts");
-  }, [selectedSection, hasClub]);
+    if (selectedSection === "tags" && !taggedPosts.data?.length)
+      setSelectedSection("posts");
+  }, [selectedSection, hasClub, taggedPosts.data]);
   const feedScope = `${session?.user.id || "guest"}:${visibleProfileId || "profile"}`;
   const publicUrl = visibleProfileId
     ? `https://www.foot-nation.com/qr/${encodeURIComponent(visibleProfileId)}`
     : "https://www.foot-nation.com";
   const loadedPosts = posts.data?.pages.flat() || [];
+  const visiblePosts = (
+    showTags ? taggedPosts.data || [] : loadedPosts
+  ) as any[];
   const accountLabel =
     profileData?.account_type === "club"
       ? "Club"
@@ -236,11 +304,14 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
       .limit(1)
       .maybeSingle();
     if (result.data?.id) router.push(`/club/${result.data.id}`);
-    else router.push(`/search?type=clubs&q=${encodeURIComponent(profileData.club)}`);
+    else
+      router.push(
+        `/search?type=clubs&q=${encodeURIComponent(profileData.club)}`,
+      );
   };
   return (
     <Screen title="Profil" header={!tab} back={!tab} scroll={false}>
-      <AuthGate>
+      <>
         {profile.isPending && !profileData ? (
           <Loading />
         ) : profile.isError && !profileData ? (
@@ -273,7 +344,7 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
           <FlatList
             key={`${feedScope}:grid`}
             numColumns={3}
-            data={showPosts ? loadedPosts : []}
+            data={showPosts || showTags ? visiblePosts : []}
             contentContainerStyle={profileStyles.list}
             showsVerticalScrollIndicator={false}
             keyExtractor={(p) => p.id}
@@ -296,7 +367,12 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
             updateCellsBatchingPeriod={60}
             ListHeaderComponent={
               <View style={profileStyles.header}>
-                <View style={profileStyles.hero}>
+                <View
+                  style={[
+                    profileStyles.hero,
+                    ownProfile && { minHeight: 0, paddingBottom: 16 },
+                  ]}
+                >
                   {profileData.cover_image_url || profileData.avatar_url ? (
                     <Image
                       source={{
@@ -327,15 +403,23 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
                   <View style={profileStyles.heroActions}>
                     {ownProfile ? (
                       <IconButton
-                        label="Paramètres du profil"
-                        onPress={() => router.push("/settings")}
+                        label="Modifier la couverture"
+                        onPress={() => setCoverOpen(true)}
                       >
-                        <Settings size={23} color={colors.white} />
+                        <Camera size={22} color={colors.white} />
                       </IconButton>
                     ) : (
                       <View style={profileStyles.heroActionSpacer} />
                     )}
                     <View style={profileStyles.heroRightActions}>
+                      {ownProfile && (
+                        <IconButton
+                          label="Voir le QR code du profil"
+                          onPress={() => router.push(`/profile-qr?id=${id}`)}
+                        >
+                          <QrCode size={21} color={colors.white} />
+                        </IconButton>
+                      )}
                       <IconButton
                         label="Partager le profil"
                         onPress={shareProfile}
@@ -350,127 +434,186 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
                       </IconButton>
                     </View>
                   </View>
-                  {ownProfile && (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Modifier la couverture"
-                      onPress={() => setCoverOpen(true)}
-                      style={({ pressed }) => ({
-                        alignSelf: "flex-end",
-                        marginRight: 20,
-                        marginTop: 6,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 7,
-                        minHeight: 36,
-                        paddingHorizontal: 12,
-                        borderRadius: 18,
-                        borderWidth: 1,
-                        borderColor: "rgba(255,255,255,0.25)",
-                        backgroundColor: pressed
-                          ? "rgba(255,255,255,0.25)"
-                          : "rgba(255,255,255,0.1)",
-                      })}
-                    >
-                      <Camera size={15} color="white" />
+                  {ownProfile ? (
+                    <View style={profileStyles.ownIdentity}>
+                      <View style={profileStyles.ownIdentityRow}>
+                        <ProfileStoryAvatar
+                          compact
+                          key={profileData.id}
+                          profile={profileData}
+                        />
+                        <View style={{ flex: 1, minWidth: 0, gap: 7 }}>
+                          <View
+                            style={[
+                              profileStyles.heroNameRow,
+                              { justifyContent: "flex-start" },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                profileStyles.heroName,
+                                { textAlign: "left", fontSize: 22 },
+                              ]}
+                            >
+                              {publicProfileName(profileData)}
+                            </Text>
+                            <ProfileJerseyNumber
+                              profile={profileData}
+                              ownProfile
+                            />
+                            {profileData.is_verified === true && (
+                              <View style={profileStyles.verifiedDot}>
+                                <Text style={profileStyles.verifiedText}>
+                                  ✓
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text
+                            style={[
+                              profileStyles.heroSubtitle,
+                              { textAlign: "left", fontSize: 12 },
+                            ]}
+                          >
+                            {[accountLabel, profileData.city]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </Text>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="Éditer le profil"
+                            onPress={() => router.push("/settings")}
+                            style={({ pressed }) => [
+                              profileStyles.ownEdit,
+                              { opacity: pressed ? 0.75 : 1 },
+                            ]}
+                          >
+                            <Edit3 size={15} color="#111827" />
+                            <Text style={profileStyles.ownEditText}>
+                              Modifier
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                      <View style={profileStyles.ownShortcuts}>
+                        {[
+                          {
+                            label: `${typeof views.data === "number" ? views.data : "—"} ${views.data === 1 ? "vue" : "vues"}`,
+                            Icon: Eye,
+                            path:
+                              views.data === 0 ? "/matching" : "/profile-views",
+                          },
+                          {
+                            label: "Opportunités",
+                            Icon: Briefcase,
+                            path: "/my-opportunities",
+                          },
+                        ].map(({ label, Icon, path }) => (
+                          <Pressable
+                            key={path}
+                            accessibilityRole="button"
+                            accessibilityLabel={label}
+                            onPress={() => router.push(path)}
+                            style={({ pressed }) => ({
+                              flex: 1,
+                              minWidth: 0,
+                              opacity: pressed ? 0.75 : 1,
+                            })}
+                          >
+                            <LinearGradient
+                              colors={["#0967FF", "#7A2CFF", "#FF174D"]}
+                              start={{ x: 0, y: 0.5 }}
+                              end={{ x: 1, y: 0.5 }}
+                              style={profileStyles.ownShortcut}
+                            >
+                              <Icon size={16} color="white" />
+                              <Text style={profileStyles.ownShortcutText}>
+                                {label}
+                              </Text>
+                            </LinearGradient>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={profileStyles.heroIdentity}>
+                      <ProfileStoryAvatar
+                        key={profileData.id}
+                        profile={profileData}
+                      />
+                      <View style={profileStyles.heroNameRow}>
+                        <Text style={profileStyles.heroName}>
+                          {publicProfileName(profileData!)}
+                        </Text>
+                        <ProfileJerseyNumber
+                          profile={profileData}
+                          ownProfile={false}
+                        />
+                        {profileData.is_verified === true && (
+                          <View style={profileStyles.verifiedDot}>
+                            <Text style={profileStyles.verifiedText}>✓</Text>
+                          </View>
+                        )}
+                      </View>
                       <Text
-                        style={{
-                          color: "white",
-                          fontFamily: "Inter-Medium",
-                          fontSize: 12,
-                        }}
+                        style={profileStyles.heroSubtitle}
+                        numberOfLines={2}
                       >
-                        Modifier la couverture
+                        {[
+                          profileData.position || profileData.primary_role,
+                          profileData.highest_level,
+                          [profileData.city, profileData.department]
+                            .filter(Boolean)
+                            .join(", "),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </Text>
-                    </Pressable>
-                  )}
-                  <View style={profileStyles.heroIdentity}>
-                    <ProfileStoryAvatar
-                      key={profileData.id}
-                      profile={profileData}
-                    />
-                    <View style={profileStyles.heroNameRow}>
-                      <Text style={profileStyles.heroName}>
-                        {publicProfileName(profileData!)}
-                      </Text>
-                      {profileData.is_verified === true && (
-                        <View style={profileStyles.verifiedDot}>
-                          <Text style={profileStyles.verifiedText}>✓</Text>
+                      {!!(!ownProfile && profileActivityLabel) && (
+                        <View style={profileStyles.activityLine}>
+                          <View
+                            accessibilityRole="text"
+                            accessibilityLabel={
+                              online ? "En ligne" : "Hors ligne"
+                            }
+                            style={[
+                              profileStyles.activityDot,
+                              {
+                                backgroundColor: online
+                                  ? "#1CC75C"
+                                  : "rgba(255,255,255,0.55)",
+                              },
+                            ]}
+                          />
+                          <Text style={profileStyles.activityText}>
+                            {profileActivityLabel}
+                          </Text>
                         </View>
                       )}
+                      {id ? (
+                        session ? (
+                          <ProfileActions id={id} variant="hero" />
+                        ) : (
+                          <Button
+                            title="Suivre ce profil"
+                            onPress={() =>
+                              router.push({
+                                pathname: "/login",
+                                params: { next: `/profile/${id}` },
+                              })
+                            }
+                          />
+                        )
+                      ) : null}
                     </View>
-                    <Text style={profileStyles.heroSubtitle} numberOfLines={2}>
-                      {[
-                        profileData.position || profileData.primary_role,
-                        profileData.highest_level,
-                        [profileData.city, profileData.department]
-                          .filter(Boolean)
-                          .join(", "),
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </Text>
-                    {!!(!ownProfile && profileActivityLabel) && (
-                      <View style={profileStyles.activityLine}>
-                        <View
-                          accessibilityRole="text"
-                          accessibilityLabel={online ? "En ligne" : "Hors ligne"}
-                          style={[
-                            profileStyles.activityDot,
-                            {
-                              backgroundColor: online
-                                ? "#1CC75C"
-                                : "rgba(255,255,255,0.55)",
-                            },
-                          ]}
-                        />
-                        <Text style={profileStyles.activityText}>
-                          {profileActivityLabel}
-                        </Text>
-                      </View>
-                    )}
-                    {!!(ownProfile && typeof views.data === "number") && (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Voir les visites de mon profil"
-                        onPress={() => router.push("/profile-views")}
-                        style={({ pressed }) => ({
-                          opacity: pressed ? 0.82 : 1,
-                        })}
-                      >
-                        <LinearGradient
-                          colors={["#0967FF", "#7A2CFF", "#FF174D"]}
-                          start={{ x: 0, y: 0.5 }}
-                          end={{ x: 1, y: 0.5 }}
-                          style={[profileStyles.heroViewsPill, { minHeight: 44 }]}
-                        >
-                          <Eye size={15} color={colors.white} />
-                          <Text style={profileStyles.heroViewsText}>
-                            {views.data} {views.data === 1 ? "vue" : "vues"}
-                          </Text>
-                        </LinearGradient>
-                      </Pressable>
-                    )}
-                    {ownProfile ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Éditer le profil"
-                        onPress={() => router.push("/settings")}
-                        style={({ pressed }) => [
-                          profileStyles.heroEditButton,
-                          { opacity: pressed ? 0.82 : 1 },
-                        ]}
-                      >
-                        <Text style={profileStyles.heroEditText}>
-                          Éditer le profil
-                        </Text>
-                      </Pressable>
-                    ) : id ? (
-                      <ProfileActions id={id} variant="hero" />
-                    ) : null}
-                  </View>
+                  )}
                   {showProfileStats && (
-                    <View style={profileStyles.heroStatsRow}>
+                    <View
+                      style={[
+                        profileStyles.heroStatsRow,
+                        ownProfile && { paddingTop: 6, marginTop: 4 },
+                      ]}
+                    >
                       <ProfileStat
                         value={profileCounts.posts}
                         label="Publications"
@@ -497,147 +640,192 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
                     </View>
                   )}
                 </View>
-                <View style={profileStyles.identity}>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                      gap: 8,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 5,
-                        backgroundColor: colors.accentSoft,
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 8,
-                      }}
-                    >
-                      {profileData.account_type === "personal" ||
-                      !profileData.account_type ? (
-                        <Shirt size={13} color={colors.blue} />
-                      ) : (
-                        <Building2 size={13} color={colors.blue} />
+                {ownProfile ? (
+                  !!(profileData.bio || profileData.club) && (
+                    <View style={profileStyles.ownBio}>
+                      {!!profileData.club && (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Voir ${profileData.club}`}
+                          onPress={() => void openProfileClub()}
+                          style={({ pressed }) => ({
+                            flexDirection: "row",
+                            alignItems: "center",
+                            minHeight: 44,
+                            gap: 6,
+                            opacity: pressed ? 0.7 : 1,
+                          })}
+                        >
+                          <Shirt size={16} color={colors.blue} />
+                          <Text
+                            style={{
+                              color: colors.ink,
+                              fontSize: 13,
+                              fontWeight: "600",
+                              flexShrink: 1,
+                            }}
+                          >
+                            {profileData.club}
+                          </Text>
+                          <ChevronRight size={16} color={colors.muted} />
+                        </Pressable>
                       )}
-                      <Text
-                        style={{
-                          fontFamily: "Inter-SemiBold",
-                          fontSize: 12,
-                          color: colors.blue,
-                        }}
-                      >
-                        {accountLabel}
-                      </Text>
-                    </View>
-                    {!!profileData.club && (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Voir ${profileData.club}`}
-                        onPress={() => void openProfileClub()}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 3,
-                          minHeight: 36,
-                          justifyContent: "center",
-                          flexShrink: 1,
-                        }}
-                      >
+                      {!!profileData.bio && (
                         <Text
-                          numberOfLines={1}
                           style={{
                             color: colors.ink,
                             fontSize: 13,
-                            fontFamily: "Inter-SemiBold",
+                            lineHeight: 20,
                           }}
                         >
-                          {profileData.club}
+                          {profileData.bio}
                         </Text>
-                        <ChevronRight size={15} color={colors.blue} />
-                      </Pressable>
-                    )}
-                  </View>
-                  {!!(profileData.position || profileData.highest_level) && (
-                    <Text
-                      style={{
-                        color: colors.muted,
-                        fontFamily: "Inter-Regular",
-                        fontSize: 13,
-                        lineHeight: 20,
-                      }}
-                    >
-                      {[profileData.position, profileData.highest_level]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </Text>
-                  )}
-                  {!!profileData.bio && (
-                    <Text
-                      style={{
-                        color: colors.ink,
-                        fontFamily: "Inter-Regular",
-                        fontSize: 14,
-                        lineHeight: 22,
-                      }}
-                    >
-                      {profileData.bio}
-                    </Text>
-                  )}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 8,
-                      borderTopWidth: 1,
-                      borderTopColor: colors.border,
-                      paddingTop: 8,
-                      marginTop: 2,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flex: 1,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 5,
-                      }}
-                    >
-                      {!!(profileData.city || profileData.department) && (
-                        <>
-                          <MapPin size={14} color={colors.muted} />
-                          <Text
-                            numberOfLines={2}
-                            style={[s.small, { flexShrink: 1 }]}
-                          >
-                            {[profileData.city, profileData.department]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </Text>
-                        </>
                       )}
                     </View>
-                    <IconButton
-                      label="Voir le QR code du profil"
-                      onPress={() => router.push(`/profile-qr?id=${id}`)}
+                  )
+                ) : (
+                  <View style={profileStyles.identity}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: 8,
+                      }}
                     >
-                      <QrCode size={19} color={colors.muted} />
-                    </IconButton>
-                    <IconButton
-                      label={
-                        ownProfile
-                          ? "Partager mon profil"
-                          : "Partager ce profil"
-                      }
-                      onPress={shareProfile}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 5,
+                          backgroundColor: colors.accentSoft,
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                        }}
+                      >
+                        {profileData.account_type === "personal" ||
+                        !profileData.account_type ? (
+                          <Shirt size={13} color={colors.blue} />
+                        ) : (
+                          <Building2 size={13} color={colors.blue} />
+                        )}
+                        <Text
+                          style={{
+                            fontFamily: "Inter-SemiBold",
+                            fontSize: 12,
+                            color: colors.blue,
+                          }}
+                        >
+                          {accountLabel}
+                        </Text>
+                      </View>
+                      {!!profileData.club && (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Voir ${profileData.club}`}
+                          onPress={() => void openProfileClub()}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 3,
+                            minHeight: 36,
+                            justifyContent: "center",
+                            flexShrink: 1,
+                          }}
+                        >
+                          <Text
+                            numberOfLines={1}
+                            style={{
+                              color: colors.ink,
+                              fontSize: 13,
+                              fontFamily: "Inter-SemiBold",
+                            }}
+                          >
+                            {profileData.club}
+                          </Text>
+                          <ChevronRight size={15} color={colors.blue} />
+                        </Pressable>
+                      )}
+                    </View>
+                    {!!(profileData.position || profileData.highest_level) && (
+                      <Text
+                        style={{
+                          color: colors.muted,
+                          fontFamily: "Inter-Regular",
+                          fontSize: 13,
+                          lineHeight: 20,
+                        }}
+                      >
+                        {[profileData.position, profileData.highest_level]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </Text>
+                    )}
+                    {!!profileData.bio && (
+                      <Text
+                        style={{
+                          color: colors.ink,
+                          fontFamily: "Inter-Regular",
+                          fontSize: 14,
+                          lineHeight: 22,
+                        }}
+                      >
+                        {profileData.bio}
+                      </Text>
+                    )}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                        borderTopWidth: 1,
+                        borderTopColor: colors.border,
+                        paddingTop: 8,
+                        marginTop: 2,
+                      }}
                     >
-                      <Share2 size={19} color={colors.muted} />
-                    </IconButton>
+                      <View
+                        style={{
+                          flex: 1,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 5,
+                        }}
+                      >
+                        {!!(profileData.city || profileData.department) && (
+                          <>
+                            <MapPin size={14} color={colors.muted} />
+                            <Text
+                              numberOfLines={2}
+                              style={[s.small, { flexShrink: 1 }]}
+                            >
+                              {[profileData.city, profileData.department]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </Text>
+                          </>
+                        )}
+                      </View>
+                      <IconButton
+                        label="Voir le QR code du profil"
+                        onPress={() => router.push(`/profile-qr?id=${id}`)}
+                      >
+                        <QrCode size={19} color={colors.muted} />
+                      </IconButton>
+                      <IconButton
+                        label={
+                          ownProfile
+                            ? "Partager mon profil"
+                            : "Partager ce profil"
+                        }
+                        onPress={shareProfile}
+                      >
+                        <Share2 size={19} color={colors.muted} />
+                      </IconButton>
+                    </View>
                   </View>
-                </View>
+                )}
                 <ProfileStoryBubbles
                   key={`bubbles:${profileData.id}`}
                   profileId={profileData.id}
@@ -655,10 +843,15 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
                       ["posts", "Publications", Grid3X3],
                       ["videos", "Shorts", PlaySquare],
                       ["clubs", "Clubs", Shirt],
+                      ["tags", "Tags", Tag],
                       ["about", "À propos", SquareUserRound],
                     ] as const
                   )
-                    .filter(([section]) => section !== "clubs" || hasClub)
+                    .filter(
+                      ([section]) =>
+                        (section !== "clubs" || hasClub) &&
+                        (section !== "tags" || !!taggedPosts.data?.length),
+                    )
                     .map(([section, label, Icon]) => (
                       <ProfileTabIcon
                         key={section}
@@ -693,9 +886,17 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
               </View>
             }
             ListEmptyComponent={
-              !showPosts ? null : posts.isPending ? (
+              !showPosts && !showTags ? null : showTags &&
+                taggedPosts.isPending ? (
                 <Loading />
-              ) : posts.isError ? (
+              ) : showTags && taggedPosts.isError ? (
+                <ErrorState
+                  error={taggedPosts.error}
+                  retry={() => void taggedPosts.refetch()}
+                />
+              ) : showPosts && posts.isPending ? (
+                <Loading />
+              ) : showPosts && posts.isError ? (
                 <ErrorState
                   error={posts.error}
                   retry={() => void posts.refetch()}
@@ -703,14 +904,20 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
               ) : (
                 <View style={s.content}>
                   <Empty
-                    title="Aucune publication"
+                    title={
+                      showTags
+                        ? "Aucune publication taguée"
+                        : "Aucune publication"
+                    }
                     description={
-                      ownProfile
-                        ? "Partage ton premier moment de football avec ton réseau."
-                        : "Les publications de ce membre apparaîtront ici."
+                      showTags
+                        ? "Les publications qui te mentionnent apparaîtront ici."
+                        : ownProfile
+                          ? "Partage ton premier moment de football avec ton réseau."
+                          : "Les publications de ce membre apparaîtront ici."
                     }
                     action={
-                      ownProfile ? (
+                      !showTags && ownProfile ? (
                         <Button
                           title="Créer une publication"
                           onPress={() => router.push("/compose")}
@@ -727,10 +934,10 @@ export default function Profile({ tab = false }: { tab?: boolean } = {}) {
             }}
           />
         )}
-      </AuthGate>
+      </>
       {!!openedPost && (
         <PagedMediaViewer
-          items={loadedPosts}
+          items={visiblePosts}
           initialKey={openedPost}
           keyFor={(item) => item.id}
           onClose={() => setOpenedPost(null)}
@@ -971,6 +1178,37 @@ const createProfileStyles = (colors: ThemeColors) =>
       alignItems: "center",
       gap: 6,
     },
+    ownIdentity: { paddingHorizontal: 20, paddingTop: 10, gap: 16 },
+    ownIdentityRow: { flexDirection: "row", alignItems: "center", gap: 16 },
+    ownEdit: {
+      alignSelf: "flex-start",
+      minHeight: 44,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      backgroundColor: "#FFF",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+    },
+    ownEditText: { color: "#111827", fontSize: 13, fontWeight: "700" },
+    ownShortcuts: { flexDirection: "row", gap: 8 },
+    ownShortcut: {
+      minHeight: 44,
+      borderRadius: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 10,
+      gap: 7,
+      flex: 1,
+    },
+    ownShortcutText: {
+      color: "#FFF",
+      fontSize: 12,
+      fontWeight: "700",
+      flexShrink: 1,
+    },
+    ownBio: { paddingHorizontal: 20, paddingVertical: 10, gap: 2 },
     heroIdentity: {
       alignItems: "center",
       paddingHorizontal: 22,

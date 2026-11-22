@@ -9,6 +9,7 @@ export const adminSections = [
   ["premium", "Premium"],
   ["publications", "Publications"],
   ["moderation", "Modération"],
+  ["decisions", "Analyse des annonces"],
   ["posthog", "PostHog"],
 ] as const;
 export type AdminSection = (typeof adminSections)[number][0];

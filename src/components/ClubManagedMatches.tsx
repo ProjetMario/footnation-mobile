@@ -4,6 +4,7 @@ import {
   ClubSectionHeading,
 } from "./ClubDesign";
 import { ClubMatchMVP } from "./ClubMatchMVP";
+import { VisibleMatchLineup } from "./VisibleMatchLineup";
 import {
   ClubGoalLiveRecorder,
   ClubMatchContributors,
@@ -134,6 +135,7 @@ export function ClubManagedMatches({ id, name }: { id: string; name: string }) {
             <Text style={s.small}>
               {match.is_home ? "À domicile" : "À l’extérieur"}
             </Text>
+            <VisibleMatchLineup clubId={id} matchId={match.id} />
             {!!(match.status === "live" || match.status === "scheduled") && (
               <>
                 <Button

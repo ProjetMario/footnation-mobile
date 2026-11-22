@@ -50,6 +50,14 @@ export function isSocialAuthCancellation(error: unknown) {
 }
 
 export class SocialAuthError extends Error {}
+
+export function socialCallbackUrlParams(url: string) {
+  const value = new URL(url);
+  const params = new URLSearchParams(value.hash.slice(1));
+  value.searchParams.forEach((entry, key) => params.set(key, entry));
+  return params;
+}
+
 export function socialAuthErrorMessage(error: unknown) {
   return error instanceof SocialAuthError
     ? error.message
@@ -67,6 +75,12 @@ export function socialCallbackErrorMessage(input: {
   const error = String(input.error || "").toLowerCase();
   const description = String(input.description || "").toLowerCase();
   const provider = socialProvider(input.provider);
+  const name =
+    provider === "apple"
+      ? "Apple"
+      : provider === "google"
+        ? "Google"
+        : "Le fournisseur";
 
   if (error === "access_denied" || code === "access_denied")
     return "Connexion annulée. Vous pouvez réessayer ou utiliser votre adresse e-mail.";
@@ -76,10 +90,13 @@ export function socialCallbackErrorMessage(input: {
       description.includes("unable to exchange external code"))
   )
     return "Google a autorisé la connexion, mais FootNation n’a pas pu valider le retour. Réessayez dans quelques instants ou connectez-vous avec votre adresse e-mail et votre mot de passe.";
-  if (code === "redirect_uri_mismatch" || description.includes("redirect_uri_mismatch"))
-    return "L’adresse de retour Google n’est pas autorisée. Vérifiez les URL de redirection OAuth dans Google et Supabase.";
+  if (
+    code === "redirect_uri_mismatch" ||
+    description.includes("redirect_uri_mismatch")
+  )
+    return `La connexion avec ${name} n’a pas pu revenir dans FootNation. Réessayez ou utilisez votre adresse e-mail.`;
   if (error === "server_error" || code === "server_error")
-    return "Le service de connexion Google est temporairement indisponible. Réessayez ou utilisez votre adresse e-mail.";
+    return `Le service de connexion ${name} est temporairement indisponible. Réessayez ou utilisez votre adresse e-mail.`;
   return "Le service de connexion n’a pas pu vous authentifier. Réessayez ou utilisez votre adresse e-mail.";
 }
 

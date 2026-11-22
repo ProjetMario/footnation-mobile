@@ -42,8 +42,21 @@ function Load() {
         .select("id,updated_at,education,certifications,training_history")
         .eq("id", session!.user.id)
         .single();
-      if (error) throw error;
-      return data;
+      if (!error) return data;
+      // Older projects may only have the certifications column. Keep the
+      // screen usable while those optional profile fields are unavailable.
+      const fallback = await supabase
+        .from("profiles")
+        .select("id,updated_at,certifications")
+        .eq("id", session!.user.id)
+        .single();
+      if (fallback.error) throw error;
+      return {
+        ...fallback.data,
+        education: [],
+        training_history: [],
+        __optionalFieldsUnavailable: true,
+      };
     },
   });
   return (
@@ -67,12 +80,24 @@ function Load() {
           key={`${section}:${query.data.updated_at}`}
           section={section}
           profile={query.data}
+          readOnly={Boolean(
+            (query.data as any).__optionalFieldsUnavailable &&
+            section !== "certifications",
+          )}
         />
       )}
     </>
   );
 }
-function Editor({ section, profile }: { section: Section; profile: any }) {
+function Editor({
+  section,
+  profile,
+  readOnly = false,
+}: {
+  section: Section;
+  profile: any;
+  readOnly?: boolean;
+}) {
   const s = useUIStyles();
 
   const { session, reload } = useAuth();
@@ -160,6 +185,16 @@ function Editor({ section, profile }: { section: Section; profile: any }) {
         </Text>
         <Text style={s.small}>
           Ces données utilisent un ancien format et sont conservées en lecture.
+        </Text>
+      </View>
+    );
+  if (readOnly)
+    return (
+      <View style={s.card}>
+        <Text style={s.h2}>Rubrique indisponible</Text>
+        <Text style={s.small}>
+          Cette rubrique sera disponible dès que les données du profil seront
+          activées.
         </Text>
       </View>
     );

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Text, View } from "react-native";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
   Avatar,
   Banner,
@@ -24,6 +24,7 @@ import {
   choices,
 } from "../lib/careerOptions";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../lib/auth";
 const blank = {
   type: "",
   level: "",
@@ -35,10 +36,34 @@ const blank = {
 };
 export default function Career() {
   const s = useUIStyles();
+  const { session } = useAuth();
 
   const [draft, setDraft] = useState(blank);
   const [filters, setFilters] = useState(blank);
   const [expanded, setExpanded] = useState(false);
+  const nearby = useQuery({
+    queryKey: ["nearby-clubs", session?.user.id],
+    enabled: !!session,
+    queryFn: async () => {
+      const profile = await supabase
+        .from("profiles")
+        .select("department,city")
+        .eq("id", session!.user.id)
+        .single();
+      if (profile.error) throw profile.error;
+      if (!profile.data.department && !profile.data.city) return [];
+      let request = supabase
+        .from("fff_clubs")
+        .select("id,name,short_name,city,department_code,logo_url")
+        .limit(4);
+      if (profile.data.department)
+        request = request.eq("department_code", profile.data.department);
+      else request = request.ilike("city", profile.data.city!);
+      const result = await request.order("name");
+      if (result.error) throw result.error;
+      return result.data || [];
+    },
+  });
   const query = useInfiniteQuery({
     queryKey: ["native-career", filters],
     initialPageParam: 0,
@@ -76,6 +101,23 @@ export default function Career() {
   return (
     <Screen title="Recherche de club">
       <Banner eyebrow="CARRIÈRE" title="Trouvez votre prochain club" />
+      {!!nearby.data?.length && (
+        <View style={s.card}>
+          <Text style={s.h2}>Clubs près de chez vous</Text>
+          <Text style={s.small}>
+            Une sélection basée sur votre ville ou votre département.
+          </Text>
+          {nearby.data.map((club) => (
+            <View key={club.id} style={[s.row, { alignItems: "center" }]}>
+              <Avatar uri={club.logo_url} name={club.name} size={42} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.text}>{club.name}</Text>
+                {!!club.city && <Text style={s.small}>{club.city}</Text>}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
       <Button
         title={expanded ? "Masquer les filtres" : "Filtrer les clubs"}
         secondary

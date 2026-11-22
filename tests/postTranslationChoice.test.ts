@@ -1,0 +1,61 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import React, { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+const state=vi.hoisted(()=>({enabled:false,queryFn:null as null | ((args:{signal:AbortSignal})=>Promise<unknown>),invoke:vi.fn()}));
+vi.mock('react-native',async()=>{
+ const React=await import('react');
+ const component=(tag:string)=>(props:any)=>React.createElement(tag,{...props,onClick:props.onPress,accessibilityRole:undefined,accessibilityState:undefined,nestedScrollEnabled:undefined,selectable:undefined},props.children);
+ return {View:component('div'),Text:component('span'),ScrollView:component('div'),Pressable:component('button')};
+});
+vi.mock('@tanstack/react-query',()=>({useQuery:(options:any)=>{state.enabled=options.enabled;state.queryFn=options.queryFn;return {data:null,error:null,isError:false,isFetching:false,refetch:vi.fn()}}}));
+vi.mock('../src/lib/i18n',()=>({useLanguage:()=>({language:'fr'}),useTranslation:()=> (key:string)=>key}));
+vi.mock('../src/lib/supabase',()=>({supabase:{functions:{invoke:state.invoke}}}));
+vi.mock('../src/theme',()=>({useTheme:()=>({colors:{ink:'black',muted:'grey'}})}));
+import {PostTranslation} from '../src/components/PostTranslation';
+let element:HTMLDivElement,root:Root;
+beforeEach(()=>{(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;element=document.createElement('div');document.body.append(element);root=createRoot(element);state.enabled=false;state.invoke.mockReset();state.invoke.mockResolvedValue({data:{translations:[{text:'Bonjour aux amis du club'}]},error:null});});
+afterEach(async()=>{await act(async()=>root.unmount());element.remove();});
+it('asks for a supported source and starts no request until the reader chooses it',async()=>{
+ await act(async()=>root.render(React.createElement(PostTranslation,{text:'Привет друзья клуба',targetLanguage:'fr',autoDetectUnknown:true,communityUiLanguage:'fr'})));
+ expect(state.enabled).toBe(false);
+ const show=element.querySelector('button');expect(show).not.toBeNull();
+ await act(async()=>show!.click());
+ expect(state.enabled).toBe(false);
+ expect(element.textContent).toContain('Langue du sujet');
+ const russian=[...element.querySelectorAll('button')].find(button=>button.textContent?.includes('(ru)'));
+ expect(russian).toBeDefined();
+ await act(async()=>russian!.click());
+ expect(state.enabled).toBe(true);
+ expect(state.invoke).not.toHaveBeenCalled();
+ await state.queryFn!({signal:new AbortController().signal});
+ expect(state.invoke).toHaveBeenCalledWith('translate',expect.objectContaining({body:{texts:['Привет друзья клуба'],source_lang:'RU',target_lang:'FR'}}));
+ const change=[...element.querySelectorAll('button')].find(button=>button.textContent?.includes('Langue du sujet'));
+ expect(change).toBeDefined();
+ await act(async()=>change!.click());
+ expect(state.enabled).toBe(false);
+ expect([...element.querySelectorAll('button')].some(button=>button.textContent?.includes('(ru)'))).toBe(true);
+});
+it('asks before treating Arabic script as Arabic',async()=>{
+ await act(async()=>root.render(React.createElement(PostTranslation,{text:'مرحبا بكم في النادي',targetLanguage:'fr',autoDetectUnknown:true,communityUiLanguage:'fr'})));
+ await act(async()=>element.querySelector('button')!.click());
+ expect(state.enabled).toBe(false);
+ const arabic=[...element.querySelectorAll('button')].find(button=>button.textContent?.includes('(ar)'));
+ expect(arabic).toBeDefined();
+ await act(async()=>arabic!.click());
+ expect(state.enabled).toBe(true);
+});
+it('allows a reader to correct an automatically detected source',async()=>{
+ await act(async()=>root.render(React.createElement(PostTranslation,{text:'I am looking for a football player and team',targetLanguage:'fr',autoDetectUnknown:true,communityUiLanguage:'fr'})));
+ await act(async()=>element.querySelector('button')!.click());
+ expect(state.enabled).toBe(true);
+ const change=[...element.querySelectorAll('button')].find(button=>button.textContent?.includes('Langue du sujet'));
+ expect(change).toBeDefined();
+ await act(async()=>change!.click());
+ expect(state.enabled).toBe(false);
+ const spanish=[...element.querySelectorAll('button')].find(button=>button.textContent?.includes('(es)'));
+ await act(async()=>spanish!.click());
+ expect(state.enabled).toBe(true);
+ await state.queryFn!({signal:new AbortController().signal});
+ expect(state.invoke).toHaveBeenCalledWith('translate',expect.objectContaining({body:expect.objectContaining({source_lang:'ES',target_lang:'FR'})}));
+});

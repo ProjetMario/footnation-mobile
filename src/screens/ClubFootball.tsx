@@ -7,7 +7,7 @@ import {
 import React, { useEffect, useState } from "react";
 import { calendarDate } from "../lib/calendarDate";
 import { todayMatches } from "../lib/todayMatches";
-import { AppState, Pressable, Text, View } from "react-native";
+import { AppState, Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -22,7 +22,10 @@ import { ClubTeams } from "../components/ClubTeams";
 import { ClubMatchCalendar } from "../components/ClubMatchCalendar";
 import { useTheme } from "../theme";
 import { ClubNews } from "../components/ClubNews";
-import { supabase } from "../lib/supabase";
+import { ClubMemberRoster } from "./ClubMemberSpace";
+import { fetchClubSports, fetchSportsTeam } from "../lib/fffSportData";
+import { sportsCoverageMessage } from '../lib/sportProjection';
+import { effectiveClubLogo } from '../lib/clubLogoPolicy.mjs';
 export function ClubFootball({
   id,
   initialTab = "teams",
@@ -39,7 +42,7 @@ export function ClubFootball({
   const s = useUIStyles();
   const { colors } = useTheme();
 
-  const [tab, setTab] = useState<string>(initialTab);
+  const [tab, setTab] = useState<"teams" | "upcomingMatches" | "pastMatches" | "today">(initialTab);
   const [day, setDay] = useState(() => calendarDate(new Date()));
   useEffect(() => {
     const update = () => setDay(calendarDate(new Date()));
@@ -53,29 +56,17 @@ export function ClubFootball({
     };
   }, []);
   const query = useQuery({
-    queryKey: ["native-club-football", id],
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("club-details", {
-        body: { clubId: id },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (!data) throw new Error("Aucune réponse pour ce club.");
-      return data;
-    },
+    queryKey: ["native-club-football", id, 'sources-v2'],
+    queryFn: () => fetchClubSports(id),
     staleTime: 120000,
   });
-  const rows =
-    tab === "today"
-      ? todayMatches(
-          query.data?.upcomingMatches || [],
-          query.data?.pastMatches || [],
-          day,
-        )
-      : query.data?.[tab] || [];
+  const matches = tab === "today"
+    ? todayMatches(query.data?.upcomingMatches || [], query.data?.pastMatches || [], day)
+    : tab === "pastMatches" ? query.data?.pastMatches || [] : query.data?.upcomingMatches || [];
   const club = {
     name: clubName || query.data?.club?.name || "",
-    logo: clubLogoUrl || query.data?.club?.logo,
+    logo: effectiveClubLogo({id, name:clubName, is_pro:query.data?.clubProfessional}, clubLogoUrl),
+    is_pro: query.data?.clubProfessional,
     teamIds: (query.data?.teams || []).map((team: { id: string }) => team.id),
   };
   return (
@@ -117,7 +108,7 @@ export function ClubFootball({
                 accessibilityLabel={label}
                 accessibilityState={{ selected: tab === key }}
                 aria-selected={tab === key}
-                onPress={() => setTab(key)}
+                onPress={() => setTab(key as typeof tab)}
                 style={{
                   flex: 1,
                   minHeight: 40,
@@ -141,17 +132,22 @@ export function ClubFootball({
             ))}
         </View>
       )}
+      <Text style={s.small}>{query.data ? `${query.data.sourceLabel} · ${query.data.season}` : 'Sources sportives officielles'}</Text>
+      {!!query.data && <>
+        {!!sportsCoverageMessage(query.data.status, query.data.stale) && <Text style={s.small}>{sportsCoverageMessage(query.data.status, query.data.stale)}</Text>}
+        {!!query.data.checkedAt && <Text style={s.small}>Dernière vérification : {new Date(query.data.checkedAt).toLocaleString("fr-FR")}</Text>}
+      </>}
       {!!query.isPending && <Loading />}
       {!!query.error && (
         <ErrorState error={query.error} retry={() => void query.refetch()} />
       )}
       {!!query.data &&
         (tab === "teams" ? (
-          <ClubTeams teams={rows} logoUrl={club.logo} />
+          <ClubTeams teams={query.data.teams} logoUrl={club.logo} />
         ) : (
           <ClubMatchCalendar
             key={id}
-            matches={rows}
+            matches={matches}
             allMatches={[
               ...(query.data.upcomingMatches || []),
               ...(query.data.pastMatches || []),
@@ -168,18 +164,10 @@ export function TeamDetail() {
   const s = useUIStyles();
 
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
-  const [tab, setTab] = useState("rankings");
+  const [tab, setTab] = useState<"rankings" | "upcomingMatches" | "pastMatches" | "news" | "roster">("rankings");
   const query = useQuery({
-    queryKey: ["native-team-football", teamId],
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("team-details", {
-        body: { teamId },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (!data?.team) throw new Error("Équipe introuvable.");
-      return data;
-    },
+    queryKey: ["native-team-football", teamId, 'sources-v2'],
+    queryFn: () => fetchSportsTeam(teamId),
   });
   return (
     <Screen title="Équipe">
@@ -187,72 +175,87 @@ export function TeamDetail() {
         <Loading />
       ) : query.error ? (
         <ErrorState error={query.error} retry={() => void query.refetch()} />
-      ) : (
+      ) : query.data ? (
         <>
           <Banner
             eyebrow={query.data.team.category || "ÉQUIPE"}
             title={query.data.team.name}
-            description={query.data.competition?.name}
+            description={`${query.data.team.seasonLabel || query.data.season} · ${query.data.team.competition?.name || query.data.sourceLabel}`}
           />
+          {!!sportsCoverageMessage(query.data.status, query.data.stale) && <Text style={s.small}>{sportsCoverageMessage(query.data.status, query.data.stale)}</Text>}
           {!!query.data.team.clubId && (
             <Button
               title="Voir le club"
               secondary
               onPress={() =>
                 router.push(
-                  `/club/${encodeURIComponent(query.data.team.clubSlug || query.data.team.clubId)}`,
+                  `/club/${encodeURIComponent(query.data.team.clubId)}`,
                 )
               }
             />
           )}
           <View style={[s.row, { flexWrap: "wrap" }]}>
             {[
-              ["rankings", "Classement"],
-              ["upcomingMatches", "Calendrier"],
-              ["pastMatches", "Résultats"],
+              ["rankings", `Classements (${query.data.rankings.filter(r => r.rows.length).length})`],
+              ["upcomingMatches", `Calendrier (${query.data.upcomingMatches.length})`],
+              ["pastMatches", `Résultats (${query.data.pastMatches.length})`],
+              ["roster", `Effectif${query.data.team.roster ? ` (${query.data.team.roster.players.length})` : ''}`],
               ["news", "Actualités"],
             ].map(([key, label]) => (
               <Chip
                 key={key}
                 label={label}
                 selected={tab === key}
-                onPress={() => setTab(key)}
+                onPress={() => setTab(key as typeof tab)}
               />
             ))}
           </View>
-          {tab === "news" && query.data.team.clubId ? (
+          <Text style={s.small}>{query.data.team.calendarComplete
+            ? "Toutes les pages publiées des engagements de cette équipe ont été vérifiées."
+            : "Calendrier partiel : certaines rencontres restent à vérifier."}</Text>
+          {!!query.data.team.matchesFetchedAt && <Text style={s.small}>Calendrier vérifié le {new Date(query.data.team.matchesFetchedAt).toLocaleString("fr-FR")}</Text>}
+          {!!query.data.team.collectionIssues.length && <Text style={s.small}>Actualisation incomplète : les dernières données vérifiées sont conservées.</Text>}
+          {tab === 'roster' ? (
+            query.data.team.roster ? <View style={s.card}>
+              <Text style={s.text}>Effectif publié par la source officielle</Text>
+              <Text style={s.small}>{query.data.team.roster.complete ? 'Effectif complet lors de la vérification.' : 'Effectif partiel : certains joueurs restent à vérifier.'}</Text>
+              <Text style={s.small}>Vérifié le {new Date(query.data.team.roster.checkedAt).toLocaleString('fr-FR')}</Text>
+              {query.data.team.roster.players.map(player => <View key={player.id} style={[s.row, {paddingVertical:8}]}>
+                <Text style={s.text}>{player.shirtNumber == null ? '' : `${player.shirtNumber} · `}{player.name}</Text>
+                {!!player.position && <Text style={s.small}>{player.position}</Text>}
+              </View>)}
+              <Button secondary title="Consulter la source" onPress={() => void Linking.openURL(query.data!.team.roster!.sourceUrl)} />
+            </View> : !query.data.clubProfessional && query.data.team.clubId ? <ClubMemberRoster id={query.data.team.clubId} /> :
+              <Empty title="Effectif officiel indisponible" description="Les joueurs apparaîtront lorsqu’une source autorisée et vérifiée sera disponible." />
+          ) : tab === "news" && query.data.team.clubId ? (
             <ClubNews
               id={query.data.team.clubId}
               name={query.data.team.clubName || query.data.team.name}
               teamId={teamId}
               title="Actualités de l’équipe"
             />
-          ) : !query.data[tab]?.length ? (
-            <Empty title="Aucune donnée disponible" />
           ) : tab === "rankings" ? (
-            <View style={s.card}>
-              {query.data.rankings.map((row: any) => (
-                <View key={`${row.rank}/${row.teamId}`} style={s.between}>
-                  <Text style={[s.text, { flex: 1 }]}>
-                    {row.rank}. {row.teamName}
-                  </Text>
-                  <Text style={s.small}>
-                    {row.played} J · {row.goalDiff > 0 ? "+" : ""}
-                    {row.goalDiff}
-                  </Text>
-                  <Text style={[s.text, { fontWeight: "800" }]}>
-                    {row.points} pts
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            query.data[tab].map((match: any) => (
-              <MatchCard key={match.id} match={match} />
-            ))
-          )}
+            query.data.rankings.length ? [...query.data.rankings].sort((a,b) => Number(!!b.rows.length) - Number(!!a.rows.length)).map(standing => (
+              <View key={standing.key} style={s.card}>
+                <Text style={s.text}>{standing.name}</Text>
+                <Text style={s.small}>{[standing.phase, standing.pool].filter(Boolean).join(" · ")}</Text>
+                {!!standing.fetchedAt && <Text style={s.small}>Vérifié le {new Date(standing.fetchedAt).toLocaleString("fr-FR")}</Text>}
+                {!standing.rows.length ? <Text style={s.small}>{standing.status === "source_unavailable" ? "Classement momentanément indisponible." : "Aucun classement publié pour cette compétition."}</Text> : <ScrollView horizontal accessibilityLabel={`Classement ${standing.name}`}>
+                  <View>
+                    <View style={{flexDirection:"row",paddingVertical:10}}>{["Rang","Équipe","Pts","J","G","N","P","BP","BC","Diff"].map((label,index) => <Text key={label} style={[s.small,{width:index===1?220:48,fontWeight:"700"}]}>{label}</Text>)}</View>
+                    {standing.rows.map((row,index) => <View key={`${row.teamId}/${index}`} style={{flexDirection:"row",paddingVertical:10,borderTopWidth:1,borderTopColor:"#e2e8f0",backgroundColor:row.teamId===teamId?"#eff6ff":"transparent"}}>
+                      {[row.rank,row.name,row.points,row.played,row.won,row.drawn,row.lost,row.goalsFor,row.goalsAgainst,row.goalDifference].map((value,cell) => <Text key={cell} style={[s.text,{width:cell===1?220:48,fontWeight:row.teamId===teamId?"700":"400"}]}>{value ?? "–"}</Text>)}
+                    </View>)}
+                  </View>
+                </ScrollView>}
+              </View>
+            )) : <Empty title={query.data.team.calendarComplete ? "Aucun classement publié pour cette équipe et cette saison" : "Classements en attente de vérification"} />
+          ) : tab === "upcomingMatches" || tab === "pastMatches" ? (
+            query.data[tab].length ? query.data[tab].map(match => <MatchCard key={match.id} match={match} club={{name:query.data.team.clubName,teamIds:[query.data.team.id],is_pro:query.data.clubProfessional}} />) : <Empty title={query.data.team.calendarComplete ? tab === "pastMatches" ? "Aucun résultat publié pour cette équipe" : "Aucune rencontre à venir publiée pour cette équipe" : "Rencontres en attente de vérification"} />
+          ) : <Empty title="Aucune donnée disponible" />}
+
         </>
-      )}
+      ) : null}
     </Screen>
   );
 }

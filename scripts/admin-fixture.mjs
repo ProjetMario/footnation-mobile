@@ -161,6 +161,7 @@ export function createAdminFixture(tables, ids) {
     status: "approved",
     joined_at: now(),
     created_at: now(),
+    updated_at: now(),
     jersey_number: null,
     position: null,
   }));
@@ -701,6 +702,24 @@ export function createAdminFixture(tables, ids) {
           )
           .map((t) => pick(t, ["id", "name", "category", "is_active"])),
       );
+    if (name === "get_native_team_invitation_editor_teams")
+      return ok(
+        tables.teams
+          .filter((t) => t.club_id === b.p_club_id && t.is_active && canManage(role, b.p_club_id, t.id))
+          .map((t) => pick(t, ["id", "name", "category", "season"])),
+      );
+    if (name === "get_native_club_dispatch_members") {
+      if (!admin(role, b.p_club_id)) return forbidden();
+      return ok(tables.profiles.filter((p) => p.linked_club_id === b.p_club_id || tables.team_members.some((m) => m.profile_id === p.id && m.is_active && m.status === "approved" && tables.teams.some((t) => t.id === m.team_id && t.club_id === b.p_club_id)))
+        .sort((a, z) => String(a.full_name || "").localeCompare(String(z.full_name || "")) || a.id.localeCompare(z.id))
+        .slice(b.p_offset || 0, (b.p_offset || 0) + 30)
+        .map((p) => ({ ...p, assignments: tables.team_members.filter((m) => m.profile_id === p.id && m.is_active).flatMap((m) => {
+          const team = tables.teams.find((t) => t.id === m.team_id && t.club_id === b.p_club_id);
+          return team ? [{ ...m, team: { name: team.name, club_id: team.club_id } }] : [];
+        }) })));
+    }
+    if (name === "get_native_coach_team_requests") return admin(role, b.p_club_id) ? ok([]) : forbidden();
+    if (name === "get_native_coach_team_options") return role === "coach" && b.p_club_id === red ? ok([]) : forbidden();
     if (
       name === "mutate_native_club_record_snapshot" ||
       name === "update_native_attendance_session"
@@ -939,7 +958,7 @@ export function createAdminFixture(tables, ids) {
     if (name === "set_native_primary_team") {
       if (!admin(role, b.p_club_id)) return forbidden();
       const profile = tables.profiles.find(
-        (p) => p.id === b.p_profile_id && p.linked_club_id === b.p_club_id,
+        (p) => p.id === b.p_profile_id && (p.linked_club_id === b.p_club_id || tables.team_members.some((m) => m.profile_id === p.id && m.is_active && m.status === "approved" && tables.teams.some((t) => t.id === m.team_id && t.club_id === b.p_club_id && t.is_active))),
       );
       if (!profile) return invalid("Ce membre ne fait plus partie du club.");
       if (
@@ -960,17 +979,28 @@ export function createAdminFixture(tables, ids) {
       const primary = assignments.filter((m) => m.is_active && m.is_primary);
       if (primary.length > 1) return invalid("Plusieurs équipes principales.");
       const previous = primary[0]?.team_id ?? null;
-      if (previous === b.p_team_id) return ok(null);
-      if (previous !== b.p_expected_team_id) return conflict();
+      if (previous !== b.p_team_id && previous !== b.p_expected_team_id)
+        return conflict();
+      const existing = assignments.find((m) => m.team_id === b.p_team_id);
+      if (
+        existing &&
+        /^(coach|entraineur|entraîneur|educat|éducat)/.test(String(existing.role || "").trim().toLowerCase()) &&
+        (!existing.is_active || existing.status !== "approved")
+      )
+        return fail(
+          403,
+          "42501",
+          "Envoyez une nouvelle invitation de coach et faites-la accepter avant de choisir cette équipe principale.",
+        );
       assignments.forEach((m) => {
         m.is_primary = false;
       });
       if (b.p_team_id) {
-        const existing = assignments.find((m) => m.team_id === b.p_team_id);
         if (existing)
           Object.assign(existing, {
             is_primary: true,
             is_active: true,
+            status: "approved",
             left_at: null,
           });
         else

@@ -50,3 +50,34 @@ export function translationSource(text: string, target: string): string | null {
     ? source
     : null;
 }
+
+// The translation endpoint accepts a fixed list of base-language codes, not
+// arbitrary BCP 47 tags. Never send `und` or a script suffix as a language.
+export const TRANSLATION_LANGUAGES = [
+  "fr", "en", "es", "de", "it", "pt", "hr", "nl", "pl", "ru", "ja", "zh", "ko",
+  "ar", "tr", "uk", "cs", "da", "el", "fi", "hu", "id", "nb", "ro", "sk",
+  "sv", "bg", "et", "lt", "lv", "sl",
+] as const;
+const translationLanguages = new Set<string>(TRANSLATION_LANGUAGES);
+export function translationLanguage(value: string | null | undefined): string | null {
+  if (!value || !/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(value)) return null;
+  // The endpoint offers only its default Chinese output (currently zh-CN).
+  // Do not present it as a traditional Chinese translation.
+  if (/^zh-(?:hant|tw|hk|mo)(?:-|$)/i.test(value)) return null;
+  const base = value.split("-")[0].toLowerCase();
+  return translationLanguages.has(base) ? base : null;
+}
+export function translationPair(text: string, target: string, explicitSource?: string | null, autoDetectUnknown = false) {
+  const destination = translationLanguage(target);
+  const knownSource = translationLanguage(explicitSource);
+  // Arabic script alone cannot distinguish Arabic, Persian or Urdu. In club
+  // discussions, AUTO means the reader must choose a supported source rather
+  // than sending an unsupported automatic-detection request to the provider.
+  const detectedSource = detectPostLanguage(text);
+  const declaredUnsupported = !!explicitSource && explicitSource.toLowerCase() !== 'und' && !knownSource;
+  const ambiguousArabicScript = autoDetectUnknown && /\p{Script=Arabic}/u.test(text);
+  const source = knownSource || (declaredUnsupported || ambiguousArabicScript
+    ? (autoDetectUnknown && /\p{L}/u.test(text) ? 'auto' : null)
+    : detectedSource || (autoDetectUnknown && /\p{L}/u.test(text) ? 'auto' : null));
+  return { destination, source: source && source !== (destination || target.toLowerCase().split(/[-_]/)[0]) ? source : null };
+}

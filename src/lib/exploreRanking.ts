@@ -9,6 +9,7 @@ import {
   type SearchResult,
 } from "./globalSearch";
 import { isSuspended } from "./validation";
+import { clubLocationLabel } from "./clubLocation";
 export type ExploreContext = {
   profile: Profile;
   clubs: Club[];
@@ -28,10 +29,11 @@ export async function loadExploreContext(
   profile: Profile,
   location: MapLocation | null,
   signal: AbortSignal,
+  blockedAuthors?: string[],
 ): Promise<ExploreContext> {
   const [clubs, blocked, follows] = await Promise.all([
     loadRelatedClubs(profile, signal),
-    blockedSocialAuthors(profile.id),
+    blockedAuthors ?? blockedSocialAuthors(profile.id, signal),
     supabase
       .from("profile_followers")
       .select("followed_id")
@@ -184,7 +186,7 @@ export async function loadExplorePriority(
       .from(kind === "clubs" ? "fff_clubs" : "profiles")
       .select(
         kind === "clubs"
-          ? "id,name,short_name,city,department_code,logo_url,latitude,longitude"
+          ? "id,name,short_name,city,department_code,metadata,logo_url,latitude,longitude"
           : "id,full_name,username,avatar_url,city,department,club,position,highest_level,favorite_pro_club,favorite_amateur_club,is_suspended,suspended_until",
       )
       .or(filters.join(","))
@@ -194,7 +196,7 @@ export async function loadExplorePriority(
     if (term.trim())
       q = q.or(
         (kind === "clubs"
-          ? ["name", "short_name", "city"]
+          ? ["name", "short_name", "city", "metadata->>country", "metadata->>country_code"]
           : ["full_name", "username", "club", "city", "position"]
         )
           .map(
@@ -234,7 +236,7 @@ export async function loadExplorePriority(
       id: `${kind}:${row.id}`,
       kind,
       title: row.name || row.full_name || row.username || "Membre FootNation",
-      subtitle: [row.club, row.city, row.department_code]
+      subtitle: kind === "clubs" ? clubLocationLabel(row) : [row.club, row.city, row.department_code]
         .filter(Boolean)
         .join(" · "),
       reason,
@@ -248,6 +250,7 @@ export async function searchWithPriorities(
   kind: SearchCategory,
   offset: number,
   priority: SearchResult[],
+  options?: Parameters<typeof searchFootNation>[7],
 ) {
   const first = priority.slice(offset, offset + 20);
   if (first.length === 20) return { rows: first, hasMore: true };
@@ -259,6 +262,7 @@ export async function searchWithPriorities(
     undefined,
     !term,
     priority.map((row) => row.id.slice(row.id.indexOf(":") + 1)),
+    options,
   );
   return {
     rows: [...first, ...rest.rows.slice(0, 20 - first.length)],

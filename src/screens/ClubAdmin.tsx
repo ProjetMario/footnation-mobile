@@ -1,4 +1,6 @@
 import { EventTeamField } from "../components/EventTeamField";
+import { EventConvocationButton } from "../components/EventConvocationButton";
+import { MatchLineup } from "../components/MatchLineup";
 import {
   loadCalendarEditorContext,
   requireCalendarEventAccess,
@@ -14,6 +16,7 @@ import ClubAttendance from "./ClubAttendance";
 import { clubFieldValue } from "../lib/clubFieldValue";
 import ClubSettings from "./ClubSettings";
 import ClubOrganization from "./ClubOrganization";
+import CoachTeamPlayers from "./CoachTeamPlayers";
 import ImportClubTeams from "./ImportClubTeams";
 import ClubStats from "./ClubStats";
 import ClubPeople, { peopleSections } from "./ClubPeople";
@@ -24,6 +27,7 @@ import React, { useMemo, useState } from "react";
 import * as ImagePicker from "expo-image-picker";
 import {
   Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -78,10 +82,12 @@ import { DateField } from "../components/DateField";
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
 import { clubSections, type ClubSection } from "../lib/clubSections";
+import { linkedConvocationEvent } from "../lib/convocationEvent";
 import { useTheme, useThemedStyles, type ThemeColors } from "../theme";
 
 const specializedSections: Record<string, { title: string }> = {
   "coach-kit": { title: "Sac du coach" },
+  "team-players": { title: "Affecter des joueurs" },
   "import-clubs": { title: "Importer des équipes" },
   attendance: { title: "Présences" },
   sessions: { title: "Entraînements et séances" },
@@ -132,9 +138,10 @@ export function ClubAdminGate({
 }
 export default function ClubAdmin() {
   const uid = useAuth().session?.user.id;
-  const { id, section } = useLocalSearchParams<{
+  const { id, section, invitation } = useLocalSearchParams<{
     id: string;
     section?: string;
+    invitation?: string;
   }>();
   if (
     section &&
@@ -167,6 +174,8 @@ export default function ClubAdmin() {
         {section ? (
           section === "coach-kit" ? (
             <CoachKit key={`${uid}:${id}`} id={id} />
+          ) : section === "team-players" ? (
+            <CoachTeamPlayers key={`${uid}:${id}`} id={id} />
           ) : section === "import-clubs" ? (
             <ImportClubTeams key={`${uid}:${id}`} id={id} />
           ) : section === "competitions" ? (
@@ -196,6 +205,7 @@ export default function ClubAdmin() {
               key={`${uid}:${id}:${section}`}
               id={id}
               section={section}
+              initialMode={invitation}
             />
           ) : informationSections[section] ? (
             <ClubInformation
@@ -493,6 +503,18 @@ function CoachKit({ id }: { id: string }) {
           text="Créer et préparer les séances"
           onPress={() => router.push(`/club-admin/${id}/sessions`)}
         />
+        <CoachShortcut
+          icon={<Users size={22} color={colors.blue} />}
+          title="Inviter dans une équipe"
+          text="Créer un lien pour mes équipes"
+          onPress={() => router.push(`/club-admin/${id}/members?invitation=team-link`)}
+        />
+        <CoachShortcut
+          icon={<Users size={22} color={colors.blue} />}
+          title="Affecter des joueurs"
+          text="Ajouter des membres approuvés à mes équipes"
+          onPress={() => router.push(`/club-admin/${id}/team-players`)}
+        />
       </View>
       {access.data.teams.map((team) => (
         <View key={team.id} style={s.card}>
@@ -694,12 +716,14 @@ function ClubCoachKit({ id }: { id: string }) {
   };
   const openVideoImport = async () => {
     setCaptureNotice("");
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setCaptureNotice(
-        "Autorisez la galerie pour importer une vidéo de match ou d’entraînement.",
-      );
-      return;
+    if (Platform.OS !== "android") {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setCaptureNotice(
+          "Autorisez la galerie pour importer une vidéo de match ou d’entraînement.",
+        );
+        return;
+      }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["videos"],
@@ -757,6 +781,12 @@ function ClubCoachKit({ id }: { id: string }) {
           title="Membres"
           text="Joueurs, parents et invitations"
           onPress={() => router.push(`/club-admin/${id}/members`)}
+        />
+        <CoachShortcut
+          icon={<Users size={22} color={colors.blue} />}
+          title="Affecter des joueurs"
+          text="Répartir les membres approuvés"
+          onPress={() => router.push(`/club-admin/${id}/team-players`)}
         />
         <CoachShortcut
           icon={<CalendarDays size={22} color={colors.blue} />}
@@ -1401,6 +1431,7 @@ function ClubRecords({ id, section }: { id: string; section: string }) {
   const config = clubSections[section];
   const [editing, setEditing] = useState<Record<string, any> | null>(null);
   const [deleting, setDeleting] = useState<Record<string, any> | null>(null);
+  const [lineupMatch, setLineupMatch] = useState<string | null>(null);
   const cache = useQueryClient();
   const rosterAccess = useQuery({
     queryKey: ["club-roster-action-access", id, uid],
@@ -1536,6 +1567,9 @@ function ClubRecords({ id, section }: { id: string; section: string }) {
                 </View>
               ),
           )}
+          {section === "matches" && <EventConvocationButton clubId={id} eventId={row.id} kind="match" />}
+          {section === "matches" && <Button title="Composition tactique" secondary onPress={() => setLineupMatch(lineupMatch === row.id ? null : row.id)} />}
+          {section === "matches" && lineupMatch === row.id && <MatchLineup clubId={id} matchId={row.id} close={() => setLineupMatch(null)} />}
           {section === "matches" &&
             rosterAccess.data === true &&
             !rosterAccess.error && (
@@ -1545,6 +1579,13 @@ function ClubRecords({ id, section }: { id: string; section: string }) {
                 onPress={() => router.push(`/club-admin/${id}/match/${row.id}`)}
               />
             )}
+          {section === "convocations" && (
+            <Button
+              title="Pointer les présences"
+              secondary
+              onPress={() => router.push(`/club-admin/${id}/convocation/${row.id}?attendance=1`)}
+            />
+          )}
           {section === "convocations" &&
             rosterAccess.data === true &&
             !rosterAccess.error && (
@@ -1785,6 +1826,7 @@ function ClubRecordEditor({
   const uid = session!.user.id;
   const [creationId] = useState(randomUUID);
   const [teamId, setTeamId] = useState(record.team_id || "");
+  const linkedEvent = linkedConvocationEvent(section, record);
   const [publicationDate] = useState(() => new Date().toISOString());
   const [values, setValues] = useState<Record<string, any>>(() =>
     Object.fromEntries(
@@ -1808,8 +1850,12 @@ function ClubRecordEditor({
       else if (config.fffAdminOnly) await requireAttendanceAdmin(id, uid);
       else await requireClubAdmin(id);
       const payload: Record<string, any> = {};
-      for (const f of config.fields)
+      for (const f of config.fields) {
+        // The database keeps linked event dates in sync. Leaving the original
+        // value out also avoids losing timestamp precision during JS parsing.
+        if (linkedEvent && f.key === "meeting_date") continue;
         payload[f.key] = clubFieldValue(f, values[f.key]);
+      }
       if (["matches", "convocations"].includes(section))
         payload.team_id = teamId || null;
       if (section === "news")
@@ -1888,6 +1934,16 @@ function ClubRecordEditor({
               disabled={save.isPending}
               onValueChange={set}
             />
+          </View>
+        ) : linkedEvent && f.key === "meeting_date" ? (
+          <View key={f.key}>
+            <Text style={s.label}>{f.label}</Text>
+            <Text style={s.text}>{new Date(String(values[f.key])).toLocaleString("fr-FR")}</Text>
+            <Text style={s.small}>
+              {linkedEvent === "match"
+                ? "Pour modifier cette date, modifiez le match associé."
+                : "Pour modifier cette date, modifiez la séance associée."}
+            </Text>
           </View>
         ) : f.type === "date" ? (
           <DateField

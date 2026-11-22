@@ -26,7 +26,7 @@ export function MessageText({
   };
   return (
     <View style={{ gap: 6 }}>
-      <Text selectable style={[s.text, { color }]}>
+      <Text selectable style={[s.text, { color, fontSize: 17, lineHeight: 27 }]}>
         {messageLinks(content).map((part, index) =>
           part.url ? (
             <Text

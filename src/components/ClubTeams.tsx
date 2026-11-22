@@ -12,6 +12,7 @@ import {
 import { useTheme } from "../theme";
 import { ClubLogo, ClubButton, useClubBrand } from "./ClubDesign";
 import { Chip, SearchField } from "./ui";
+import { sportsTeamPath } from '../lib/sportProjection';
 import {
   filterClubTeams,
   sortClubTeams,
@@ -69,13 +70,13 @@ function TeamCard({
       accessibilityRole="button"
       accessibilityLabel={`Voir l’équipe ${item.team.name}, ${item.team.category || item.category}`}
       onPress={() =>
-        router.push(`/fff-team/${encodeURIComponent(item.team.id)}`)
+        router.push(sportsTeamPath(item.team.id))
       }
       style={({ pressed }) => ({
         width,
         minWidth: 0,
-        padding: 18,
-        gap: 16,
+        padding: 16,
+        gap: 12,
         borderRadius: 20,
         borderWidth: 1,
         borderColor: colors.border,
@@ -132,6 +133,9 @@ function TeamCard({
           <ArrowUpRight size={17} color={colors.blue} />
         </View>
       </View>
+      {!!item.team.sportsSummary && <Text style={{color: colors.ink, fontSize: 12, fontFamily: "Inter-SemiBold"}}>
+        {`${item.team.sportsSummary.results} résultat${item.team.sportsSummary.results === 1 ? "" : "s"} · ${item.team.sportsSummary.upcoming} à venir · ${item.team.sportsSummary.rankings} classement${item.team.sportsSummary.rankings > 1 ? "s" : ""}`}
+      </Text>}
       <View
         style={{
           borderTopWidth: 1,
@@ -152,7 +156,9 @@ function TeamCard({
             lineHeight: 18,
           }}
         >
-          {item.team.competition?.name || "Compétition non renseignée"}
+          {item.team.competitions?.length
+            ? `${item.team.competitions.slice(0, 2).join("\n")}${item.team.competitions.length > 2 ? `\n+ ${item.team.competitions.length - 2} autre${item.team.competitions.length - 2 > 1 ? "s" : ""} compétition${item.team.competitions.length - 2 > 1 ? "s" : ""} · Voir l’équipe` : ""}`
+            : item.team.competition?.name || (item.team.calendarComplete ? "Aucun engagement publié pour cette saison" : "Compétitions en attente de vérification")}
         </Text>
       </View>
     </Pressable>
@@ -215,7 +221,7 @@ export function ClubTeams({
             fontSize: 17,
           }}
         >
-          Les équipes arrivent bientôt
+          Équipes en attente de vérification
         </Text>
         <Text
           style={{
@@ -224,7 +230,7 @@ export function ClubTeams({
             lineHeight: 21,
           }}
         >
-          Les équipes séniors et les catégories de l’académie apparaîtront ici.
+          Aucune équipe vérifiée n’est disponible pour cette saison.
         </Text>
       </View>
     );

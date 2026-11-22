@@ -10,6 +10,10 @@ export type MatchTeam = {
 export type CalendarMatch = {
   id: string;
   date?: string;
+  datePrecision?: "day" | "instant";
+  sourceStatus?: string;
+  homePenalties?: number | null;
+  awayPenalties?: number | null;
   time?: string;
   status?: string;
   competition?: string;

@@ -1,5 +1,7 @@
+import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, { useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 import { Quote } from "lucide-react-native";
 import {
@@ -203,7 +205,7 @@ export function ProfileRecommendations({ profile }: { profile: Profile }) {
             if (!change.isPending) setRemoving(null);
           }}
         >
-          <View
+          <SafeAreaView
             style={{
               flex: 1,
               justifyContent: "center",
@@ -211,11 +213,15 @@ export function ProfileRecommendations({ profile }: { profile: Profile }) {
               backgroundColor: "rgba(3,12,24,0.6)",
             }}
           >
-            <View
-              style={[
-                s.card,
-                { alignSelf: "center", width: "100%", maxWidth: 460, gap: 16 },
-              ]}
+            <ScrollView
+              style={{
+                maxHeight: "100%",
+                flexGrow: 0,
+                alignSelf: "center",
+                width: "100%",
+                maxWidth: 460,
+              }}
+              contentContainerStyle={[s.card, { gap: 16 }]}
             >
               <Text style={s.h2}>Retirer cette recommandation ?</Text>
               <Text style={s.small}>
@@ -239,8 +245,8 @@ export function ProfileRecommendations({ profile }: { profile: Profile }) {
                 disabled={change.isPending}
                 onPress={() => setRemoving(null)}
               />
-            </View>
-          </View>
+            </ScrollView>
+          </SafeAreaView>
         </Modal>
       )}
     </View>

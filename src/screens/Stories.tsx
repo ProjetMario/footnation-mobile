@@ -9,7 +9,13 @@ import {
   DEFAULT_STORY_FILTERS,
   normalizeStoryFilters,
 } from "../lib/storyFilters";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AppState,
   FlatList,
@@ -18,6 +24,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -48,7 +55,10 @@ import {
 import { storyPublicationJournal } from "../lib/storyPublicationStorage";
 import { storyPublicationServices } from "../lib/storyPublicationServices";
 import { Profile, displayName } from "../lib/models";
-import { notifyNetworkNewContent, notifyPublicationPublished } from "../lib/notificationEvents";
+import {
+  notifyNetworkNewContent,
+  notifyPublicationPublished,
+} from "../lib/notificationEvents";
 import {
   Avatar,
   Button,
@@ -161,12 +171,19 @@ function storyHashtagSuggestions({
   mediaKind?: "image" | "video";
   current: string;
 }) {
-  const seen = new Set(parseStoryHashtags(current).map((tag) => tag.toLowerCase()));
+  const seen = new Set(
+    parseStoryHashtags(current).map((tag) => tag.toLowerCase()),
+  );
   const suggestions: string[] = [];
   const add = (value: string) => {
     const tag = normalizeStoryHashtag(value);
     const key = tag.toLowerCase();
-    if (!tag || seen.has(key) || suggestions.some((item) => item.toLowerCase() === key)) return;
+    if (
+      !tag ||
+      seen.has(key) ||
+      suggestions.some((item) => item.toLowerCase() === key)
+    )
+      return;
     suggestions.push(tag);
   };
   for (const part of location.split(/[·,\-]/)) add(part.trim());
@@ -238,9 +255,7 @@ async function loadStoryRail(
   const readMembers = (withPhoto: boolean) => {
     let query = supabase
       .from("profiles")
-      .select(
-        railProfileFields,
-      )
+      .select(railProfileFields)
       .neq("id", uid)
       .or("is_private.eq.false,is_private.is.null")
       .order("full_name")
@@ -280,7 +295,8 @@ async function loadStoryRail(
         .order("id")
         .limit(1)
         .abortSignal(signal),
-      supabase.from("user_blocks")
+      supabase
+        .from("user_blocks")
         .select("blocker_id,blocked_id")
         .or(`blocker_id.eq.${uid},blocked_id.eq.${uid}`)
         .abortSignal(signal),
@@ -306,15 +322,22 @@ async function loadStoryRail(
   return {
     accountId: uid,
     profiles,
-    stories: [
-      ...stories,
-      ...((ownRead.data || []) as StoryRailStory[]),
-    ],
+    stories: [...stories, ...((ownRead.data || []) as StoryRailStory[])],
     blocks: blocksRead.data || [],
   };
 }
 
-function RailCircle({ entry, online }: { entry: StoryRailEntry; online?: boolean }) {
+function RailCircle({
+  entry,
+  online,
+  itemWidth,
+  avatarSize,
+}: {
+  entry: StoryRailEntry;
+  online?: boolean;
+  itemWidth: number;
+  avatarSize: number;
+}) {
   const t = useTranslation();
   const { colors } = useTheme();
   const storyStyles = useThemedStyles(createStoryStyles);
@@ -324,12 +347,17 @@ function RailCircle({ entry, online }: { entry: StoryRailEntry; online?: boolean
     : `/profile/${encodeURIComponent(entry.profile.id)}`;
   const avatar = (
     <View style={storyStyles.avatarInset}>
-      <Avatar uri={entry.profile.avatar_url} name={name} size={56} />
+      <Avatar uri={entry.profile.avatar_url} name={name} size={avatarSize} />
     </View>
   );
   return (
-    <View style={storyStyles.circle}>
-      <View style={storyStyles.ownAvatar}>
+    <View style={[storyStyles.circle, { width: itemWidth }]}>
+      <View
+        style={[
+          storyStyles.ownAvatar,
+          { width: avatarSize + 8, height: avatarSize + 8 },
+        ]}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
@@ -460,7 +488,8 @@ export function StoryRail() {
     Math.max(now, Date.now()),
   );
   const activityIds = useMemo(
-    () => entries.filter((entry) => !entry.own).map((entry) => entry.profile.id),
+    () =>
+      entries.filter((entry) => !entry.own).map((entry) => entry.profile.id),
     [entries],
   );
   const activities = useQuery({
@@ -470,14 +499,29 @@ export function StoryRail() {
     retry: false,
     queryFn: () => readProfilesActivity(uid!, activityIds),
   });
+  const { width: windowWidth } = useWindowDimensions();
+  const [railWidth, setRailWidth] = useState(0);
+  // Five complete slots, including the current user's story. Measure the rail
+  // itself so this also works inside a narrower desktop feed column.
+  const itemWidth = Math.max(
+    44,
+    ((railWidth || windowWidth) - 24 - 4 * 12) / 5,
+  );
+  const avatarSize = Math.min(128, itemWidth - 8);
+  const circleSize = { width: avatarSize + 8, height: avatarSize + 8 };
   const hasOwn = entries.some((entry) => entry.own);
   return (
-    <View style={storyStyles.rail}>
+    <View
+      style={storyStyles.rail}
+      onLayout={(event) => setRailWidth(event.nativeEvent.layout.width)}
+    >
       <ScrollView
         key={uid || "guest"}
         horizontal
         keyboardShouldPersistTaps="handled"
-        showsHorizontalScrollIndicator={false}
+        showsHorizontalScrollIndicator
+        snapToInterval={itemWidth + 12}
+        decelerationRate="fast"
         contentContainerStyle={storyStyles.railContent}
       >
         {!hasOwn && (
@@ -487,16 +531,17 @@ export function StoryRail() {
             onPress={() => router.push(uid ? "/stories/create" : "/login")}
             style={({ pressed }) => [
               storyStyles.circle,
+              { width: itemWidth },
               { opacity: pressed ? 0.7 : 1 },
             ]}
           >
-            <View style={storyStyles.ownAvatar}>
-              <View style={storyStyles.seeAll}>
+            <View style={[storyStyles.ownAvatar, circleSize]}>
+              <View style={[storyStyles.seeAll, circleSize]}>
                 <Plus size={24} color={colors.ink} strokeWidth={1.7} />
               </View>
             </View>
             <Text numberOfLines={1} style={storyStyles.label}>
-              {t("stories.own")}
+              {t("stories.create")}
             </Text>
           </Pressable>
         )}
@@ -504,6 +549,8 @@ export function StoryRail() {
           <RailCircle
             key={entry.profile.id}
             entry={entry}
+            itemWidth={itemWidth}
+            avatarSize={avatarSize}
             online={isActivityOnline(
               activities.data?.[entry.profile.id],
               activities.dataUpdatedAt,
@@ -516,10 +563,11 @@ export function StoryRail() {
           onPress={() => router.push("/stories")}
           style={({ pressed }) => [
             storyStyles.circle,
+            { width: itemWidth },
             { opacity: pressed ? 0.7 : 1 },
           ]}
         >
-          <View style={storyStyles.seeAll}>
+          <View style={[storyStyles.seeAll, circleSize]}>
             <ArrowRight size={24} color={colors.ink} strokeWidth={1.7} />
           </View>
           <Text numberOfLines={1} style={storyStyles.label}>
@@ -569,13 +617,13 @@ const createStoryStyles = (colors: ThemeColors) =>
       paddingBottom: 4,
       backgroundColor: colors.surface,
     },
-    railContent: { gap: 6, paddingHorizontal: 12 },
+    railContent: { gap: 12, paddingHorizontal: 12 },
     circle: { width: 74, alignItems: "center" },
-    ring: { padding: 2, borderRadius: 32 },
+    ring: { padding: 2, borderRadius: 999 },
     neutralRing: { backgroundColor: colors.border },
     avatarInset: {
       padding: 2,
-      borderRadius: 30,
+      borderRadius: 999,
       backgroundColor: colors.surface,
     },
     ownAvatar: {
@@ -620,12 +668,12 @@ const createStoryStyles = (colors: ThemeColors) =>
       fontSize: 12,
       lineHeight: 16,
       paddingVertical: 4,
-      maxWidth: 74,
+      maxWidth: "100%",
       textAlign: "center",
     },
     nameTarget: {
       minHeight: 24,
-      width: 74,
+      width: "100%",
       justifyContent: "center",
       alignItems: "center",
     },
@@ -652,7 +700,7 @@ const createStoryStyles = (colors: ThemeColors) =>
     seeAll: {
       height: 64,
       width: 64,
-      borderRadius: 32,
+      borderRadius: 999,
       borderWidth: 1,
       borderColor: colors.border,
       alignItems: "center",
@@ -752,8 +800,18 @@ const detailStyles = StyleSheet.create({
   },
   authorName: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
   time: { color: "rgba(255,255,255,0.78)", fontSize: 12, marginTop: 1 },
-  bottomPanel: { gap: 6, padding: 14, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.42)" },
-  caption: { color: "#FFFFFF", fontSize: 16, lineHeight: 22, fontWeight: "600" },
+  bottomPanel: {
+    gap: 6,
+    padding: 14,
+    borderRadius: 22,
+    backgroundColor: "rgba(0,0,0,0.42)",
+  },
+  caption: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
   meta: { color: "rgba(255,255,255,0.78)", fontSize: 13 },
   tags: { color: "#69B7FF", fontSize: 14, fontWeight: "700" },
 });
@@ -790,7 +848,11 @@ export function StoryDetail() {
     },
   });
   return (
-    <Screen title="Story" header={false} scroll={false}>
+    <Screen
+      title="Story"
+      header={q.isPending || q.isError || !q.data}
+      scroll={false}
+    >
       <AuthGate>
         <View style={detailStyles.screen}>
           {q.isPending ? (
@@ -812,7 +874,9 @@ export function StoryDetail() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Retour"
-                    onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+                    onPress={() =>
+                      router.canGoBack() ? router.back() : router.replace("/")
+                    }
                     style={detailStyles.roundButton}
                   >
                     <ArrowLeft size={24} color="#FFFFFF" strokeWidth={2.4} />
@@ -843,7 +907,11 @@ export function StoryDetail() {
                       accessibilityLabel="Signaler ou bloquer"
                       onPress={() =>
                         router.push(
-                          contentReportPath(q.data!.user_id, "story", q.data!.id),
+                          contentReportPath(
+                            q.data!.user_id,
+                            "story",
+                            q.data!.id,
+                          ),
                         )
                       }
                       style={detailStyles.roundButton}
@@ -962,7 +1030,9 @@ function StoryCreateContent({
           setAsset({
             uri: `data:${draft.mime};base64,${draft.base64}`,
             base64: draft.base64,
-            kind: draft.mediaKind || (draft.mime.startsWith("video/") ? "video" : "image"),
+            kind:
+              draft.mediaKind ||
+              (draft.mime.startsWith("video/") ? "video" : "image"),
             mime: draft.mime,
           });
           setCaption(draft.record.caption);
@@ -1104,7 +1174,10 @@ function StoryCreateContent({
                 .split(/\s+/)
                 .filter((tag) => tag.startsWith("#") && tag.length > 1)
                 .map((tag) => tag.slice(1)),
-              filters: media.kind === "image" ? normalizeStoryFilters(filters) : { ...DEFAULT_STORY_FILTERS },
+              filters:
+                media.kind === "image"
+                  ? normalizeStoryFilters(filters)
+                  : { ...DEFAULT_STORY_FILTERS },
               expires_at: new Date(createdAt + STORY_LIFETIME).toISOString(),
             },
           },
@@ -1118,7 +1191,11 @@ function StoryCreateContent({
       assertCurrentAccount();
       setPersisted(true);
       const storyId = await save.mutateAsync(attempt.current);
-      void notifyPublicationPublished({ authorId: userId, contentId: storyId, kind: "story" });
+      void notifyPublicationPublished({
+        authorId: userId,
+        contentId: storyId,
+        kind: "story",
+      });
       void notifyNetworkNewContent({
         authorId: userId,
         authorName: profile ? displayName(profile) : null,
@@ -1126,7 +1203,9 @@ function StoryCreateContent({
         kind: "story",
       });
       void cache.invalidateQueries({ queryKey: ["notifications", userId] });
-      void cache.invalidateQueries({ queryKey: ["notifications", userId, "unread-count"] });
+      void cache.invalidateQueries({
+        queryKey: ["notifications", userId, "unread-count"],
+      });
       finish();
     } catch (error) {
       if (current())
@@ -1292,13 +1371,19 @@ function StoryCreateContent({
           disabled={frozen || working || pickerOpen}
         />
         <Button
-          title={asset?.kind === "image" ? "Changer la photo" : "Importer une photo"}
+          title={
+            asset?.kind === "image" ? "Changer la photo" : "Importer une photo"
+          }
           secondary
           onPress={() => void pickMedia("photo")}
           disabled={frozen || working || pickerOpen}
         />
         <Button
-          title={asset?.kind === "video" ? "Changer la vidéo / short" : "Importer une vidéo / short"}
+          title={
+            asset?.kind === "video"
+              ? "Changer la vidéo / short"
+              : "Importer une vidéo / short"
+          }
           secondary
           onPress={() => void pickMedia("video")}
           disabled={frozen || working || pickerOpen}
@@ -1344,7 +1429,9 @@ function StoryCreateContent({
       />
       {!!hashtagSuggestions.length && (
         <View style={{ gap: 8 }}>
-          <Text style={[s.small, { fontWeight: "800", color: colors.muted }]}>Suggestions</Text>
+          <Text style={[s.small, { fontWeight: "800", color: colors.muted }]}>
+            Suggestions
+          </Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {hashtagSuggestions.map((tag) => (
               <Pressable
@@ -1365,7 +1452,9 @@ function StoryCreateContent({
                   opacity: frozen || working ? 0.55 : 1,
                 })}
               >
-                <Text style={{ color: colors.blue, fontWeight: "800" }}>#{tag}</Text>
+                <Text style={{ color: colors.blue, fontWeight: "800" }}>
+                  #{tag}
+                </Text>
               </Pressable>
             ))}
           </View>

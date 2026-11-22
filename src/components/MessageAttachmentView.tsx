@@ -1,5 +1,6 @@
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, { useEffect, useRef, useState } from "react";
-import { AppState, Linking, Modal, Text, View } from "react-native";
+import { AppState, Linking, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeVideo } from "./Video";

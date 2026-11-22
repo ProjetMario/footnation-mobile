@@ -1,0 +1,34 @@
+--- a/Libraries/Components/ScrollView/ScrollView.js
++++ b/Libraries/Components/ScrollView/ScrollView.js
+@@ -1408,9 +1408,15 @@
+   /**
+    * Invoke this from an `onScroll` event.
+    */
+-  _handleScrollShouldSetResponder: () => boolean = () => {
++  _handleScrollShouldSetResponder: (e: ScrollEvent) => boolean = (e: ScrollEvent) => {
+     // Allow any event touch pass through if the default pan responder is disabled
+     if (this.props.disableScrollViewPanResponder === true) {
++      return false;
++    }
++    // A nested, programmatically scrolling ticker must not terminate a press
++    // on its sibling. Fabric negotiates from the common ancestor, so only
++    // this scroll view's own event may transfer the responder on iOS.
++    if (Platform.OS === 'ios' && e.target !== this.getNativeScrollRef()) {
+       return false;
+     }
+     return this._isTouching;
+@@ -1473,5 +1479,14 @@
+   _handleStartShouldSetResponderCapture: (e: GestureResponderEvent) => boolean =
+     (e: GestureResponderEvent) => {
++      // A continuously driven iOS rail emits momentum-end notifications even
++      // for non-animated scrollTo. Respect its explicit responder opt-out
++      // before that synthetic animation state can consume a child tap.
++      if (
++        Platform.OS === 'ios' &&
++        this.props.disableScrollViewPanResponder === true
++      ) {
++        return false;
++      }
+       // The scroll view should receive taps instead of its descendants if:
+       // * it is already animating/decelerating
+       if (this._isAnimating()) {

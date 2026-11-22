@@ -12,14 +12,19 @@ export type BirthdateProps = {
   label?: string;
 };
 
-function partsFromIso(value: string) {
+function partsFromIso(value: string, minAge: number) {
+  const fallback = latestAllowedBirthdate(new Date(), minAge);
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
     ? {
         day: value.slice(8, 10),
         month: value.slice(5, 7),
         year: value.slice(0, 4),
       }
-    : { day: "", month: "", year: "" };
+    : {
+        day: fallback.slice(8, 10),
+        month: fallback.slice(5, 7),
+        year: fallback.slice(0, 4),
+      };
 }
 
 function digits(value: string, maxLength: number) {
@@ -51,16 +56,25 @@ export function BirthdateField({
 }: BirthdateProps) {
   const { colors, mode } = useTheme();
   const s = useUIStyles();
-  const [parts, setParts] = useState(partsFromIso(value));
+  const [parts, setParts] = useState(() => partsFromIso(value, minAge));
   const lastValue = useRef(value);
+  const seededDefault = useRef(Boolean(value));
 
   useEffect(() => {
+    if (!value && !seededDefault.current) {
+      const fallback = latestAllowedBirthdate(new Date(), minAge);
+      seededDefault.current = true;
+      lastValue.current = fallback;
+      setParts(partsFromIso(fallback, minAge));
+      onChange(fallback);
+      return;
+    }
     // The parent echoes "" while a part is incomplete. Keep that local draft;
     // only a new value loaded or reset by the parent replaces all three parts.
     if (value === lastValue.current) return;
     lastValue.current = value;
-    setParts(partsFromIso(value));
-  }, [value]);
+    setParts(value ? partsFromIso(value, minAge) : { day: "", month: "", year: "" });
+  }, [value, minAge]);
 
   function update(next: Partial<typeof parts>) {
     const merged = { ...parts, ...next };

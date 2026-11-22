@@ -8,6 +8,8 @@ import { useTheme } from "../theme";
 import { parseMatchDateTime } from "../lib/clubFeaturedMatch";
 import { findClubLogo } from "../lib/clubLogo";
 import { clubLogoIdentity, clubTeamBaseName } from "../lib/clubLogoIdentity";
+import { effectiveClubLogo, isProfessionalClub } from '../lib/clubLogoPolicy.mjs';
+import { isPublicSportsTeamId, sportsTeamPath } from '../lib/sportProjection';
 
 import { type CalendarMatch, type MatchTeam } from "../lib/clubMatchFilters";
 
@@ -15,6 +17,7 @@ export type CalendarClub = {
   name: string;
   logo?: string | null;
   teamIds?: string[];
+  is_pro?: boolean;
 };
 
 function MatchTeamBadge({
@@ -34,18 +37,20 @@ function MatchTeamBadge({
   const ownTeam =
     !!club &&
     ((!!team?.id && !!club.teamIds?.includes(team.id)) ||
-      (!!team?.name &&
+      (!team?.id && !!team?.name &&
         clubLogoIdentity(team.name) === clubLogoIdentity(club.name)));
-  const primary = (ownTeam ? club?.logo : null) || team?.logo;
+  const identity = { id:team?.id, name, is_pro:ownTeam ? club?.is_pro : undefined };
+  const suppressLogo = isProfessionalClub(identity) || isPublicSportsTeamId(team?.id || '');
+  const primary = suppressLogo ? undefined : effectiveClubLogo(identity, (ownTeam ? club?.logo : null) || team?.logo) || undefined;
   const baseName = clubTeamBaseName(team?.name || "");
   const lookup = useQuery({
     queryKey: ["club-logo", baseName],
     queryFn: () => findClubLogo(baseName),
-    enabled: !!baseName && (!primary || failed.includes(primary)),
+    enabled: !suppressLogo && !!baseName && (!primary || failed.includes(primary)),
     staleTime: 24 * 60 * 60_000,
     retry: 1,
   });
-  const uri = [primary, lookup.data].find(
+  const uri = suppressLogo ? undefined : [primary, lookup.data].find(
     (candidate) => !!candidate && !failed.includes(candidate),
   );
   return (
@@ -54,7 +59,7 @@ function MatchTeamBadge({
       accessibilityRole={team?.id ? "button" : undefined}
       accessibilityLabel={team?.id ? `Voir l’équipe ${name}` : name}
       onPress={() =>
-        team?.id && router.push(`/fff-team/${encodeURIComponent(team.id)}`)
+        team?.id && router.push(sportsTeamPath(team.id))
       }
       style={({ pressed }) => ({
         minWidth: 0,
@@ -150,6 +155,7 @@ export function ClubCalendarMatch({
         finished: "Terminé",
         postponed: "Reporté",
         cancelled: "Annulé",
+        abandoned: "Interrompu",
       } as Record<string, string>
     )[status || ""] || "À confirmer";
   const showScore = hasScore || status === "finished" || status === "live";
@@ -160,7 +166,7 @@ export function ClubCalendarMatch({
       month: "short",
       year: "numeric",
     }) || "Date à confirmer";
-  const time = kickoff?.toLocaleTimeString("fr-FR", {
+  const time = match.datePrecision === "day" ? (match.time ? `${match.time} (heure locale)` : null) : kickoff?.toLocaleTimeString("fr-FR", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -219,6 +225,8 @@ export function ClubCalendarMatch({
         showScore={showScore}
         score={match.awayScore}
       />
+      {!!match.sourceStatus && <Text style={{ color: colors.muted, fontSize: 12 }}>{match.sourceStatus}</Text>}
+      {(match.homePenalties != null || match.awayPenalties != null) && <Text style={{ color: colors.muted, fontSize: 12 }}>Tirs au but : {match.homePenalties ?? "–"} – {match.awayPenalties ?? "–"}</Text>}
       {!!details && (
         <Text
           style={{

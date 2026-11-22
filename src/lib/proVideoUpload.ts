@@ -44,7 +44,9 @@ export function createProVideoUploader() {
     const bytes = await readAsset(asset.uri, MAX_PRO_VIDEO_BYTES);
     validateProVideo(asset, bytes.byteLength);
     const sha256 = Array.from(
-      new Uint8Array(await digest(CryptoDigestAlgorithm.SHA256, bytes)),
+      new Uint8Array(
+        await digest(CryptoDigestAlgorithm.SHA256, new Uint8Array(bytes)),
+      ),
       (byte) => byte.toString(16).padStart(2, "0"),
     ).join("");
     if (attempt && (attempt.sha256 !== sha256 || attempt.mime !== mime))

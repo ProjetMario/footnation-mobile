@@ -1,4 +1,5 @@
 import type { ClubSearchType } from "./clubSearch";
+import { clubCountryCode, clubCountryLabel } from "./clubLocation";
 export type MapLocation = { latitude: number; longitude: number };
 export type ClubMapPoint = MapLocation & {
   id: string;
@@ -6,6 +7,7 @@ export type ClubMapPoint = MapLocation & {
   short_name?: string | null;
   city: string | null;
   department_code: string;
+  metadata?: Record<string, unknown> | null;
   logo_url: string | null;
   type: "club" | "five_center";
 };
@@ -51,7 +53,7 @@ export function filterClubMap(
         (type === "all" || p.type === type) &&
         (!term ||
           normalize(
-            [p.name, p.short_name, p.city].filter(Boolean).join(" "),
+            [p.name, p.short_name, p.city, clubCountryLabel(p), clubCountryCode(p)].filter(Boolean).join(" "),
           ).includes(term)) &&
         (!location || distanceKm(location, p) <= radius),
     )

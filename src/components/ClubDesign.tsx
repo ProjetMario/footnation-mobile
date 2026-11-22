@@ -1,3 +1,4 @@
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, {
   createContext,
   useContext,
@@ -8,7 +9,6 @@ import React, {
 import {
   AccessibilityInfo,
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,

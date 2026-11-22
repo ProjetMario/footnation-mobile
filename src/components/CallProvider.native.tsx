@@ -1,3 +1,4 @@
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, {
   createContext,
   useContext,
@@ -5,7 +6,7 @@ import React, {
   useMemo,
   useSyncExternalStore,
 } from "react";
-import { AppState, Modal, ScrollView, Text, View } from "react-native";
+import { AppState, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import {

@@ -1,4 +1,6 @@
 import React, { useRef, useState } from "react";
+import ClubSourceTeams from "./ClubSourceTeams";
+import { ClubCoachRequests } from "./CoachTeamRequests";
 import { Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 import {
@@ -17,7 +19,7 @@ import {
   useUIStyles,
 } from "../components/ui";
 import { supabase } from "../lib/supabase";
-import { requireClubAdmin } from "../lib/clubAccess";
+import { requireAttendanceAdmin } from "./ClubAttendanceSessions";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../theme";
 import { clubImportRpc } from "../lib/import-clubs/client";
@@ -25,10 +27,33 @@ import {
   buildAssignmentPlan,
   type AssignmentMember,
 } from "../lib/import-clubs/plan";
+type DispatchAssignment = {
+  id: string;
+  team_id: string;
+  is_primary: boolean;
+  status: string;
+  role: string | null;
+  updated_at: string | null;
+  team: { name: string };
+};
+type DispatchMember = {
+  id: string;
+  full_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  primary_role: string | null;
+  assignments: DispatchAssignment[];
+};
+function isApprovedCoach(assignment: DispatchAssignment) {
+  return assignment.status === "approved" &&
+    ["coach", "entraineur", "entraîneur", "educateur", "éducateur"].includes((assignment.role || "").trim().toLowerCase());
+}
 export default function ClubOrganization({ id }: { id: string }) {
   const s = useUIStyles();
   const uid = useAuth().session!.user.id;
   const [grouping, setGrouping] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [coachRemoval, setCoachRemoval] = useState<{ member: DispatchMember; assignment: DispatchAssignment } | null>(null);
 
   const [selection, setSelection] = useState<{
     member: any;
@@ -38,7 +63,7 @@ export default function ClubOrganization({ id }: { id: string }) {
   const teams = useQuery({
     queryKey: ["club-organization-teams", id, uid],
     queryFn: async () => {
-      await requireClubAdmin(id, uid);
+      await requireAttendanceAdmin(id, uid);
       const { data, error } = await supabase
         .from("teams")
         .select("id,name,category")
@@ -53,41 +78,20 @@ export default function ClubOrganization({ id }: { id: string }) {
     queryKey: ["club-organization", id, uid],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
-      await requireClubAdmin(id, uid);
-      const result = await supabase
-        .from("profiles")
-        .select(
-          "id,full_name,username,avatar_url,primary_role,position,target_position",
-        )
-        .eq("linked_club_id", id)
-        .order("full_name")
-        .order("id")
-        .range(pageParam, pageParam + 29);
+      await requireAttendanceAdmin(id, uid);
+      const result = await supabase.rpc("get_native_club_dispatch_members", {
+        p_club_id: id,
+        p_offset: pageParam,
+      });
       if (result.error) throw result.error;
-      const ids = result.data.map((m) => m.id);
-      if (!ids.length) return [];
-      const assignments = await supabase
-        .from("team_members")
-        .select(
-          "id,profile_id,team_id,is_primary,team:teams!inner(name,club_id)",
-        )
-        .in("profile_id", ids)
-        .eq("team.club_id", id)
-        .eq("is_active", true);
-      if (assignments.error) throw assignments.error;
-      return result.data.map((member) => ({
-        ...member,
-        assignments: assignments.data.filter(
-          (a) => a.profile_id === member.id,
-        ) as any[],
-      }));
+      return result.data as DispatchMember[];
     },
     getNextPageParam: (last, pages) =>
       last.length === 30 ? pages.length * 30 : undefined,
   });
   const mutation = useMutation({
     mutationFn: async ({ member, team }: { member: any; team: string }) => {
-      await requireClubAdmin(id, uid);
+      await requireAttendanceAdmin(id, uid);
       const snapshot = await supabase.auth.getSession();
       if (snapshot.error || snapshot.data.session?.user.id !== uid)
         throw new Error("La session a changé. Rouvrez cet espace.");
@@ -107,7 +111,15 @@ export default function ClubOrganization({ id }: { id: string }) {
           "Authorization",
           `Bearer ${snapshot.data.session.access_token}`,
         );
-      if (response.error) throw response.error;
+      if (response.error) {
+        if (
+          response.error.code === "42501" &&
+          response.error.message ===
+            "Envoyez une nouvelle invitation de coach et faites-la accepter avant de choisir cette équipe principale."
+        )
+          throw new Error(response.error.message);
+        throw response.error;
+      }
     },
     onSuccess: () => {
       setSelection(null);
@@ -122,6 +134,29 @@ export default function ClubOrganization({ id }: { id: string }) {
         void cache.invalidateQueries({ queryKey: [prefix, id] });
     },
   });
+  const removeCoach = useMutation({
+    mutationFn: async ({ assignment }: { member: DispatchMember; assignment: DispatchAssignment }) => {
+      await requireAttendanceAdmin(id, uid);
+      if (!assignment.updated_at) throw new Error("Cette affectation doit être actualisée avant son retrait.");
+      const result = await supabase.rpc("remove_native_team_coach", {
+        p_club_id: id,
+        p_membership_id: assignment.id,
+        p_expected_updated_at: assignment.updated_at,
+      });
+      if (result.error) {
+        if (result.error.code === "40001") throw new Error("Cette affectation a changé. Actualisez avant de réessayer.");
+        throw result.error;
+      }
+      if (result.data !== assignment.id) throw new Error("Le retrait n’a pas été confirmé. Actualisez avant de réessayer.");
+    },
+    onSuccess: () => {
+      setCoachRemoval(null);
+      for (const key of ["club-organization", "club-member-context", "member-calendar", "calendar-editor-teams", "club-invite-teams", "club-coach-kit", "club-coach-requests"])
+        void cache.invalidateQueries({ queryKey: [key, id] });
+      void cache.invalidateQueries({ queryKey: ["member-space"] });
+    },
+  });
+  if (sourcesOpen) return <ClubSourceTeams id={id} close={() => setSourcesOpen(false)} />;
   if (grouping)
     return (
       <GroupAssignments
@@ -144,6 +179,8 @@ export default function ClubOrganization({ id }: { id: string }) {
   return (
     <>
       <Text style={s.h2}>Affectations aux équipes</Text>
+      <Button title="Retrouver les équipes de la fiche du club" secondary onPress={() => setSourcesOpen(true)} />
+      <ClubCoachRequests id={id} onMap={() => setSourcesOpen(true)} />
       <Text style={s.small}>
         Changer l’équipe principale conserve les autres appartenances du membre.
       </Text>
@@ -159,6 +196,7 @@ export default function ClubOrganization({ id }: { id: string }) {
         }
         onPress={() => {
           setSelection(null);
+          mutation.reset();
           setGrouping(true);
         }}
       />
@@ -173,12 +211,15 @@ export default function ClubOrganization({ id }: { id: string }) {
       {!!mutation.error && (
         <ErrorState
           error={mutation.error}
+          title="Affectation impossible"
           retry={() => {
             setSelection(null);
+            mutation.reset();
             void members.refetch();
           }}
         />
       )}
+      {!!removeCoach.error && <ErrorState error={removeCoach.error} retry={() => { setCoachRemoval(null); removeCoach.reset(); void members.refetch(); }} />}
       {members.data?.pages.flat().map((member) => (
         <View key={member.id} style={s.card}>
           <Avatar
@@ -189,10 +230,18 @@ export default function ClubOrganization({ id }: { id: string }) {
           <Text style={s.subtitle}>{member.primary_role}</Text>
           {member.assignments.length ? (
             member.assignments.map((a) => (
-              <Text style={s.text} key={a.id}>
-                {a.team?.name}
-                {a.is_primary ? " · équipe principale" : ""}
-              </Text>
+              <View key={a.id}>
+                <Text style={s.text}>
+                  {a.team?.name}
+                  {a.is_primary ? " · équipe principale" : ""}
+                  {a.status === "pending" ? " · en attente" : a.status === "rejected" ? " · refusée" : ""}
+                </Text>
+                {isApprovedCoach(a) && (coachRemoval?.assignment.id === a.id ? <View style={s.card}>
+                  <Text style={s.text}>Retirer {member.full_name || "ce coach"} de {a.team?.name} ? Ses autres équipes sont conservées.</Text>
+                  <Button title="Confirmer le retrait" busy={removeCoach.isPending} onPress={() => removeCoach.mutate({ member, assignment: a })} />
+                  <Button title="Annuler le retrait" secondary disabled={removeCoach.isPending} onPress={() => { setCoachRemoval(null); removeCoach.reset(); }} />
+                </View> : <Button title="Retirer de cette équipe" accessibilityLabel={`Retirer ${member.full_name || "ce coach"} de ${a.team?.name}`} secondary disabled={removeCoach.isPending} onPress={() => { removeCoach.reset(); setCoachRemoval({ member, assignment: a }); }} />)}
+              </View>
             ))
           ) : (
             <Text style={s.small}>Aucune équipe affectée</Text>
@@ -233,7 +282,10 @@ export default function ClubOrganization({ id }: { id: string }) {
                 title="Annuler"
                 secondary
                 disabled={mutation.isPending}
-                onPress={() => setSelection(null)}
+                onPress={() => {
+                  setSelection(null);
+                  mutation.reset();
+                }}
               />
             </>
           ) : (
@@ -241,13 +293,14 @@ export default function ClubOrganization({ id }: { id: string }) {
               title="Modifier l’équipe principale"
               secondary
               disabled={mutation.isPending}
-              onPress={() =>
+              onPress={() => {
+                mutation.reset();
                 setSelection({
                   member,
                   team:
                     member.assignments.find((a) => a.is_primary)?.team_id || "",
-                })
-              }
+                });
+              }}
             />
           )}
         </View>

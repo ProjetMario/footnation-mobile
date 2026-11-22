@@ -6,6 +6,11 @@ import {
 } from "../lib/exploreRanking";
 import type { MapLocation } from "../lib/clubMap";
 import { blockedSocialAuthors } from "../lib/socialVisibility";
+import {
+  exploreDiscoveryOptions,
+  exploreHashtags,
+  uniqueExploreRows,
+} from "../lib/exploreDiscovery";
 import { MediaGrid } from "../components/MediaGrid";
 import {
   parseProfileInfoSearchField,
@@ -25,23 +30,25 @@ import {
 import { Image } from "expo-image";
 import {
   ArrowLeft,
-  Briefcase,
-  Building2,
   MapPin,
   Menu,
   Search,
   Shield,
   SlidersHorizontal,
+  X,
   Trophy,
   Users,
 } from "lucide-react-native";
 import { useTheme, useThemedStyles, type ThemeColors } from "../theme";
 import { router, useLocalSearchParams } from "expo-router";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { useAuth } from "../lib/auth";
 import { useDebounced, useProfile } from "../lib/data";
 import type { Profile } from "../lib/models";
-import { supabase } from "../lib/supabase";
 import {
   searchFootNation,
   searchCategories,
@@ -49,14 +56,30 @@ import {
 } from "../lib/globalSearch";
 import { AuthGate } from "../components/AuthGate";
 import { AccountMenu } from "../components/AccountMenu";
-import {
-  Button,
-  Empty,
-  ErrorState,
-  Loading,
-  Screen,
-  useUIStyles,
-} from "../components/ui";
+import { Button, Empty, ErrorState, Loading, Screen } from "../components/ui";
+function SearchPressable({
+  style,
+  ...props
+}: React.ComponentProps<typeof Pressable>) {
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      {...props}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={(state) => [
+        typeof style === "function" ? style(state) : style,
+        { opacity: state.pressed ? 0.65 : hovered ? 0.8 : 1 },
+        focused && { borderColor: colors.blue, borderWidth: 2 },
+      ]}
+    />
+  );
+}
+
 export default function GlobalSearch() {
   const { session } = useAuth();
   const { q, type, field } = useLocalSearchParams<{
@@ -80,17 +103,17 @@ export default function GlobalSearch() {
 
 const createExploreStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    screen: { flex: 1, backgroundColor: "#06111D" },
+    screen: { flex: 1, backgroundColor: colors.background },
     content: {
-      paddingHorizontal: 18,
-      paddingTop: 18,
+      paddingHorizontal: 16,
+      paddingTop: 12,
       paddingBottom: 104,
       gap: 16,
       width: "100%",
       maxWidth: 680,
       alignSelf: "center",
     },
-    header: { gap: 18 },
+    header: { gap: 14 },
     titleRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -110,13 +133,13 @@ const createExploreStyles = (colors: ThemeColors) =>
       borderRadius: 23,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "rgba(255,255,255,0.08)",
+      backgroundColor: colors.surfaceRaised,
     },
     title: {
-      color: colors.white,
+      color: colors.ink,
       fontFamily: "Inter-Bold",
-      fontSize: 32,
-      lineHeight: 38,
+      fontSize: 24,
+      lineHeight: 30,
       fontWeight: "800",
     },
     titleActions: {
@@ -130,43 +153,43 @@ const createExploreStyles = (colors: ThemeColors) =>
       borderRadius: 23,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "rgba(255,255,255,0.08)",
+      backgroundColor: colors.surfaceRaised,
     },
     searchBox: {
-      minHeight: 58,
+      minHeight: 50,
       borderRadius: 18,
       paddingHorizontal: 16,
       flexDirection: "row",
       alignItems: "center",
       gap: 10,
-      backgroundColor: "#102033",
+      backgroundColor: colors.surface,
     },
     searchInput: {
       flex: 1,
       minWidth: 0,
-      minHeight: 56,
-      color: colors.white,
+      minHeight: 48,
+      color: colors.ink,
       fontFamily: "Inter-Regular",
       fontSize: 16,
     },
-    filters: { gap: 10, paddingRight: 18 },
+    filters: { gap: 6 },
     filterPill: {
-      minHeight: 48,
-      borderRadius: 16,
-      paddingHorizontal: 18,
+      minHeight: 44,
+      borderRadius: 22,
+      paddingHorizontal: 14,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#102033",
+      backgroundColor: colors.surface,
     },
-    filterPillActive: { backgroundColor: colors.white },
+    filterPillActive: { backgroundColor: colors.accentSoft },
     filterPillText: {
-      color: "rgba(255,255,255,0.72)",
+      color: colors.muted,
       fontFamily: "Inter-Bold",
       fontSize: 14,
       fontWeight: "700",
     },
-    filterPillTextActive: { color: "#06111D" },
-    featuredWrap: { gap: 26 },
+    filterPillTextActive: { color: colors.deepBlue },
+    featuredWrap: { gap: 24, paddingTop: 6 },
     featuredSection: { gap: 12 },
     sectionTitleRow: {
       flexDirection: "row",
@@ -175,72 +198,70 @@ const createExploreStyles = (colors: ThemeColors) =>
       gap: 12,
     },
     sectionTitle: {
-      color: colors.white,
+      color: colors.ink,
       fontFamily: "Inter-Bold",
-      fontSize: 21,
-      lineHeight: 27,
+      fontSize: 17,
+      lineHeight: 23,
       fontWeight: "800",
     },
     seeAll: {
-      color: "#3B82F6",
+      color: colors.deepBlue,
       fontFamily: "Inter-Bold",
       fontSize: 14,
       fontWeight: "700",
     },
-    horizontalCards: { gap: 14, paddingRight: 18 },
+    horizontalCards: { gap: 10 },
     hashtagRow: { gap: 10, paddingRight: 18 },
     hashtagChip: {
-      minHeight: 42,
+      minHeight: 44,
       borderRadius: 999,
       paddingHorizontal: 16,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "rgba(59,130,246,0.18)",
+      backgroundColor: colors.accentSoft,
       borderWidth: 1,
-      borderColor: "rgba(96,165,250,0.35)",
+      borderColor: colors.border,
     },
     hashtagText: {
-      color: "#BFDBFE",
+      color: colors.deepBlue,
       fontFamily: "Inter-Bold",
       fontSize: 14,
       fontWeight: "800",
     },
     playerCard: {
-      width: 132,
+      width: 108,
+      alignItems: "center",
+      gap: 6,
+      paddingVertical: 6,
       borderRadius: 16,
-      overflow: "hidden",
-      backgroundColor: "#102033",
-      paddingBottom: 12,
     },
-    playerImage: { width: "100%", height: 112 },
+    playerImage: { width: 64, height: 64, borderRadius: 32 },
     playerImageFallback: {
-      width: "100%",
-      height: 112,
+      width: 64,
+      height: 64,
+      borderRadius: 32,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#172A42",
+      backgroundColor: colors.surfaceRaised,
     },
     clubCard: {
-      width: 132,
-      minHeight: 150,
+      width: 108,
+      paddingVertical: 6,
       borderRadius: 16,
-      backgroundColor: "#102033",
-      padding: 14,
       alignItems: "center",
-      justifyContent: "center",
-      gap: 10,
+      gap: 6,
     },
-    clubLogo: { width: 70, height: 70 },
+    clubLogo: { width: 56, height: 56, borderRadius: 12 },
     clubLogoFallback: {
-      width: 70,
-      height: 70,
-      borderRadius: 35,
+      width: 56,
+      height: 56,
+      borderRadius: 12,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#172A42",
+      backgroundColor: colors.surfaceRaised,
     },
     cardName: {
-      color: colors.white,
+      color: colors.ink,
       fontFamily: "Inter-Bold",
       fontSize: 14,
       lineHeight: 19,
@@ -250,7 +271,7 @@ const createExploreStyles = (colors: ThemeColors) =>
       maxWidth: "100%",
     },
     cardMeta: {
-      color: "rgba(255,255,255,0.58)",
+      color: colors.muted,
       fontFamily: "Inter-Regular",
       fontSize: 12,
       lineHeight: 17,
@@ -258,32 +279,19 @@ const createExploreStyles = (colors: ThemeColors) =>
       textAlign: "center",
       maxWidth: "100%",
     },
-    cardMiniActions: {
-      flexDirection: "row",
-      justifyContent: "center",
-      gap: 18,
-      paddingTop: 8,
-    },
-    miniAction: {
-      color: "#38BDF8",
-      fontFamily: "Inter-Bold",
-      fontSize: 20,
-      lineHeight: 22,
-      fontWeight: "800",
-    },
     opportunityCard: {
-      width: 310,
-      minHeight: 100,
+      width: 270,
+      minHeight: 84,
       borderRadius: 16,
-      backgroundColor: "#102033",
+      backgroundColor: colors.surface,
       flexDirection: "row",
       overflow: "hidden",
     },
     opportunityImage: {
-      width: 118,
+      width: 52,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#1D4ED8",
+      backgroundColor: colors.accentSoft,
     },
     opportunityText: {
       flex: 1,
@@ -293,14 +301,14 @@ const createExploreStyles = (colors: ThemeColors) =>
       gap: 8,
     },
     opportunityTitle: {
-      color: colors.white,
+      color: colors.ink,
       fontFamily: "Inter-Bold",
       fontSize: 16,
       lineHeight: 21,
       fontWeight: "800",
     },
     opportunityMeta: {
-      color: "rgba(255,255,255,0.58)",
+      color: colors.muted,
       fontFamily: "Inter-Regular",
       fontSize: 13,
       lineHeight: 18,
@@ -308,11 +316,13 @@ const createExploreStyles = (colors: ThemeColors) =>
     resultCard: {
       borderRadius: 16,
       padding: 14,
-      gap: 9,
-      backgroundColor: "#102033",
+      gap: 7,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
     },
     resultKind: {
-      color: "#60A5FA",
+      color: colors.deepBlue,
       fontFamily: "Inter-Bold",
       fontSize: 12,
       lineHeight: 17,
@@ -323,25 +333,24 @@ const createExploreStyles = (colors: ThemeColors) =>
       alignItems: "center",
       gap: 12,
     },
-    resultImage: { width: 58, height: 58, borderRadius: 14 },
+    resultImage: { width: 48, height: 48, borderRadius: 12 },
     resultText: { flex: 1, minWidth: 0, gap: 4 },
     resultTitle: {
-      color: colors.white,
+      color: colors.ink,
       fontFamily: "Inter-Bold",
       fontSize: 17,
       lineHeight: 22,
       fontWeight: "800",
     },
     resultSubtitle: {
-      color: "rgba(255,255,255,0.58)",
+      color: colors.muted,
       fontFamily: "Inter-Regular",
       fontSize: 13,
       lineHeight: 18,
     },
   });
 function FeaturedExplore({
-  loading,
-  error,
+  states,
   players,
   clubs,
   opportunities,
@@ -358,8 +367,10 @@ function FeaturedExplore({
   }[];
   hashtags: string[];
   onHashtagPress: (tag: string) => void;
-  loading: boolean;
-  error: unknown;
+  states: Record<
+    "players" | "clubs" | "opportunities" | "posts",
+    ExploreLoadState
+  >;
   players: {
     id: string;
     full_name: string | null;
@@ -387,14 +398,13 @@ function FeaturedExplore({
   }[];
 }) {
   const styles = useThemedStyles(createExploreStyles);
-  if (loading) return <Loading />;
-  if (error) return <ErrorState error={error} />;
+  const { colors } = useTheme();
   return (
     <View style={styles.featuredWrap}>
       {!!hashtags.length && (
         <View style={styles.featuredSection}>
           <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitle}>Hashtags des stories</Text>
+            <Text style={styles.sectionTitle}>Hashtags</Text>
           </View>
           <ScrollView
             horizontal
@@ -402,7 +412,7 @@ function FeaturedExplore({
             contentContainerStyle={styles.hashtagRow}
           >
             {hashtags.map((tag) => (
-              <Pressable
+              <SearchPressable
                 key={tag}
                 accessibilityRole="button"
                 accessibilityLabel={`Explorer le hashtag ${tag}`}
@@ -410,14 +420,18 @@ function FeaturedExplore({
                 style={styles.hashtagChip}
               >
                 <Text style={styles.hashtagText}>#{tag}</Text>
-              </Pressable>
+              </SearchPressable>
             ))}
           </ScrollView>
         </View>
       )}
-      <FeaturedSection title="Joueurs à suivre" href="/search?type=profiles">
+      <FeaturedSection
+        title="Profils à découvrir"
+        href="/search?type=profiles"
+        state={states.players}
+      >
         {players.map((player) => (
-          <Pressable
+          <SearchPressable
             key={player.id}
             accessibilityRole="button"
             accessibilityLabel={player.full_name || player.username || "Profil"}
@@ -432,7 +446,7 @@ function FeaturedExplore({
               />
             ) : (
               <View style={styles.playerImageFallback}>
-                <Users size={30} color="#60A5FA" />
+                <Users size={30} color={colors.deepBlue} />
               </View>
             )}
             <Text style={styles.cardName} numberOfLines={1}>
@@ -444,17 +458,12 @@ function FeaturedExplore({
                 player.club ||
                 "Joueur"}
             </Text>
-            <View style={styles.cardMiniActions}>
-              <Text style={[styles.miniAction, { fontSize: 12 }]}>
-                Voir le profil →
-              </Text>
-            </View>
-          </Pressable>
+          </SearchPressable>
         ))}
       </FeaturedSection>
-      <FeaturedSection title="Clubs en vue" href="/clubs">
+      <FeaturedSection title="Clubs" href="/clubs" state={states.clubs}>
         {clubs.map((club) => (
-          <Pressable
+          <SearchPressable
             key={club.id}
             accessibilityRole="button"
             accessibilityLabel={club.name}
@@ -469,7 +478,7 @@ function FeaturedExplore({
               />
             ) : (
               <View style={styles.clubLogoFallback}>
-                <Shield size={34} color="#60A5FA" />
+                <Shield size={34} color={colors.deepBlue} />
               </View>
             )}
             <Text style={styles.cardName} numberOfLines={1}>
@@ -478,13 +487,19 @@ function FeaturedExplore({
             <Text style={styles.cardMeta} numberOfLines={1}>
               {club.city || club.level || club.department_code || "Club"}
             </Text>
-          </Pressable>
+          </SearchPressable>
         ))}
       </FeaturedSection>
-      {!!opportunities.length && (
-        <FeaturedSection title="Opportunités à venir" href="/opportunities">
+      {(!!opportunities.length ||
+        states.opportunities.pending ||
+        !!states.opportunities.error) && (
+        <FeaturedSection
+          title="Opportunités"
+          href="/opportunities"
+          state={states.opportunities}
+        >
           {opportunities.map((opportunity) => (
-            <Pressable
+            <SearchPressable
               key={opportunity.id}
               accessibilityRole="button"
               accessibilityLabel={opportunity.title}
@@ -492,7 +507,7 @@ function FeaturedExplore({
               style={styles.opportunityCard}
             >
               <View style={styles.opportunityImage}>
-                <Trophy size={30} color="#FFFFFF" />
+                <Trophy size={22} color={colors.deepBlue} />
               </View>
               <View style={styles.opportunityText}>
                 <Text style={styles.opportunityTitle} numberOfLines={2}>
@@ -504,23 +519,25 @@ function FeaturedExplore({
                     .join(" · ") || opportunity.opportunity_type}
                 </Text>
               </View>
-            </Pressable>
+            </SearchPressable>
           ))}
         </FeaturedSection>
       )}
-      {!!posts.length && (
+      {(!!posts.length || states.posts.pending || !!states.posts.error) && (
         <View style={styles.featuredSection}>
           <View style={styles.sectionTitleRow}>
             <Text style={styles.sectionTitle}>À découvrir</Text>
-            <Pressable
+            <SearchPressable
               accessibilityRole="button"
               accessibilityLabel="Voir toutes les publications"
               onPress={() => router.push("/search?type=posts")}
             >
               <Text style={styles.seeAll}>Voir tout</Text>
-            </Pressable>
+            </SearchPressable>
           </View>
+          <ExploreFeedback state={states.posts} />
           <MediaGrid
+            videoPreviews={false}
             items={posts.map((post) => ({
               id: post.id,
               title: post.content,
@@ -534,28 +551,38 @@ function FeaturedExplore({
     </View>
   );
 }
+type ExploreLoadState = { pending: boolean; error: unknown; retry: () => void };
+function ExploreFeedback({ state }: { state?: ExploreLoadState }) {
+  if (state?.error)
+    return <ErrorState error={state.error} retry={state.retry} />;
+  if (state?.pending) return <Loading />;
+  return null;
+}
 function FeaturedSection({
   title,
   href,
   children,
+  state,
 }: {
   title: string;
   href: string;
   children: React.ReactNode;
+  state?: ExploreLoadState;
 }) {
   const styles = useThemedStyles(createExploreStyles);
   return (
     <View style={styles.featuredSection}>
       <View style={styles.sectionTitleRow}>
         <Text style={styles.sectionTitle}>{title}</Text>
-        <Pressable
+        <SearchPressable
           accessibilityRole="button"
           accessibilityLabel={`Voir tout ${title}`}
           onPress={() => router.push(href)}
         >
           <Text style={styles.seeAll}>Voir tout</Text>
-        </Pressable>
+        </SearchPressable>
       </View>
+      <ExploreFeedback state={state} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -576,7 +603,6 @@ function SearchContent({
   profileField?: ProfileInfoSearchField;
 }) {
   const { colors } = useTheme();
-  const s = useUIStyles();
   const styles = useThemedStyles(createExploreStyles);
 
   const { session, profile: authProfile } = useAuth();
@@ -589,21 +615,37 @@ function SearchContent({
   const [kind, setKind] = useState(category);
   const [activeField, setActiveField] = useState(profileField);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const term = useDebounced(text);
+  const blocked = useQuery({
+    queryKey: ["explore-blocks", session?.user.id],
+    enabled: !!session,
+    staleTime: 30_000,
+    queryFn: ({ signal }) => blockedSocialAuthors(session!.user.id, signal),
+  });
   const context = useQuery({
-    queryKey: ["explore-context", session?.user.id, profile, location],
-    enabled: !!session && (!!profile || !profileQuery.isPending),
-    staleTime: 60_000,
+    queryKey: [
+      "explore-context",
+      session?.user.id,
+      profile,
+      location,
+      blocked.data,
+    ],
+    enabled:
+      !!session && blocked.isSuccess && (!!profile || !profileQuery.isPending),
+    staleTime: 120_000,
     queryFn: ({ signal }) =>
       loadExploreContext(
         profile || ({ id: session!.user.id } as Profile),
         location,
         signal,
+        blocked.data,
       ),
   });
   const priority = useQuery({
     queryKey: ["explore-priority", context.data, term, kind, activeField],
-    enabled: !!context.data && !activeField,
+    enabled: !!context.data && !activeField && !term,
+    staleTime: 120_000,
     queryFn: async ({ signal }) =>
       kind === "all"
         ? (
@@ -656,29 +698,55 @@ function SearchContent({
       setLocating(false);
     }
   }
-  const rankingReady =
-    !!activeField ||
-    context.isError ||
-    (context.data && (priority.isSuccess || priority.isError));
-  const query = useInfiniteQuery({
+  // Typed searches start immediately. Personalization enhances browsing without
+  // holding the input, general results or independent discovery sections.
+  const browsingPriority =
+    !term && !activeField && (kind === "clubs" || kind === "profiles")
+      ? priority.data?.filter(
+          (row) =>
+            row.kind !== "profiles" ||
+            !blocked.data?.includes(row.id.replace("profiles:", "")),
+        )
+      : undefined;
+  type SearchPage = Awaited<ReturnType<typeof searchFootNation>>;
+  const query = useInfiniteQuery<
+    SearchPage,
+    Error,
+    InfiniteData<SearchPage, number>,
+    readonly unknown[],
+    number
+  >({
     queryKey: [
       "global-search",
       session?.user.id,
       term,
       kind,
       activeField,
-      priority.data,
+      browsingPriority,
+      blocked.data,
     ],
-    enabled: !!session && !!rankingReady && (!!term || kind !== "all"),
+    enabled: !!session && blocked.isSuccess && (!!term || kind !== "all"),
     initialPageParam: 0,
-    queryFn: ({ pageParam }) =>
-      !activeField && (kind === "clubs" || kind === "profiles")
+    staleTime: 60_000,
+    placeholderData: (previous, previousQuery) => {
+      const key = previousQuery?.queryKey;
+      return key?.[1] === session?.user.id &&
+        key?.[2] === term &&
+        key?.[3] === kind &&
+        key?.[4] === activeField &&
+        key?.[6] === blocked.data
+        ? previous
+        : undefined;
+    },
+    queryFn: ({ pageParam, signal }) =>
+      browsingPriority
         ? searchWithPriorities(
             session!.user.id,
             term,
             kind,
             pageParam,
-            priority.data || [],
+            browsingPriority,
+            { blockedAuthors: blocked.data, signal },
           )
         : searchFootNation(
             session!.user.id,
@@ -687,151 +755,73 @@ function SearchContent({
             pageParam,
             activeField,
             !term && kind !== "all",
+            [],
+            { blockedAuthors: blocked.data, signal },
           ),
     getNextPageParam: (last, _pages, offset) =>
       last.hasMore ? offset + 20 : undefined,
   });
-  const featured = useQuery({
-    queryKey: ["explore-featured-v2", session?.user.id, priority.data],
-    enabled: !!session && !!rankingReady && !term && kind === "all",
-    queryFn: async () => {
-      const blocked = await blockedSocialAuthors(session!.user.id);
-      let playersRequest = supabase
-        .from("profiles")
-        .select(
-          "id,full_name,username,avatar_url,position,highest_level,club,is_suspended,suspended_until",
-        )
-        .neq("id", session!.user.id)
-        .or("primary_role.ilike.joueu%,position.not.is.null")
-        .or("account_type.is.null,account_type.eq.personal")
-        .or(
-          `is_suspended.is.null,is_suspended.eq.false,suspended_until.lte.${new Date().toISOString()}`,
-        )
-        .order("avatar_url", { ascending: false, nullsFirst: false })
-        .order("created_at", { ascending: false })
-        .order("id")
-        .limit(24);
-      let postsRequest = supabase
-        .from("posts")
-        .select("id,user_id,content,hashtags,image_url,video_url,created_at")
-        .or("moderation_hidden.is.null,moderation_hidden.eq.false")
-        .order("created_at", { ascending: false })
-        .order("id")
-        .limit(12);
-      let storiesRequest = supabase
-        .from("stories")
-        .select("id,user_id,hashtags,expires_at")
-        .gt("expires_at", new Date().toISOString())
-        .order("expires_at", { ascending: true })
-        .limit(80);
-      if (blocked.length) {
-        playersRequest = playersRequest.not(
-          "id",
-          "in",
-          `(${blocked.join(",")})`,
-        );
-        postsRequest = postsRequest.not(
-          "user_id",
-          "in",
-          `(${blocked.join(",")})`,
-        );
-        storiesRequest = storiesRequest.not(
-          "user_id",
-          "in",
-          `(${blocked.join(",")})`,
-        );
-      }
-      const [players, clubs, opportunities, posts, stories] = await Promise.all([
-        playersRequest,
-        supabase
-          .from("fff_clubs")
-          .select("id,name,short_name,city,department_code,logo_url,level")
-          .limit(12),
-        supabase
-          .from("opportunities")
-          .select("id,title,location_city,location_department,opportunity_type")
-          .eq("is_active", true)
-          .limit(6),
-        postsRequest,
-        storiesRequest,
-      ]);
-      if (posts.error) throw posts.error;
-      if (stories.error) throw stories.error;
-      if (players.error) throw players.error;
-      if (clubs.error) throw clubs.error;
-      if (opportunities.error) throw opportunities.error;
-      const hashtagCounts = new Map<string, number>();
-      for (const row of [...(stories.data || []), ...(posts.data || [])])
-        for (const tag of row.hashtags || []) {
-          const clean = String(tag).replace(/^#/, "").trim();
-          if (clean) hashtagCounts.set(clean, (hashtagCounts.get(clean) || 0) + 1);
-        }
-      return {
-        hashtags: [...hashtagCounts.entries()]
-          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-          .slice(0, 16)
-          .map(([tag]) => tag),
-        players: [
-          ...new Map(
-            [
-              ...(priority.data || [])
-                .filter(
-                  (row) =>
-                    row.kind === "profiles" &&
-                    !context.data?.following.includes(
-                      row.id.replace("profiles:", ""),
-                    ),
-                )
-                .slice(0, 24)
-                .map((row) => ({
-                  id: row.id.replace("profiles:", ""),
-                  full_name: row.title,
-                  username: null,
-                  avatar_url: row.image,
-                  position: row.reason || row.subtitle,
-                  highest_level: null,
-                  club: null,
-                })),
-              ...(players.data || []).filter(
-                (row) => !context.data?.following.includes(row.id),
-              ),
-            ].map((row) => [row.id, row]),
-          ).values(),
-        ]
-          .slice(0, 24)
-          .filter((row: any) => {
-            const suspended = row.is_suspended === true;
-            const until = row.suspended_until
-              ? Date.parse(row.suspended_until)
-              : NaN;
-            return (
-              !suspended || (Number.isFinite(until) && until <= Date.now())
-            );
-          }),
-        posts: posts.data || [],
-        clubs: [
-          ...new Map(
-            [
-              ...(priority.data || [])
-                .filter((row) => row.kind === "clubs")
-                .slice(0, 12)
-                .map((row) => ({
-                  id: row.id.replace("clubs:", ""),
-                  name: row.title,
-                  short_name: null,
-                  city: row.reason || row.subtitle,
-                  department_code: null,
-                  logo_url: row.image,
-                  level: null,
-                })),
-              ...(clubs.data || []),
-            ].map((row) => [row.id, row]),
-          ).values(),
-        ].slice(0, 12),
-        opportunities: opportunities.data || [],
-      };
-    },
-  });
+  const options = exploreDiscoveryOptions(
+    session?.user.id || "",
+    blocked.isSuccess ? blocked.data : undefined,
+    !term && kind === "all",
+  );
+  const players = useQuery(options.players);
+  const clubs = useQuery(options.clubs);
+  const opportunities = useQuery(options.opportunities);
+  const posts = useQuery(options.posts);
+  const stories = useQuery(options.stories);
+  const featuredPlayers = !blocked.isSuccess
+    ? []
+    : uniqueExploreRows(
+        [
+          ...(priority.data || [])
+            .filter((row) => row.kind === "profiles")
+            .map((row) => ({
+              id: row.id.replace("profiles:", ""),
+              full_name: row.title,
+              username: null,
+              avatar_url: row.image,
+              position: row.reason || row.subtitle,
+              highest_level: null,
+              club: null,
+            })),
+          ...(players.data || []),
+        ].filter(
+          (row) =>
+            !context.data?.following.includes(row.id) &&
+            !blocked.data?.includes(row.id),
+        ),
+        24,
+      );
+  const featuredClubs = uniqueExploreRows(
+    [
+      ...(priority.data || [])
+        .filter((row) => row.kind === "clubs")
+        .map((row) => ({
+          id: row.id.replace("clubs:", ""),
+          name: row.title,
+          short_name: null,
+          city: row.reason || row.subtitle,
+          department_code: null,
+          logo_url: row.image,
+          level: null,
+        })),
+      ...(clubs.data || []),
+    ],
+    12,
+  );
+  const hashtags = exploreHashtags([
+    ...(stories.data || []),
+    ...(posts.data || []),
+  ]);
+  const refreshFeatured = () => {
+    void players.refetch();
+    void clubs.refetch();
+    void opportunities.refetch();
+    void posts.refetch();
+    void stories.refetch();
+  };
   const rows = [
     ...new Map(
       (query.data?.pages.flatMap((page) => page.rows) || []).map((row) => [
@@ -841,7 +831,7 @@ function SearchContent({
     ).values(),
   ];
   return (
-    <Screen title="Explorer" header={false} scroll={false}>
+    <Screen title="Rechercher" header={false} scroll={false}>
       <AccountMenu
         visible={accountMenuOpen}
         onClose={() => setAccountMenuOpen(false)}
@@ -856,51 +846,69 @@ function SearchContent({
             <View style={styles.header}>
               <View style={styles.titleRow}>
                 <View style={styles.titleLeft}>
-                  <Pressable
+                  <SearchPressable
                     accessibilityRole="button"
                     accessibilityLabel="Retour"
-                    onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+                    onPress={() =>
+                      router.canGoBack() ? router.back() : router.replace("/")
+                    }
                     style={styles.backIcon}
                   >
-                    <ArrowLeft size={28} color={colors.white} strokeWidth={2.4} />
-                  </Pressable>
-                  <Text style={styles.title}>Explorer</Text>
+                    <ArrowLeft size={28} color={colors.ink} strokeWidth={2.4} />
+                  </SearchPressable>
+                  <Text style={styles.title}>Rechercher</Text>
                 </View>
                 <View style={styles.titleActions}>
-                  <Pressable
+                  <SearchPressable
                     accessibilityRole="button"
-                    accessibilityLabel="Filtres avancés"
-                    onPress={() => router.push("/matching")}
+                    accessibilityLabel="Options de recherche"
+                    accessibilityState={{ expanded: optionsOpen }}
+                    onPress={() => setOptionsOpen((open) => !open)}
                     style={styles.filterIcon}
                   >
-                    <SlidersHorizontal size={23} color={colors.white} />
-                  </Pressable>
-                  <Pressable
+                    <SlidersHorizontal size={23} color={colors.ink} />
+                  </SearchPressable>
+                  <SearchPressable
                     accessibilityRole="button"
                     accessibilityLabel="Menu"
                     onPress={() => setAccountMenuOpen(true)}
                     style={styles.filterIcon}
                   >
-                    <Menu size={24} color={colors.white} strokeWidth={2} />
-                  </Pressable>
+                    <Menu size={24} color={colors.ink} strokeWidth={2} />
+                  </SearchPressable>
                 </View>
               </View>
               <View style={styles.searchBox}>
-                <Search size={20} color="rgba(255,255,255,0.58)" />
+                <Search size={20} color={colors.muted} />
                 <TextInput
                   accessibilityLabel="Rechercher sur FootNation"
                   value={text}
                   onChangeText={setText}
-                  placeholder="Joueur, club, opportunité..."
-                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  placeholder="Un nom, un club, un mot-clé…"
+                  placeholderTextColor={colors.muted}
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="search"
                   style={styles.searchInput}
                 />
+                {!!text && (
+                  <SearchPressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Effacer la recherche"
+                    onPress={() => setText("")}
+                    style={{
+                      minWidth: 44,
+                      minHeight: 44,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <X size={18} color={colors.muted} />
+                  </SearchPressable>
+                )}
               </View>
               {!!activeField && (kind === "profiles" || kind === "all") && (
-                <Pressable
+                <SearchPressable
                   accessibilityRole="button"
                   accessibilityLabel="Retirer le filtre du profil"
                   onPress={() => setActiveField(undefined)}
@@ -909,72 +917,86 @@ function SearchContent({
                   <Text style={styles.filterPillText}>
                     {profileInfoSearchFields[activeField]} · {text} ×
                   </Text>
-                </Pressable>
+                </SearchPressable>
               )}
-              <View style={{ gap: 8 }}>
+              {optionsOpen && (
                 <View
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    flexWrap: "wrap",
+                    gap: 8,
+                    padding: 12,
+                    borderRadius: 16,
+                    backgroundColor: colors.surface,
                   }}
                 >
-                  <Text style={{ color: "#A9B9CD", fontSize: 12 }}>
-                    {location
-                      ? "Autour de vous · vos affinités"
-                      : profile?.city
-                        ? `${profile.city} · vos affinités`
-                        : "Suggestions selon votre profil"}
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Classer autour de moi"
-                    disabled={locating}
-                    onPress={() => void locate()}
+                  <View
                     style={{
                       flexDirection: "row",
-                      gap: 6,
                       alignItems: "center",
-                      minHeight: 40,
+                      justifyContent: "space-between",
+                      gap: 12,
+                      flexWrap: "wrap",
                     }}
                   >
-                    <MapPin size={16} color="#60A5FA" />
-                    <Text style={{ color: "#60A5FA", fontSize: 13 }}>
-                      {locating ? "Localisation…" : "Autour de moi"}
+                    <Text style={{ color: colors.muted, fontSize: 12 }}>
+                      {location
+                        ? "Autour de vous · vos affinités"
+                        : profile?.city
+                          ? `${profile.city} · vos affinités`
+                          : "Suggestions selon votre profil"}
                     </Text>
-                  </Pressable>
+                    <SearchPressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Classer autour de moi"
+                      disabled={locating}
+                      onPress={() => void locate()}
+                      style={{
+                        flexDirection: "row",
+                        gap: 6,
+                        alignItems: "center",
+                        minHeight: 44,
+                      }}
+                    >
+                      <MapPin size={16} color={colors.deepBlue} />
+                      <Text style={{ color: colors.deepBlue, fontSize: 13 }}>
+                        {locating ? "Localisation…" : "Autour de moi"}
+                      </Text>
+                    </SearchPressable>
+                  </View>
+                  {!!locationError && (
+                    <Text
+                      accessibilityRole="alert"
+                      style={{ color: colors.muted, fontSize: 12 }}
+                    >
+                      {locationError}
+                    </Text>
+                  )}
+                  {!!(context.error || priority.error) && (
+                    <SearchPressable
+                      accessibilityRole="button"
+                      onPress={() => {
+                        void context.refetch();
+                        void priority.refetch();
+                      }}
+                    >
+                      <Text style={{ color: colors.muted, fontSize: 12 }}>
+                        Suggestions personnalisées indisponibles · Réessayer
+                      </Text>
+                    </SearchPressable>
+                  )}
+                  <Button
+                    secondary
+                    title="Matching avancé"
+                    onPress={() => router.push("/matching")}
+                  />
                 </View>
-                {!!locationError && (
-                  <Text
-                    accessibilityRole="alert"
-                    style={{ color: "#A9B9CD", fontSize: 12 }}
-                  >
-                    {locationError}
-                  </Text>
-                )}
-                {!!(context.error || priority.error) && (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => {
-                      void context.refetch();
-                      void priority.refetch();
-                    }}
-                  >
-                    <Text style={{ color: "#A9B9CD", fontSize: 12 }}>
-                      Suggestions personnalisées indisponibles · Réessayer
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
+              )}
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.filters}
               >
                 {searchCategories.map((item) => (
-                  <Pressable
+                  <SearchPressable
                     key={item.key}
                     accessibilityRole="button"
                     accessibilityState={{ selected: kind === item.key }}
@@ -990,24 +1012,50 @@ function SearchContent({
                         kind === item.key && styles.filterPillTextActive,
                       ]}
                     >
-                      {item.key === "profiles"
-                        ? "Joueurs"
-                        : item.key === "events"
-                          ? "Tournois"
-                          : item.label}
+                      {item.label}
                     </Text>
-                  </Pressable>
+                  </SearchPressable>
                 ))}
               </ScrollView>
               {!term && kind === "all" && (
                 <FeaturedExplore
-                  posts={featured.data?.posts || []}
-                  loading={featured.isPending}
-                  error={featured.error}
-                  players={featured.data?.players || []}
-                  clubs={featured.data?.clubs || []}
-                  opportunities={featured.data?.opportunities || []}
-                  hashtags={featured.data?.hashtags || []}
+                  posts={posts.data || []}
+                  states={{
+                    players: {
+                      pending: players.isPending && !featuredPlayers.length,
+                      error: blocked.error || players.error,
+                      retry: () => {
+                        void blocked.refetch();
+                        void players.refetch();
+                      },
+                    },
+                    clubs: {
+                      pending: clubs.isPending && !featuredClubs.length,
+                      error: clubs.error,
+                      retry: () => {
+                        void clubs.refetch();
+                      },
+                    },
+                    opportunities: {
+                      pending: opportunities.isPending,
+                      error: opportunities.error,
+                      retry: () => {
+                        void opportunities.refetch();
+                      },
+                    },
+                    posts: {
+                      pending: posts.isPending,
+                      error: blocked.error || posts.error,
+                      retry: () => {
+                        void blocked.refetch();
+                        void posts.refetch();
+                      },
+                    },
+                  }}
+                  players={featuredPlayers}
+                  clubs={featuredClubs}
+                  opportunities={opportunities.data || []}
+                  hashtags={hashtags}
                   onHashtagPress={(tag) => {
                     setText(`#${tag}`);
                     setKind("posts");
@@ -1024,7 +1072,7 @@ function SearchContent({
             </View>
           }
           renderItem={({ item }) => (
-            <Pressable
+            <SearchPressable
               style={styles.resultCard}
               accessibilityRole="button"
               accessibilityLabel={item.title}
@@ -1049,18 +1097,25 @@ function SearchContent({
                   <Text style={styles.resultTitle} numberOfLines={2}>
                     {item.title}
                   </Text>
-                  <Text style={styles.resultSubtitle}>{item.subtitle}</Text>
+                  <Text style={styles.resultSubtitle} numberOfLines={2}>
+                    {item.subtitle}
+                  </Text>
                   {!!item.reason && (
-                    <Text style={{ color: "#60A5FA", fontSize: 12 }}>
+                    <Text style={{ color: colors.deepBlue, fontSize: 12 }}>
                       {item.reason}
                     </Text>
                   )}
                 </View>
               </View>
-            </Pressable>
+            </SearchPressable>
           )}
           ListEmptyComponent={
-            !term && kind === "all" ? null : query.isPending ? (
+            !term && kind === "all" ? null : blocked.error ? (
+              <ErrorState
+                error={blocked.error}
+                retry={() => void blocked.refetch()}
+              />
+            ) : query.isPending ? (
               <Loading />
             ) : query.isError ? (
               <ErrorState
@@ -1084,10 +1139,14 @@ function SearchContent({
               />
             ) : null
           }
-          refreshing={query.isRefetching && !query.isFetchingNextPage}
+          refreshing={
+            term || kind !== "all"
+              ? query.isRefetching && !query.isFetchingNextPage
+              : players.isRefetching || clubs.isRefetching
+          }
           onRefresh={() => {
             if (term || kind !== "all") void query.refetch();
-            else void featured.refetch();
+            else refreshFeatured();
           }}
         />
       </AuthGate>

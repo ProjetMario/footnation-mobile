@@ -70,6 +70,35 @@ export function ProfileStoryBubbles({ profileId }: { profileId: string }) {
       ? activeStory.data
       : null;
   if (!own && (!query.data?.length || query.error)) return null;
+  if (own && !ownStory && !query.data?.length) {
+    return (
+      <View style={{ paddingHorizontal: 20, paddingVertical: 6 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Créer une bulle de stories à la une"
+          onPress={() => router.push("/story-collections/new")}
+          style={({ pressed }) => ({
+            alignSelf: "flex-start",
+            minHeight: 44,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 12,
+            borderRadius: 12,
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            borderWidth: 1,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Plus size={18} color={colors.blue} />
+          <Text style={{ color: colors.ink, fontSize: 12, fontWeight: "600" }}>
+            À la une
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
   return (
     <View style={{ paddingVertical: 16 }}>
       <ScrollView

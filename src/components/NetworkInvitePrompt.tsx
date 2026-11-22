@@ -1,16 +1,12 @@
-import React, { useEffect } from "react";
-import { Keyboard, Modal, StyleSheet, View } from "react-native";
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
+import React, { useEffect, useState } from "react";
+import { Keyboard, Platform, StyleSheet, View } from "react-native";
 import { usePathname } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useAuth } from "../lib/auth";
 import { buildInvitationUrl } from "../lib/invitationShare";
 import { canPresentNetworkInvite } from "../lib/networkInvite";
-import {
-  activationPrompts,
-  useActivationPrompts,
-} from "../lib/useActivationPrompts";
-import { invitationPromptReady } from "../lib/activationPrompts";
 import { useInvitationActions } from "../lib/useInvitationActions";
 import { InviteNetworkCard } from "./InviteNetworkCard";
 import { useCalls } from "./CallProvider";
@@ -49,34 +45,40 @@ export function NetworkInvitePrompt() {
   } = useAuth();
   const pathname = usePathname();
   const calls = useCalls();
-  const promptState = useActivationPrompts(session?.user.id || null);
-  const visible =
-    invitationPromptReady(promptState, session?.user.id) &&
-    canPresentNetworkInvite({
-      request: networkInviteRequest,
-      userId: session?.user.id,
-      profile,
-      profileStatus,
-      loading,
-      error,
-      pathname,
-      callBusy: calls.busy,
-    });
+  const [closingKey, setClosingKey] = useState<string | null>(null);
+  const eligible = canPresentNetworkInvite({
+    request: networkInviteRequest,
+    userId: session?.user.id,
+    profile,
+    profileStatus,
+    loading,
+    error,
+    pathname,
+    callBusy: calls.busy,
+  });
+  const closing = closingKey === networkInviteRequest?.key;
+  const visible = eligible && !closing;
   useEffect(() => {
     if (visible) Keyboard.dismiss();
   }, [visible]);
-  if (!visible || !networkInviteRequest) return null;
+  if ((!eligible && !closing) || !networkInviteRequest) return null;
   const close = () => {
-    activationPrompts.dismissInvitation(networkInviteRequest.userId);
-    dismissNetworkInvite(networkInviteRequest.key);
+    // Keep the request pending until UIKit finishes dismissing its modal.
+    // Otherwise FirstLoginOnboarding can present in the same React commit.
+    if (Platform.OS === "ios") setClosingKey(networkInviteRequest.key);
+    else dismissNetworkInvite(networkInviteRequest.key);
   };
   return (
     <Modal
       transparent
-      visible
+      visible={visible}
       animationType="fade"
       statusBarTranslucent
       onRequestClose={close}
+      onDismiss={() => {
+        if (closingKey) dismissNetworkInvite(closingKey);
+        setClosingKey(null);
+      }}
     >
       <StatusBar style="light" />
       <SafeAreaView style={styles.overlay}>

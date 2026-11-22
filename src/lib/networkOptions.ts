@@ -1,8 +1,8 @@
 // Options reprises du site FootNation.
 export const roleOptions = [
-  { value: "Passionné(e)", label: "Passionné(e)" },
-  { value: "Joueur pro", label: "Joueur pro" },
   { value: "Joueur amateur", label: "Joueur amateur" },
+  { value: "Joueur pro", label: "Joueur pro" },
+  { value: "Passionné(e)", label: "Passionné(e)" },
   { value: "Joueur loisir", label: "Joueur loisir" },
   { value: "Joueur indoor (Five)", label: "Joueur indoor (Five)" },
   { value: "Joueur corpo", label: "Joueur corpo" },

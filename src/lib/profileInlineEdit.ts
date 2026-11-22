@@ -7,6 +7,8 @@ import { validEmail } from "./validation";
 import { latestAllowedBirthdate, validBirthdate } from "./calendarDate";
 import { notifyClubChange } from "./notificationEvents";
 import { displayName } from "./models";
+import { isPlayerProfile } from "./profileAbout";
+import { parseJerseyNumber } from "./profileJersey";
 export type EditableProfileField = {
   label: string;
   keys: string[];
@@ -28,6 +30,7 @@ const fields: Record<string, string> = {
   "Club / Structure": "club",
   "Plus haut niveau": "highest_level",
   "Poste principal": "position",
+  "Numéro de maillot": "jersey_number",
   "Postes secondaires": "secondary_positions",
   "Pied fort": "strong_foot",
   "Pied faible": "weak_foot",
@@ -71,6 +74,7 @@ export function editableProfileField(
         : ["first_name", "last_name"],
     };
   let key = Object.hasOwn(fields, label) ? fields[label] : undefined;
+  if (key === "jersey_number" && !isPlayerProfile(profile)) return null;
   if (organization) {
     const prefix = profile.account_type!;
     const names: Record<string, string> = {
@@ -119,6 +123,10 @@ export function inlineProfilePayload(
   const payload: Record<string, unknown> = {};
   for (const key of expected.keys) {
     let value = (values[key] || "").trim();
+    if (key === "jersey_number") {
+      payload[key] = parseJerseyNumber(value);
+      continue;
+    }
     if (value.length > (expected.multiline ? 2000 : 200))
       throw new Error("Cette information est trop longue.");
     if (

@@ -7,6 +7,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
+import { CompactForm, FormDetails } from "../components/CompactForm";
 import { DateField } from "../components/DateField";
 import { ChoiceField } from "../components/ChoiceField";
 import { ProfileAutocompleteField } from "../components/ProfileAutocompleteField";
@@ -43,7 +44,13 @@ function CommunityEditor({ kind }: { kind: "groups" | "events" }) {
     [department, setDepartment] = useState(""),
     [privacy, setPrivacy] = useState("public"),
     [type, setType] = useState("tournament"),
-    [start, setStart] = useState(""),
+    [start, setStart] = useState(() => {
+      // Keep a valid default for a new event; the user can still change it in
+      // the calendar before publishing.
+      const next = new Date(Date.now() + 60 * 60 * 1000);
+      next.setMinutes(0, 0, 0);
+      return next.toISOString();
+    }),
     [end, setEnd] = useState(""),
     [price, setPrice] = useState("0"),
     [max, setMax] = useState(""),
@@ -203,10 +210,114 @@ function CommunityEditor({ kind }: { kind: "groups" | "events" }) {
           <Loading />
         ) : id && existing.isError ? (
           <ErrorState error={existing.error} />
+        ) : kind === "events" ? (
+          <CompactForm>
+            <Field
+              label="Titre"
+              value={name}
+              onChangeText={setName}
+              maxLength={150}
+              placeholder="Ex. Tournoi de quartier"
+              editable={!save.isPending}
+            />
+            <ChoiceField
+              label="Type"
+              value={type}
+              onChange={setType}
+              optional={false}
+              options={types.map(([value, label]) => ({ value, label }))}
+            />
+            <DateField label="Début" value={start} onChange={setStart} />
+            <ProfileAutocompleteField
+              kind="city"
+              label="Ville"
+              value={city}
+              disabled={save.isPending}
+              onChange={setCity}
+              onSelect={(item) => {
+                setCity(item.name);
+                if (item.department) setDepartment(item.department);
+              }}
+            />
+            <View style={{ gap: 8 }}>
+              <Text style={s.label}>Visibilité</Text>
+              <View style={[s.row, { flexWrap: "wrap" }]}>
+                <Chip
+                  label="Public"
+                  selected={privacy === "public"}
+                  onPress={() => setPrivacy("public")}
+                />
+                <Chip
+                  label="Privé"
+                  selected={privacy === "private"}
+                  onPress={() => setPrivacy("private")}
+                />
+              </View>
+            </View>
+            <Field
+              label="Description (facultative)"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              maxLength={10000}
+              placeholder="Programme, participants…"
+              style={{ minHeight: 88 }}
+            />
+            <FormDetails
+              title="Lieu, tarif et autres détails"
+              defaultOpen={!!id}
+            >
+              <ChoiceField
+                label="Département"
+                value={department}
+                options={departmentOptions}
+                disabled={save.isPending}
+                onChange={setDepartment}
+              />
+              <ProfileAutocompleteField
+                kind="city"
+                label="Lieu / adresse"
+                value={location}
+                disabled={save.isPending}
+                maxLength={300}
+                onChange={setLocation}
+                onSelect={(item) => {
+                  setLocation(item.name);
+                  if (!city) setCity(item.name);
+                  if (item.department) setDepartment(item.department);
+                }}
+              />
+              <DateField
+                label="Fin (facultative)"
+                value={end}
+                onChange={setEnd}
+              />
+              <Field
+                label="Tarif"
+                value={price}
+                onChangeText={setPrice}
+                keyboardType="decimal-pad"
+              />
+              <Field
+                label="Nombre de places (facultatif)"
+                placeholder="Illimité"
+                value={max}
+                onChangeText={setMax}
+                keyboardType="number-pad"
+              />
+            </FormDetails>
+            {!!save.isError && <ErrorState error={save.error} />}
+            <Button
+              title={id ? "Enregistrer" : "Publier l’événement"}
+              busy={save.isPending}
+              disabled={!name.trim()}
+              onPress={() => save.mutate()}
+            />
+          </CompactForm>
         ) : (
           <>
             <Field
-              label={kind === "groups" ? "Nom du groupe" : "Titre"}
+              label="Nom du groupe"
               value={name}
               onChangeText={setName}
               maxLength={150}
@@ -251,57 +362,6 @@ function CommunityEditor({ kind }: { kind: "groups" | "events" }) {
                 />
               ))}
             </View>
-            {kind === "events" && (
-              <>
-                <Text style={s.label}>Type d’événement</Text>
-                <View style={[s.row, { flexWrap: "wrap" }]}>
-                  {types.map(([value, label]) => (
-                    <Chip
-                      key={value}
-                      label={label}
-                      selected={type === value}
-                      onPress={() => setType(value)}
-                    />
-                  ))}
-                </View>
-                <DateField label="Début" value={start} onChange={setStart} />
-                <DateField
-                  label="Fin (facultative)"
-                  value={end}
-                  onChange={setEnd}
-                />
-                <ProfileAutocompleteField
-                  kind="city"
-                  label="Lieu / adresse"
-                  value={location}
-                  disabled={save.isPending}
-                  maxLength={300}
-                  onChange={setLocation}
-                  onSelect={(item) => {
-                    setLocation(item.name);
-                    if (!city) setCity(item.name);
-                    if (item.department) setDepartment(item.department);
-                  }}
-                />
-                <Field
-                  label="Tarif"
-                  value={price}
-                  onChangeText={setPrice}
-                  keyboardType="decimal-pad"
-                />
-                <Field
-                  label="Nombre de places (vide : illimité)"
-                  value={max}
-                  onChangeText={setMax}
-                  keyboardType="number-pad"
-                />
-                {!id && (
-                  <Text style={s.small}>
-                    L’événement sera publié dès sa création.
-                  </Text>
-                )}
-              </>
-            )}
             {!!save.isError && <ErrorState error={save.error} />}
             <Button
               title={
@@ -309,9 +369,7 @@ function CommunityEditor({ kind }: { kind: "groups" | "events" }) {
                   ? "Terminer la création"
                   : id
                     ? "Enregistrer"
-                    : kind === "events"
-                      ? "Créer et publier l’événement"
-                      : "Créer le groupe"
+                    : "Créer le groupe"
               }
               busy={save.isPending}
               disabled={!name.trim()}

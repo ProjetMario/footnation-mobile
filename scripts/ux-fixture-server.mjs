@@ -4,7 +4,8 @@ import http from "node:http";
 import { createSupportSocialFixture } from "./support-social-fixture.mjs";
 import { createAdminFixture } from "./admin-fixture.mjs";
 import { createSuperAdminFixture } from "./super-admin-fixture.mjs";
-import { randomUUID } from "node:crypto";
+import { createSupportersFixture } from "./supporters-fixture.mjs";
+import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, statSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 const localVideo = fileURLToPath(
@@ -149,12 +150,13 @@ function roleFor(request) {
 // Deliberately limited PostgREST filters used by the exercised club screens.
 // Unknown operators fail visibly rather than returning unrelated profiles.
 function splitFilters(value) {
-  if (!value.startsWith("(") || !value.endsWith(")"))
-    throw new Error("Invalid OR");
+  if (value.length > 8192 || !value.startsWith("(") || !value.endsWith(")"))
+    throw new Error("Invalid logical filter");
   const clauses = [];
   let part = "",
     quoted = false,
-    escaped = false;
+    escaped = false,
+    depth = 0;
   for (const char of value.slice(1, -1)) {
     if (escaped) {
       part += char;
@@ -167,18 +169,44 @@ function splitFilters(value) {
       continue;
     }
     if (char === '"') quoted = !quoted;
-    if (char === "," && !quoted) {
+    if (!quoted && char === "(") depth++;
+    if (!quoted && char === ")") depth--;
+    if (depth < 0 || depth > 8) throw new Error("Invalid filter depth");
+    if (char === "," && !quoted && depth === 0) {
+      if (!part || clauses.length >= 100) throw new Error("Invalid clauses");
       clauses.push(part);
       part = "";
     } else part += char;
   }
-  if (quoted || escaped || !part) throw new Error("Invalid OR");
+  if (quoted || escaped || depth !== 0 || !part)
+    throw new Error("Invalid logical filter");
   clauses.push(part);
   return clauses;
 }
+function logicalFilterFor(operator, value, depth = 0, budget = { left: 100 }) {
+  if (depth > 8) throw new Error("Invalid filter depth");
+  const tests = splitFilters(value).map((clause) => {
+    if (--budget.left < 0) throw new Error("Too many filter clauses");
+    const nested = /^(and|or)(\(.*\))$/.exec(clause);
+    if (nested)
+      return logicalFilterFor(nested[1], nested[2], depth + 1, budget);
+    const separator = clause.indexOf(".");
+    if (separator < 1) throw new Error("Invalid filter clause");
+    return filterFor(clause.slice(0, separator), clause.slice(separator + 1));
+  });
+  return operator === "and"
+    ? (row) => tests.every((test) => test(row))
+    : (row) => tests.some((test) => test(row));
+}
 function filterFor(key, value) {
-  if (value === "not.is.null") return (row) => row[key] != null;
-  if (value === "is.null") return (row) => row[key] == null;
+  const field = (row) =>
+    key.split(".").reduce((value, part) => value?.[part], row);
+  const identity = /^(not\.)?is\.(null|true|false)$/.exec(value);
+  if (identity) return (row) => {
+    const actual = field(row);
+    const matches = identity[2] === "null" ? actual == null : actual === (identity[2] === "true");
+    return identity[1] ? !matches : matches;
+  };
   if (value.startsWith("in.(") || value.startsWith("not.in.(")) {
     const inverse = value.startsWith("not.");
     const values = value.slice(inverse ? 8 : 4, -1).split(",");
@@ -187,8 +215,6 @@ function filterFor(key, value) {
   }
   const separator = value.indexOf(".");
   const operator = value.slice(0, separator);
-  const field = (row) =>
-    key.split(".").reduce((value, part) => value?.[part], row);
   let expected = value.slice(separator + 1);
   if (expected.startsWith('"')) expected = JSON.parse(expected);
   if (["eq", "neq", "gt", "gte", "lt", "lte"].includes(operator))
@@ -221,15 +247,54 @@ function filterFor(key, value) {
 export function createFixtureServer({
   socialAuth = false,
   superAdmin = false,
+  guestPreview = false,
   liveMatches = false,
+  supporters = process.env.FOOTNATION_FIXTURE_SUPPORTERS === "1",
+  live = process.env.FOOTNATION_FIXTURE_LIVE === "1",
+  publication = process.env.FOOTNATION_FIXTURE_PUBLICATION === "1",
+  rejectedCoach = process.env.FOOTNATION_FIXTURE_REJECTED_COACH === "1",
 } = {}) {
+  // Opt-in, memory-only publication fixtures; no external database or storage.
+  const uploadedMedia = new Map();
+  const missingPublicationProfiles = new Map();
+  let postFault = "none";
+  let publicationAttempts = 0;
+  let liveFault = "none";
   const socialProfiles = new Map();
+  const oauthCodes = new Map();
   const needsSocialProfile = (role) =>
     socialAuth && ["new", "parent"].includes(role) && !socialProfiles.has(role);
   const tables = structuredClone(initialTables);
+  if (guestPreview) {
+    Object.assign(tables.profiles[0], {
+      slug: "recette-public",
+      is_published: true,
+      is_private: false,
+      suspended_until: null,
+    });
+    for (const [suffix, slug, state] of [
+      ["11", "recette-prive", { is_private: true }],
+      ["12", "recette-suspendu", { is_suspended: true, suspended_until: "2099-01-01T00:00:00.000Z" }],
+    ]) {
+      tables.profiles.push({
+        ...tables.profiles[0],
+        id: "00000000-0000-4000-8000-" + suffix.padStart(12, "0"),
+        slug,
+        username: slug,
+        full_name: `CONFIDENTIEL-${slug}`,
+        bio: `BIO-CONFIDENTIELLE-${slug}`,
+        email: `${slug}-secret@fixture.test`,
+        phone: "SECRET-PHONE-" + slug,
+        ...state,
+      });
+    }
+  }
   for (const table of [
+    "swipes",
+    "matching_matches",
     "user_blocks",
     "connections",
+    "call_sessions",
     "shorts",
     "short_comments",
     "short_likes",
@@ -254,6 +319,9 @@ export function createFixtureServer({
     "stories",
     "groups",
     "events",
+    "live_stream_comments",
+    "live_stream_likes",
+    "live_stream_viewers",
   ])
     tables[table] ||= [];
   tables.fff_clubs = [
@@ -435,6 +503,11 @@ export function createFixtureServer({
     },
   ];
   const administration = createAdminFixture(tables, ids);
+  if (rejectedCoach) {
+    const assignment = tables.team_members.find((m) => m.profile_id === ids.coach);
+    if (!assignment) throw new Error("Fixture coach introuvable.");
+    Object.assign(assignment, { status: "rejected", is_active: false, is_primary: false });
+  }
   const superAdministration = superAdmin
     ? createSuperAdminFixture(tables, ids)
     : null;
@@ -477,6 +550,161 @@ export function createFixtureServer({
     return [...stats.values()];
   };
   const supportSocial = createSupportSocialFixture(ids);
+  const supporterCommunities = supporters ? createSupportersFixture(ids, tables.profiles, tables.fff_clubs) : null;
+  // Exact REST operations exercised by ClubLive/useLiveInteractions. This does
+  // not fabricate a camera stream, video URL, or a realtime signaling service.
+  function mutateLive(table, method, body, matches, role) {
+    const inputs = Array.isArray(body) ? body : [body];
+    const notification =
+      table === "notifications" &&
+      method === "POST" &&
+      inputs.every((row) => row.type === "live_started");
+    if (!live || (!table.startsWith("live_stream") && !notification))
+      return null;
+    const fail = (status, message, code = "FIXTURE_LIVE") => ({
+      status,
+      data: { code, message },
+    });
+    const ok = (data, status = 200) => ({ status, data });
+    const uid = ids[role];
+    if (!uid) return fail(401, "Session requise");
+    if (
+      (table === "live_streams" &&
+        method === "POST" &&
+        liveFault === "create") ||
+      (notification && liveFault === "notifications") ||
+      (table === "live_streams" && method === "PATCH" && liveFault === "stop")
+    )
+      return fail(503, "Panne live simulée : " + liveFault);
+    if (notification) {
+      if (
+        inputs.some(
+          (row) =>
+            row.sender_id !== uid ||
+            !tables.profiles.some(
+              (profile) => profile.id === row.receiver_id,
+            ) ||
+            !tables.live_streams.some(
+              (stream) =>
+                stream.id === row.metadata?.stream_id &&
+                stream.broadcaster_id === uid,
+            ),
+        )
+      )
+        return fail(403, "Notification live interdite");
+      const rows = inputs.map((row) => ({
+        id: randomUUID(),
+        created_at: new Date().toISOString(),
+        ...row,
+      }));
+      tables.notifications.push(...rows);
+      return ok(rows, 201);
+    }
+    if (table === "live_streams") {
+      if (method === "POST") {
+        if (inputs.some((row) => row.broadcaster_id !== uid))
+          return fail(403, "Diffuseur différent");
+        if (!tables.profiles.some((profile) => profile.id === uid))
+          return fail(
+            409,
+            'insert or update on table "live_streams" violates foreign key constraint "live_streams_broadcaster_id_fkey"',
+            "23503",
+          );
+        if (
+          inputs.some(
+            (row) =>
+              typeof row.title !== "string" ||
+              !row.title.trim() ||
+              row.status !== "live" ||
+              !Number.isFinite(Date.parse(row.started_at)) ||
+              typeof row.match_id !== "string" ||
+              !row.match_id,
+          )
+        )
+          return fail(400, "Live incomplet");
+        const rows = inputs.map((row) => ({
+          id: randomUUID(),
+          created_at: new Date().toISOString(),
+          ended_at: null,
+          expires_at: null,
+          video_url: null,
+          ...row,
+        }));
+        tables.live_streams.push(...rows);
+        return ok(rows, 201);
+      }
+      if (method !== "PATCH") return fail(501, "Méthode live non simulée");
+      const selected = tables.live_streams.filter(matches);
+      if (selected.some((row) => row.broadcaster_id !== uid))
+        return fail(403, "Diffuseur différent");
+      if (
+        body.status !== "ended" ||
+        !Number.isFinite(Date.parse(body.ended_at)) ||
+        Object.keys(body).some((key) => !["status", "ended_at"].includes(key))
+      )
+        return fail(400, "Arrêt live invalide");
+      selected.forEach((row) => Object.assign(row, body));
+      return ok(selected);
+    }
+    if (
+      ![
+        "live_stream_comments",
+        "live_stream_likes",
+        "live_stream_viewers",
+      ].includes(table)
+    )
+      return fail(501, "Table live non simulée");
+    if (method === "POST") {
+      if (inputs.some((row) => row.user_id !== uid))
+        return fail(403, "Compte différent");
+      if (
+        inputs.some(
+          (row) =>
+            !tables.live_streams.some((stream) => stream.id === row.stream_id),
+        )
+      )
+        return fail(409, "Live inconnu", "23503");
+      if (
+        table === "live_stream_comments" &&
+        inputs.some((row) => typeof row.body !== "string" || !row.body.trim())
+      )
+        return fail(400, "Commentaire vide");
+      if (
+        table !== "live_stream_comments" &&
+        inputs.some((row) =>
+          tables[table].some(
+            (existing) =>
+              existing.stream_id === row.stream_id && existing.user_id === uid,
+          ),
+        )
+      )
+        return fail(409, "Interaction existante", "23505");
+      const rows = inputs.map((row) => ({
+        id: randomUUID(),
+        created_at: new Date().toISOString(),
+        ...row,
+      }));
+      tables[table].push(...rows);
+      return ok(rows, 201);
+    }
+    const selected = tables[table].filter(matches);
+    if (selected.some((row) => row.user_id !== uid))
+      return fail(403, "Compte différent");
+    if (method === "DELETE") {
+      tables[table] = tables[table].filter((row) => !selected.includes(row));
+      return ok(selected);
+    }
+    if (
+      method === "PATCH" &&
+      table === "live_stream_viewers" &&
+      Object.keys(body).join() === "last_seen" &&
+      Number.isFinite(Date.parse(body.last_seen))
+    ) {
+      selected.forEach((row) => Object.assign(row, body));
+      return ok(selected);
+    }
+    return fail(501, "Méthode live non simulée");
+  }
   let scenario = "normal";
   const supportedModes = [
     "normal",
@@ -497,6 +725,7 @@ export function createFixtureServer({
     "match_comments",
     "match_predictions",
   ]);
+  if (publication) writable.add("posts");
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
     response.setHeader("Access-Control-Allow-Origin", "*");
@@ -511,6 +740,110 @@ export function createFixtureServer({
       response.writeHead(204);
       response.end();
       return;
+    }
+    if (publication && url.pathname.startsWith("/storage/v1/object/")) {
+      const storageMatch =
+        /^\/storage\/v1\/object\/(?:(info|public)\/)?post-media\/(.+)$/.exec(
+          url.pathname,
+        );
+      const storageSend = (status, value) => {
+        response.writeHead(status);
+        response.end(JSON.stringify(value));
+      };
+      if (!storageMatch)
+        return storageSend(501, { message: "Stockage non simulé" });
+      const [, action, encodedKey] = storageMatch;
+      let key;
+      try {
+        key = decodeURIComponent(encodedKey);
+      } catch {
+        return storageSend(400, { message: "Chemin de média invalide" });
+      }
+      const role = roleFor(request);
+      const stored = uploadedMedia.get(key);
+      // Production freezePostDraft uses images/<post UUID>.<ext> (or videos/),
+      // rather than an owner folder. Ownership is attached to the object itself.
+      if (
+        action !== "public" &&
+        (!role ||
+          !/^(images|videos)\/[a-z0-9_-]+\.(jpg|png|webp|heic|heif|mp4|mov|webm)$/i.test(
+            key,
+          ) ||
+          (stored && stored.ownerId !== ids[role]))
+      )
+        return storageSend(403, { message: "Compte différent" });
+      if (action === "info" && request.method === "GET")
+        return stored
+          ? storageSend(200, {
+              id: stored.id,
+              name: key,
+              size: stored.bytes.length,
+              metadata: stored.metadata,
+              content_type: stored.contentType,
+            })
+          : storageSend(404, {
+              statusCode: "404",
+              error: "not_found",
+              message: "Object not found",
+            });
+      if (action === "public" && ["GET", "HEAD"].includes(request.method)) {
+        if (!stored) return storageSend(404, { message: "Object not found" });
+        response.setHeader("Content-Type", stored.contentType);
+        response.setHeader("Content-Length", stored.bytes.length);
+        response.writeHead(200);
+        response.end(request.method === "HEAD" ? undefined : stored.bytes);
+        return;
+      }
+      if (!action && request.method === "POST") {
+        if (stored)
+          return storageSend(409, {
+            statusCode: "409",
+            error: "Duplicate",
+            message: "The resource already exists",
+          });
+        let bytes, metadata;
+        try {
+          const chunks = [];
+          let size = 0;
+          for await (const chunk of request) {
+            size += chunk.length;
+            if (size > 10 * 1024 * 1024)
+              throw new Error("Fixture object limit");
+            chunks.push(chunk);
+          }
+          bytes = Buffer.concat(chunks);
+          metadata = request.headers["x-metadata"]
+            ? JSON.parse(
+                Buffer.from(request.headers["x-metadata"], "base64").toString(
+                  "utf8",
+                ),
+              )
+            : {};
+          if (
+            [...uploadedMedia.values()].reduce(
+              (sum, item) => sum + item.bytes.length,
+              bytes.length,
+            ) >
+            25 * 1024 * 1024
+          )
+            throw new Error("Fixture memory limit");
+        } catch {
+          return storageSend(400, {
+            message: "Média local invalide ou trop volumineux",
+          });
+        }
+        const id = randomUUID();
+        uploadedMedia.set(key, {
+          id,
+          ownerId: ids[role],
+          bytes,
+          metadata,
+          contentType:
+            request.headers["content-type"] || "application/octet-stream",
+        });
+        return storageSend(200, { Id: id, Key: "post-media/" + key });
+      }
+      return storageSend(405, { message: "Méthode non simulée" });
     }
     if (url.pathname === videoRoute) {
       if (!["GET", "HEAD"].includes(request.method)) {
@@ -594,16 +927,163 @@ export function createFixtureServer({
       response.end(JSON.stringify({ fixture: true, scenario, roles }));
       return;
     }
+    if (publication && url.pathname === "/__fixture/publication") {
+      if (request.method === "POST") {
+        if (
+          (body.fault !== undefined &&
+            !["none", "posts_user_id_fkey"].includes(body.fault)) ||
+          (body.profileMissing !== undefined &&
+            typeof body.profileMissing !== "boolean") ||
+          (body.role !== undefined && !roles.includes(body.role))
+        ) {
+          response.writeHead(400);
+          response.end('{"message":"Faute de publication inconnue"}');
+          return;
+        }
+        if (body.fault !== undefined) postFault = body.fault;
+        const targetRole = body.role || "player";
+        if (
+          body.profileMissing === true &&
+          !missingPublicationProfiles.has(targetRole)
+        ) {
+          const profile = tables.profiles.find(
+            (row) => row.id === ids[targetRole],
+          );
+          if (profile) {
+            missingPublicationProfiles.set(targetRole, profile);
+            tables.profiles = tables.profiles.filter(
+              (row) => row.id !== ids[targetRole],
+            );
+          }
+        } else if (
+          body.profileMissing === false &&
+          missingPublicationProfiles.has(targetRole)
+        ) {
+          tables.profiles.push(missingPublicationProfiles.get(targetRole));
+          missingPublicationProfiles.delete(targetRole);
+        }
+      }
+      response.end(
+        JSON.stringify({
+          fixture: true,
+          fault: postFault,
+          attempts: publicationAttempts,
+          uploadedObjects: uploadedMedia.size,
+          missingProfiles: [...missingPublicationProfiles.keys()],
+        }),
+      );
+      return;
+    }
+    if (live && url.pathname === "/__fixture/live") {
+      if (request.method === "POST") {
+        if (!["none", "create", "notifications", "stop"].includes(body.fault)) {
+          response.writeHead(400);
+          response.end('{"message":"Faute live inconnue"}');
+          return;
+        }
+        liveFault = body.fault;
+      }
+      response.end(
+        JSON.stringify({
+          fixture: true,
+          fault: liveFault,
+          streams: tables.live_streams,
+          notifications: tables.notifications.filter(
+            (row) => row.type === "live_started",
+          ).length,
+        }),
+      );
+      return;
+    }
     const role = roleFor(request);
     if (process.env.FOOTNATION_FIXTURE_TRACE === "1")
       console.log(request.method, url.pathname, role);
     const send = (value) => response.end(JSON.stringify(value));
+    if (url.pathname === "/auth/v1/settings")
+      return send({ external: { google: socialAuth, apple: socialAuth } });
+    if (socialAuth && url.pathname === "/auth/v1/authorize") {
+      let redirect;
+      try {
+        redirect = new URL(url.searchParams.get("redirect_to"));
+      } catch {}
+      const provider = url.searchParams.get("provider");
+      const challenge = url.searchParams.get("code_challenge");
+      if (
+        !redirect ||
+        redirect.protocol !== "http:" ||
+        !["localhost", "127.0.0.1"].includes(redirect.hostname) ||
+        redirect.pathname !== "/auth/callback" ||
+        redirect.username ||
+        redirect.password ||
+        !["google", "apple"].includes(provider) ||
+        !challenge ||
+        url.searchParams.get("code_challenge_method") !== "s256"
+      ) {
+        response.writeHead(400);
+        return send({ error: "invalid_fixture_authorization" });
+      }
+      const failure = url.searchParams.get("fixture_error");
+      const selected = url.searchParams.get("fixture_role");
+      if (["access_denied", "server_error"].includes(failure)) {
+        redirect.hash = new URLSearchParams({ error: failure }).toString();
+      } else if (["player", "new", "parent"].includes(selected)) {
+        const code = randomUUID();
+        oauthCodes.set(code, {
+          role: selected,
+          provider,
+          challenge,
+          expires: Date.now() + 60000,
+        });
+        if (oauthCodes.size > 50)
+          oauthCodes.delete(oauthCodes.keys().next().value);
+        redirect.searchParams.set("code", code);
+      } else {
+        const options = [
+          ["fixture_role", "player", "Compte existant"],
+          ["fixture_role", "new", "Nouveau compte"],
+          ["fixture_role", "parent", "Compte mineur"],
+          ["fixture_error", "access_denied", "Annuler"],
+          ["fixture_error", "server_error", "Simuler une erreur"],
+        ];
+        response.setHeader("Content-Type", "text/html; charset=utf-8");
+        return response.end(
+          `<!doctype html><html lang="fr"><meta name="viewport" content="width=device-width"><title>Connexion de recette</title><h1>${provider === "apple" ? "Apple" : "Google"} : recette locale</h1>${options
+            .map(([key, value, label]) => {
+              const target = new URL(url);
+              target.searchParams.set(key, value);
+              const href = (target.pathname + target.search)
+                .replaceAll("&", "&amp;")
+                .replaceAll('"', "&quot;");
+              return `<p><a href="${href}">${label}</a></p>`;
+            })
+            .join("")}</html>`,
+        );
+      }
+      response.writeHead(302, { Location: redirect.toString() });
+      return response.end();
+    }
     if (url.pathname === "/auth/v1/token") {
-      const selected = roles.find(
+      let selected = roles.find(
         (item) =>
           body.email === item + "@fixture.test" ||
           body.refresh_token === "fixture-refresh-" + item,
       );
+      let provider;
+      if (socialAuth && url.searchParams.get("grant_type") === "pkce") {
+        const code = oauthCodes.get(body.auth_code);
+        oauthCodes.delete(body.auth_code);
+        if (
+          code &&
+          code.expires > Date.now() &&
+          typeof body.code_verifier === "string" &&
+          createHash("sha256")
+            .update(body.code_verifier)
+            .digest("base64url") === code.challenge
+        ) {
+          selected = code.role;
+          provider = code.provider;
+        }
+      }
       if (!selected) {
         response.writeHead(400);
         return send({
@@ -618,7 +1098,17 @@ export function createFixtureServer({
         expires_in: 36000,
         expires_at: Math.floor(Date.now() / 1000) + 36000,
         user: user(selected),
+        ...(provider === "apple"
+          ? { provider_refresh_token: "fixture-apple-refresh" }
+          : {}),
       });
+    }
+    if (socialAuth && url.pathname === "/functions/v1/apple-auth-credentials") {
+      if (!role || body.providerRefreshToken !== "fixture-apple-refresh") {
+        response.writeHead(403);
+        return send({ error: "invalid_fixture_apple_credentials" });
+      }
+      return send({ stored: true });
     }
     if (scenario === "slow")
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -636,6 +1126,89 @@ export function createFixtureServer({
       return send(user(role));
     }
     if (url.pathname === "/auth/v1/logout") return send({});
+    if (
+      (publication || url.pathname === "/rest/v1/rpc/get_signup_status") &&
+      [
+        "/rest/v1/rpc/get_signup_status",
+        "/rest/v1/rpc/complete_signup",
+      ].includes(url.pathname)
+    ) {
+      if (!role) {
+        response.writeHead(401);
+        return send({ message: "Session requise" });
+      }
+      if (request.method !== "POST") {
+        response.writeHead(405);
+        return send({ message: "POST requis" });
+      }
+      const profile = tables.profiles.find((row) => row.id === ids[role]);
+      if (url.pathname.endsWith("get_signup_status")) {
+        const identity = profile || missingPublicationProfiles.get(role) || {};
+        return send({
+          required: !profile || needsSocialProfile(role),
+          full_name: identity.full_name || "Recette " + role,
+          username: identity.username || "",
+          birthdate: identity.birthdate || null,
+          account_type: identity.account_type || "personal",
+          primary_role: identity.primary_role || "",
+          ...socialProfiles.get(role),
+          ...(!profile ? { required: true } : {}),
+        });
+      }
+      if (
+        typeof body.p_full_name !== "string" ||
+        body.p_full_name.trim().length < 2 ||
+        !/^[a-z0-9_]{3,30}$/.test(body.p_username || "") ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(body.p_birthdate || "") ||
+        !Number.isFinite(Date.parse(body.p_birthdate)) ||
+        Date.parse(body.p_birthdate) >= Date.now() ||
+        !["personal", "club", "business", "institution"].includes(
+          body.p_account_type,
+        ) ||
+        (body.p_account_type === "personal" && !body.p_primary_role) ||
+        body.p_terms_version !== "1.0"
+      ) {
+        response.writeHead(400);
+        return send({ message: "Champs de recette incomplets" });
+      }
+      if (
+        tables.profiles.some(
+          (row) => row.id !== ids[role] && row.username === body.p_username,
+        )
+      ) {
+        response.writeHead(409);
+        return send({ code: "23505", message: "Pseudo déjà utilisé" });
+      }
+      const identity = {
+        full_name: body.p_full_name.trim(),
+        username: body.p_username,
+        birthdate: body.p_birthdate,
+        account_type: body.p_account_type,
+        primary_role: body.p_primary_role,
+      };
+      if (profile) Object.assign(profile, identity);
+      else {
+        tables.profiles.push({
+          ...missingPublicationProfiles.get(role),
+          id: ids[role],
+          ...identity,
+        });
+        missingPublicationProfiles.delete(role);
+        postFault = "none";
+      }
+      socialProfiles.set(role, { required: false, ...identity });
+      return send({
+        state:
+          role === "parent"
+            ? "parent_required"
+            : role === "underage"
+              ? "underage"
+              : "eligible",
+        allowed: !["parent", "underage"].includes(role),
+        onboarding_required: false,
+        resend_available_at: null,
+      });
+    }
     if (
       socialAuth &&
       [
@@ -721,8 +1294,18 @@ export function createFixtureServer({
       url.pathname === "/rest/v1/rpc/get_native_conversations"
     )
       return send([]);
-    const supportResult = url.pathname.startsWith("/rest/v1/rpc/") ? supportSocial(url.pathname.split("/").at(-1), body, role) : null;
-    if (supportResult) { response.writeHead(supportResult.status); return send(supportResult.data); }
+    const supporterResult = supporterCommunities?.(url, request.method, body, role, request.headers);
+    if (supporterResult) {
+      response.writeHead(supporterResult.status);
+      return send(supporterResult.data);
+    }
+    const supportResult = url.pathname.startsWith("/rest/v1/rpc/")
+      ? supportSocial(url.pathname.split("/").at(-1), body, role)
+      : null;
+    if (supportResult) {
+      response.writeHead(supportResult.status);
+      return send(supportResult.data);
+    }
     const superResult = url.pathname.startsWith("/rest/v1/rpc/")
       ? superAdministration?.rpc(
           url.pathname.split("/").at(-1),
@@ -846,6 +1429,53 @@ export function createFixtureServer({
       });
       return send(body.p_id);
     }
+    // Mirror the public presentation endpoint; never expose full fixture users.
+    if (url.pathname === "/functions/v1/public-post-preview") {
+      response.setHeader("Cache-Control", "no-store");
+      if (request.method !== "GET") {
+        response.writeHead(405);
+        return send({ error: "Méthode non autorisée." });
+      }
+      const pick = (row, fields) => Object.fromEntries(fields.map((field) => [field, row?.[field] ?? null]));
+      const publicAuthor = (id) => tables.profiles.find((row) => row.id === id && row.profile_visibility === "public" && row.is_private !== true && !(row.is_suspended && (!row.suspended_until || Date.parse(row.suspended_until) > Date.now())));
+      const project = (post) => ({
+        ...pick(post, ["id", "content", "location", "hashtags", "image_url", "video_url", "created_at", "user_id", "is_short", "interests", "views"]),
+        profiles: pick(publicAuthor(post.user_id), ["id", "username", "full_name", "avatar_url", "position", "club"]),
+      });
+      let publicPosts = tables.posts.filter((row) => row.moderation_hidden !== true && publicAuthor(row.user_id));
+      const postId = url.searchParams.get("id");
+      if (postId) {
+        const post = publicPosts.find((row) => row.id === postId);
+        if (!post) {
+          response.writeHead(404);
+          return send({ error: "Publication introuvable." });
+        }
+        return send({ post: project(post), expiresIn: 30 });
+      }
+      const authorId = url.searchParams.get("authorId");
+      if (authorId) publicPosts = publicPosts.filter((row) => row.user_id === authorId);
+      if (url.searchParams.get("type") === "video") publicPosts = publicPosts.filter((row) => row.video_url);
+      publicPosts.sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
+      const before = url.searchParams.get("before");
+      if (before) {
+        const [createdAt, id] = before.split("|");
+        if (!Number.isFinite(Date.parse(createdAt))) {
+          response.writeHead(400);
+          return send({ error: "Curseur invalide." });
+        }
+        publicPosts = publicPosts.filter((row) => row.created_at < createdAt || (id && row.created_at === createdAt && row.id < id));
+      }
+      const limit = Math.max(1, Math.min(20, Number(url.searchParams.get("limit")) || 20));
+      const page = publicPosts.slice(0, limit);
+      const hasMore = publicPosts.length > page.length;
+      const last = page.at(-1);
+      return send({
+        posts: page.map(project),
+        hasMore,
+        nextCursor: hasMore && last ? `${last.created_at}|${last.id}` : null,
+        expiresIn: 30,
+      });
+    }
     if (url.pathname === "/functions/v1/club-details")
       return send({ teams: [], upcomingMatches: [], pastMatches: [] });
     if (
@@ -859,6 +1489,10 @@ export function createFixtureServer({
     }
     if (url.pathname.startsWith("/rest/v1/")) {
       const table = url.pathname.split("/").at(-1);
+      if (table === "call_sessions" && !role) {
+        response.writeHead(401);
+        return send({ message: "Session requise" });
+      }
       const sourceRows =
         table === "match_prediction_stats"
           ? predictionStats()
@@ -873,20 +1507,22 @@ export function createFixtureServer({
       try {
         filters = [...url.searchParams].flatMap(([key, value]) => {
           if (
-            ["select", "order", "offset", "limit", "on_conflict"].includes(key)
+            [
+              "select",
+              "order",
+              "offset",
+              "limit",
+              "on_conflict",
+              "columns",
+            ].includes(key)
           )
             return [];
-          if (key === "or") {
-            const clauses = splitFilters(value);
-            const tests = clauses.map((clause) => {
-              const separator = clause.indexOf(".");
-              if (separator < 1) throw new Error("Invalid OR");
-              return filterFor(
-                clause.slice(0, separator),
-                clause.slice(separator + 1),
-              );
-            });
-            return [(row) => tests.some((test) => test(row))];
+          if (key === "or" || key === "and")
+            return [logicalFilterFor(key, value)];
+          if (key.endsWith(".or") || key.endsWith(".and")) {
+            const parts = key.split(".");
+            const test = logicalFilterFor(parts.pop(), value);
+            return [(row) => test(parts.reduce((item, part) => item?.[part], row) || {})];
           }
           return [filterFor(key, value)];
         });
@@ -899,6 +1535,22 @@ export function createFixtureServer({
         if (!role) {
           response.writeHead(401);
           return send({ message: "Session requise" });
+        }
+        const liveWrite = mutateLive(
+          table,
+          request.method,
+          body,
+          matches,
+          role,
+        );
+        if (liveWrite) {
+          response.writeHead(liveWrite.status);
+          return send(
+            request.headers.accept?.includes("vnd.pgrst.object") &&
+              Array.isArray(liveWrite.data)
+              ? liveWrite.data[0] || null
+              : liveWrite.data,
+          );
         }
         const adminWrite = administration.mutate(
           table,
@@ -933,6 +1585,34 @@ export function createFixtureServer({
           if (inputs.some((row) => row[actor] !== ids[role])) {
             response.writeHead(403);
             return send({ message: "Compte différent" });
+          }
+          if (publication && table === "posts") {
+            publicationAttempts++;
+            if (
+              postFault === "posts_user_id_fkey" ||
+              missingPublicationProfiles.has(role)
+            ) {
+              response.writeHead(409);
+              return send({
+                code: "23503",
+                details: `Key (user_id)=(${ids[role]}) is not present in table \"users\".`,
+                hint: null,
+                message:
+                  'insert or update on table "posts" violates foreign key constraint "posts_user_id_fkey"',
+              });
+            }
+            if (
+              inputs.some((row) =>
+                tables.posts.some((existing) => existing.id === row.id),
+              )
+            ) {
+              response.writeHead(409);
+              return send({
+                code: "23505",
+                message:
+                  'duplicate key value violates unique constraint "posts_pkey"',
+              });
+            }
           }
           if (
             table === "match_predictions" &&
@@ -1013,12 +1693,16 @@ export function createFixtureServer({
       }
       const selection = url.searchParams.get("select") || "*";
       let rows =
-        scenario === "empty"
+        scenario === "empty" || (guestPreview && !role && table === "posts")
           ? []
           : sourceRows.filter((row) =>
               administration.readable(table, row, role),
             );
       const extraRelations = {
+        live_streams: [["broadcaster", "profiles", "broadcaster_id"]],
+        live_stream_comments: [["profile", "profiles", "user_id"]],
+        live_stream_likes: [["profile", "profiles", "user_id"]],
+        live_stream_viewers: [["profile", "profiles", "user_id"]],
         club_matches: [["club", "fff_clubs", "club_id"]],
         club_competitions: [],
         club_competition_standings: [
@@ -1170,12 +1854,11 @@ export function createFixtureServer({
           return send({ message: "Jointure non simulée" });
         }
       }
-      rows = rows.filter(matches);
       // Only relationships whose contract is explicitly represented are joined.
       const relations = {
         shorts: {
-          pattern: /user:profiles!shorts_user_id_fkey\([^()]*\)/,
-          alias: "user",
+          pattern: /(?:user:profiles!shorts_user_id_fkey(?:!inner)?|profiles:user_id)\([^()]*\)/,
+          alias: selection.includes("profiles:user_id(") ? "profiles" : "user",
           target: "profiles",
           key: "user_id",
         },
@@ -1186,10 +1869,10 @@ export function createFixtureServer({
           key: "user_id",
         },
         club_followers: {
-          pattern: /profile:profiles!club_followers_profile_id_fkey\([^()]*\)/,
-          alias: "profile",
-          target: "profiles",
-          key: "profile_id",
+          pattern: /(?:profile:profiles!club_followers_profile_id_fkey|club:fff_clubs!club_followers_club_id_fkey)\([^()]*\)/,
+          alias: selection.includes("club:fff_clubs") ? "club" : "profile",
+          target: selection.includes("club:fff_clubs") ? "fff_clubs" : "profiles",
+          key: selection.includes("club:fff_clubs") ? "club_id" : "profile_id",
         },
         club_players: {
           pattern: /profile:profiles\([^()]*\)/,
@@ -1232,7 +1915,9 @@ export function createFixtureServer({
               (target) => target.id === row[relation.key],
             ) || null,
         }));
+        if (selection.includes("!inner(")) rows = rows.filter((row) => row[relation.alias] !== null);
       }
+      rows = rows.filter(matches);
       if (table === "shorts")
         rows = rows.map((row) => ({
           ...row,
@@ -1281,7 +1966,9 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   const port = Number(process.env.FOOTNATION_FIXTURE_PORT || 7082);
-  createFixtureServer().listen(port, "127.0.0.1", () =>
+  createFixtureServer({
+    publication: process.env.FOOTNATION_FIXTURE_PUBLICATION === "1",
+  }).listen(port, "127.0.0.1", () =>
     console.log("Recette locale : http://127.0.0.1:" + port),
   );
 }

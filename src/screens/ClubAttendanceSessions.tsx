@@ -1,4 +1,6 @@
 import { useState } from "react";
+import CoachSessionAttendance from "./CoachSessionAttendance";
+import { EventConvocationButton } from "../components/EventConvocationButton";
 import { Text, View } from "react-native";
 import { randomUUID } from "expo-crypto";
 import {
@@ -51,6 +53,7 @@ export default function ClubAttendanceSessions({
 
   const uid = useAuth().session!.user.id;
   const [editing, setEditing] = useState<Record<string, any> | null>(null);
+  const [pointing, setPointing] = useState<string | null>(null);
   const query = useInfiniteQuery({
     queryKey: ["club-attendance-sessions", id, uid],
     initialPageParam: 0,
@@ -88,6 +91,7 @@ export default function ClubAttendanceSessions({
     getNextPageParam: (last, pages) =>
       last.rows.length === 30 ? pages.length * 30 : undefined,
   });
+  if (pointing) return <CoachSessionAttendance id={id} sessionId={pointing} close={() => setPointing(null)} />;
   if (editing)
     return (
       <SessionForm
@@ -139,6 +143,8 @@ export default function ClubAttendanceSessions({
               secondary
               onPress={() => setEditing(row)}
             />
+            <EventConvocationButton clubId={id} eventId={row.id} kind="session" />
+            <Button title="Pointer les présences" secondary onPress={() => setPointing(row.id)} />
             {!!query.data?.pages[0]?.canViewAttendance && (
               <Button
                 title="Voir les présences de cette séance"

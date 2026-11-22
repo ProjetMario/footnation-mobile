@@ -3,6 +3,7 @@ import { focusManager, onlineManager } from "@tanstack/react-query";
 import { randomUUID } from "expo-crypto";
 import { useAuth } from "../lib/auth";
 import { supportRpc } from "../lib/support";
+import { optionalRpc } from "../lib/optionalRpc";
 
 /** A lease for this foreground app session only, never a permanent online flag. */
 export function ProfilePresenceBridge() {
@@ -20,10 +21,10 @@ export function ProfilePresenceBridge() {
       if (!active && !sentActive) return;
       sending = true;
       try {
-        await supportRpc(uid, "set_profile_presence", {
+        await optionalRpc("set_profile_presence", () => supportRpc(uid, "set_profile_presence", {
           p_session_id: sessionId,
           p_active: active,
-        });
+        }));
         sentActive = active;
       } catch {
         /* Unknown or offline presence never creates a visible green dot. */

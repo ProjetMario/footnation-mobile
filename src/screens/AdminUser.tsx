@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "../lib/supabase";
+import { AdminReauthenticationRequiredError } from "../lib/admin/api";
 import {
   Avatar,
   Button,
@@ -889,6 +890,17 @@ function AccountOperation({
           destructive={destructive}
           busy={m.isPending}
           error={m.error}
+          onReauthenticate={
+            m.error instanceof AdminReauthenticationRequiredError
+              ? () => {
+                  setOpen(false);
+                  router.push({
+                    pathname: "/login",
+                    params: { next: `/admin/user/${profile.id}?tab=admin` },
+                  });
+                }
+              : undefined
+          }
           onCancel={() => setOpen(false)}
           onConfirm={(reason) => m.mutate(reason)}
         />

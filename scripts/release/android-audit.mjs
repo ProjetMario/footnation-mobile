@@ -17,6 +17,15 @@ try {
   const encrypted=fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE,payload));
   if(crypto.createHash('sha256').update(encrypted).digest('hex')!==process.env.FN_PAYLOAD_SHA256)throw Error('Payload hash mismatch');
   const data=JSON.parse(decrypt(encrypted,key));
+  const candidate={
+   ...data,
+   aabUrl:process.env.FN_CANDIDATE_AAB_URL||data.aabUrl,
+   buildId:process.env.FN_CANDIDATE_BUILD_ID||data.buildId,
+   version:process.env.FN_CANDIDATE_VERSION||data.version,
+   build:process.env.FN_CANDIDATE_BUILD||data.build,
+  };
+  if(candidate.version!=='1.0.5'||candidate.build!=='24'||!/^[0-9a-f-]{36}$/i.test(candidate.buildId||''))throw Error('Invalid candidate identity');
+  Object.assign(data,candidate);
   const url=new URL(data.aabUrl);
   if(url.protocol!=='https:'||!['expo.dev','expo.io','eas-build-artifacts.s3.us-east-1.amazonaws.com'].some(h=>url.hostname===h||url.hostname.endsWith('.'+h)))throw Error('Unexpected build artifact host');
   const response=await fetch(url);

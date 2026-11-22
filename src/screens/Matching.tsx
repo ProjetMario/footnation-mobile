@@ -1,13 +1,23 @@
 import React, { useEffect, useReducer, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { router, usePathname } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaModal } from "../components/SafeAreaModal";
 import {
   useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { ArrowLeft, ArrowUpRight, Check, MessageCircle, Sparkles } from "lucide-react-native";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Check,
+  MessageCircle,
+  SlidersHorizontal,
+  Sparkles,
+} from "lucide-react-native";
 import { useMatchingEntities } from "../hooks/useMatchingEntities";
 import { MatchableItem } from "../types/matching";
 import { FootballMatchCard } from "../components/FootballMatchCard";
@@ -21,6 +31,7 @@ import {
 import { supportsClubMatching } from "../lib/matchingSchema";
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabase";
+import { displayName } from "../lib/models";
 import { AuthGate } from "../components/AuthGate";
 import {
   Avatar,
@@ -49,7 +60,8 @@ function formatMatchDate(value?: string | null) {
   return `Match du ${date.toLocaleDateString("fr-FR", {
     day: "2-digit",
     month: "long",
-    year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+    year:
+      date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
   })}`;
 }
 
@@ -59,10 +71,11 @@ function matchCountLabel(count: number, hasMore?: boolean) {
 }
 
 export default function Matching() {
+  const { session } = useAuth();
   return (
     <Screen title="Matching">
       <AuthGate>
-        <Content />
+        <Content key={session?.user.id || "guest"} />
       </AuthGate>
     </Screen>
   );
@@ -82,7 +95,8 @@ function Content() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [category, setCategory] = useState("Tous");
   const [matchFilter, setMatchFilter] = useState("Tous");
-  const [matchCelebration, setMatchCelebration] = useState<MatchableItem | null>(null);
+  const [matchCelebration, setMatchCelebration] =
+    useState<MatchableItem | null>(null);
   const filters = {
     ...filterState.applied,
     ...(category === "Clubs"
@@ -103,48 +117,75 @@ function Content() {
         }
       : {}),
   };
-  const categoryBar = (dark = false) => (
-    <View
-      style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, width: "100%" }}
-    >
-      {["Tous", "Joueurs", "Clubs", "Agents", "Opportunités"].map((label) => (
-        <Pressable
-          key={label}
-          accessibilityRole="button"
-          accessibilityState={{ selected: category === label }}
-          onPress={() => {
-            if (label === "Opportunités") {
-              router.push("/opportunities");
-              return;
-            }
-            setReview(null);
-            swipe.reset();
-            setCategory(label);
-          }}
+  const categoryBar = (dark = false) => {
+    const categories = [
+      "Tous",
+      "Joueurs",
+      "Clubs",
+      "Agents",
+      "Opportunités",
+    ].map((label) => (
+      <Pressable
+        key={label}
+        accessibilityRole="button"
+        accessibilityState={{ selected: category === label }}
+        onPress={() => {
+          if (label === "Opportunités") {
+            router.push("/opportunities");
+            return;
+          }
+          setReview(null);
+          swipe.reset();
+          setCategory(label);
+        }}
+        style={{
+          minHeight: 44,
+          justifyContent: "center",
+          paddingVertical: 10,
+          paddingHorizontal: 14,
+          borderRadius: 24,
+          backgroundColor:
+            category === label ? "#087fff" : dark ? "#102338dd" : "#e7edf5",
+        }}
+      >
+        <Text
           style={{
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            borderRadius: 24,
-            backgroundColor:
-              category === label ? "#087fff" : dark ? "#102338dd" : "#e7edf5",
+            fontWeight: "700",
+            color: category === label || dark ? "white" : "#152238",
           }}
         >
-          <Text
-            style={{
-              fontWeight: "700",
-              color: category === label || dark ? "white" : "#152238",
-            }}
-          >
-            {label}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
+          {label}
+        </Text>
+      </Pressable>
+    ));
+    return dark ? (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        accessibilityLabel="Catégories de matching"
+        style={{ width: "100%", flexGrow: 0 }}
+        contentContainerStyle={{ gap: 8 }}
+      >
+        {categories}
+      </ScrollView>
+    ) : (
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 8,
+          width: "100%",
+        }}
+      >
+        {categories}
+      </View>
+    );
+  };
   const draft = filterState.draft;
   const [history, setHistory] = useState<MatchableItem[]>([]);
   const [review, setReview] = useState<MatchableItem | null>(null);
   const [handled, setHandled] = useState<string[]>([]);
+  const [actionNotice, setActionNotice] = useState("");
   const query = useMatchingEntities(filters);
   const candidate = query.data?.pages
     .flatMap((page) => page.entities)
@@ -169,6 +210,9 @@ function Content() {
     query.fetchNextPage,
   ]);
   const hasProfile = query.data?.pages[0]?.hasProfile === true;
+  const completeProfile = () => {
+    router.push({ pathname: "/profile-setup", params: { next: "/matching" } });
+  };
   const matches = useInfiniteQuery({
     enabled: tab === "matches",
     queryKey: ["matching-matches", uid],
@@ -189,7 +233,11 @@ function Content() {
           const club = (mineFirst ? row.user2_type : row.user1_type) === "club";
           const other = await supabase
             .from(club ? "fff_clubs" : "profiles")
-            .select(club ? "id,name,logo_url" : "id,full_name,avatar_url")
+            .select(
+              club
+                ? "id,name,logo_url"
+                : "id,full_name,first_name,last_name,username,avatar_url",
+            )
             .eq("id", otherId)
             .maybeSingle();
           if (other.error) throw other.error;
@@ -198,7 +246,11 @@ function Content() {
             ...row,
             otherId,
             club,
-            name: value?.name || value?.full_name || "Compte indisponible",
+            name: value
+              ? club
+                ? value.name
+                : displayName(value)
+              : "Compte indisponible",
             avatar: value?.logo_url || value?.avatar_url,
           };
         }),
@@ -222,7 +274,11 @@ function Content() {
     }: {
       item: MatchableItem;
       direction: "left" | "right" | "super";
-    }): Promise<{ message: string; newMatch: boolean; item: MatchableItem }> => {
+    }): Promise<{
+      message: string;
+      newMatch: boolean;
+      item: MatchableItem;
+    }> => {
       if (!hasProfile)
         throw new Error("Enregistrez votre profil pour envoyer un intérêt.");
       const typed = await supportsClubMatching();
@@ -251,7 +307,8 @@ function Content() {
         });
         if (error) throw error;
       }
-      if (direction === "left") return { message: "Choix enregistré.", newMatch: false, item };
+      if (direction === "left")
+        return { message: "Choix enregistré.", newMatch: false, item };
       if (item.entity_type === "profile") {
         const reciprocal = await supabase
           .from("swipes")
@@ -264,7 +321,12 @@ function Content() {
           throw new Error(
             "Votre intérêt est enregistré, mais sa réciprocité n’a pas pu être vérifiée.",
           );
-        if (!reciprocal.data) return { message: "Votre intérêt est enregistré.", newMatch: false, item };
+        if (!reciprocal.data)
+          return {
+            message: "Votre intérêt est enregistré.",
+            newMatch: false,
+            item,
+          };
       }
       const club = item.entity_type === "club";
       const first = club || uid < item.id ? uid : item.id;
@@ -327,7 +389,10 @@ function Content() {
         const notification = await supabase.from("notifications").insert(rows);
         if (notification.error) {
           // The match is already created; keep the user flow intact and refresh visible counters.
-          console.warn("matching notification failed", notification.error.message);
+          console.warn(
+            "matching notification failed",
+            notification.error.message,
+          );
         }
       }
       return {
@@ -339,23 +404,26 @@ function Content() {
       };
     },
     onSuccess: (result, { item }) => {
+      setActionNotice(result.message);
       setHistory((list) => [...list, item]);
       setHandled((list) => [...list, `${item.entity_type}:${item.id}`]);
       if (result.newMatch) setMatchCelebration(item);
       void cache.invalidateQueries({ queryKey: ["matching-matches", uid] });
       void cache.invalidateQueries({ queryKey: ["notifications", uid] });
-      void cache.invalidateQueries({ queryKey: ["notifications", uid, "unread-count"] });
+      void cache.invalidateQueries({
+        queryKey: ["notifications", uid, "unread-count"],
+      });
     },
   });
   return (
     <>
-      <Modal
+      <SafeAreaModal
         visible={!!matchCelebration}
         transparent
         animationType="fade"
         onRequestClose={() => setMatchCelebration(null)}
       >
-        <View
+        <SafeAreaView
           style={{
             flex: 1,
             justifyContent: "center",
@@ -364,8 +432,9 @@ function Content() {
           }}
         >
           {!!matchCelebration && (
-            <View
-              style={{
+            <ScrollView
+              style={{ flexGrow: 0, maxHeight: "100%" }}
+              contentContainerStyle={{
                 borderRadius: 34,
                 padding: 24,
                 gap: 18,
@@ -432,7 +501,9 @@ function Content() {
                 })}
               >
                 <MessageCircle size={25} color="#FFFFFF" />
-                <Text style={{ color: "#FFFFFF", fontSize: 19, fontWeight: "900" }}>
+                <Text
+                  style={{ color: "#FFFFFF", fontSize: 19, fontWeight: "900" }}
+                >
                   {matchCelebration.entity_type === "club"
                     ? "Contacter le club"
                     : "Envoyer un message"}
@@ -444,14 +515,16 @@ function Content() {
                 onPress={() => setMatchCelebration(null)}
                 style={{ padding: 10 }}
               >
-                <Text style={{ color: "rgba(255,255,255,0.72)", fontWeight: "800" }}>
+                <Text
+                  style={{ color: "rgba(255,255,255,0.72)", fontWeight: "800" }}
+                >
                   Continuer à matcher
                 </Text>
               </Pressable>
-            </View>
+            </ScrollView>
           )}
-        </View>
-      </Modal>
+        </SafeAreaView>
+      </SafeAreaModal>
       <Text style={s.subtitle}>
         Trouve ton équipe. Rencontre les talents du foot.
       </Text>
@@ -586,130 +659,183 @@ function Content() {
               <Modal
                 visible={!filtersOpen && isFocused}
                 animationType="fade"
+                presentationStyle="fullScreen"
                 onRequestClose={() =>
                   review ? setReview(null) : leaveMatching()
                 }
               >
-                <FootballMatchCard
-                  key={`${item.entity_type}:${item.id}`}
-                  item={item}
-                  busy={swipe.isPending || !!review}
-                  fullscreen
-                  overlay={
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        flexWrap: "wrap",
-                        gap: 10,
-                      }}
-                    >
-                      {[
-                        ["Retour", leaveMatching],
-                        [
-                          "Filtres",
-                          () => {
-                            setReview(null);
-                            setFiltersOpen(true);
-                          },
-                        ],
-                        [
-                          "Rencontres",
-                          () => {
-                            setReview(null);
-                            setTab("matches");
-                          },
-                        ],
-                      ].map(([label, action]) => (
-                        <Pressable
-                          key={label as string}
-                          accessibilityRole="button"
-                          accessibilityLabel={label as string}
-                          onPress={action as () => void}
-                          style={{
-                            padding: 10,
-                            backgroundColor: "#102338dd",
-                            borderRadius: 20,
-                          }}
-                        >
-                          {label === "Retour" ? (
-                            <ArrowLeft
-                              size={22}
-                              color="white"
-                              strokeWidth={2.4}
-                            />
-                          ) : (
-                            <Text
-                              style={{ color: "white", fontWeight: "700" }}
+                <SafeAreaProvider
+                  style={{ flex: 1, backgroundColor: "#102b47" }}
+                >
+                  {!filtersOpen && isFocused && <StatusBar style="light" />}
+                  <FootballMatchCard
+                    key={`${item.entity_type}:${item.id}`}
+                    item={item}
+                    busy={swipe.isPending || !!review}
+                    fullscreen
+                    overlay={
+                      <View
+                        style={{
+                          alignSelf: "stretch",
+                          gap: 8,
+                        }}
+                      >
+                        <View style={{ flexDirection: "row", gap: 8 }}>
+                          {[
+                            ["Retour", leaveMatching],
+                            [
+                              "Filtres",
+                              () => {
+                                setReview(null);
+                                setFiltersOpen(true);
+                              },
+                            ],
+                            [
+                              "Rencontres",
+                              () => {
+                                setReview(null);
+                                setTab("matches");
+                              },
+                            ],
+                          ].map(([label, action]) => (
+                            <Pressable
+                              key={label as string}
+                              accessibilityRole="button"
+                              accessibilityLabel={label as string}
+                              hitSlop={6}
+                              onPress={action as () => void}
+                              style={({ pressed }) => ({
+                                minHeight: 48,
+                                minWidth: 48,
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 7,
+                                paddingHorizontal: 12,
+                                paddingVertical: 10,
+                                backgroundColor:
+                                  label === "Filtres" ? "#087fff" : "#102338dd",
+                                opacity: pressed ? 0.7 : 1,
+                                borderRadius: 20,
+                              })}
                             >
-                              {label as string}
+                              {label === "Retour" ? (
+                                <ArrowLeft
+                                  size={22}
+                                  color="white"
+                                  strokeWidth={2.4}
+                                />
+                              ) : (
+                                <>
+                                  {label === "Filtres" && (
+                                    <SlidersHorizontal
+                                      size={18}
+                                      color="white"
+                                    />
+                                  )}
+                                  <Text
+                                    style={{
+                                      color: "white",
+                                      fontWeight: "700",
+                                    }}
+                                  >
+                                    {label as string}
+                                  </Text>
+                                </>
+                              )}
+                            </Pressable>
+                          ))}
+                        </View>
+                        {categoryBar(true)}
+                        {!hasProfile && (
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={completeProfile}
+                            style={{ minHeight: 44, justifyContent: "center" }}
+                          >
+                            <Text style={{ color: "white" }}>
+                              Enregistrer mon profil pour matcher →
                             </Text>
-                          )}
-                        </Pressable>
-                      ))}
-                      {categoryBar(true)}
-                      {!hasProfile && (
-                        <Pressable
-                          onPress={() => router.push("/profile-setup")}
-                        >
-                          <Text style={{ color: "white" }}>
-                            Enregistrer mon profil pour matcher →
+                          </Pressable>
+                        )}
+                        {!!actionNotice && !swipe.error && (
+                          <Text
+                            accessibilityLiveRegion="polite"
+                            style={{ color: "#98f4d4", width: "100%" }}
+                          >
+                            {actionNotice}
                           </Text>
-                        </Pressable>
-                      )}
-                      {!!swipe.error && (
-                        <Text
-                          accessibilityRole="alert"
-                          style={{
-                            color: "white",
-                            width: "100%",
-                            backgroundColor: "#6b1f2b",
-                            padding: 12,
-                            borderRadius: 12,
-                          }}
-                        >
-                          {swipe.error.message ||
-                            "Impossible d’enregistrer votre choix. Réessayez."}
-                        </Text>
-                      )}
-                    </View>
-                  }
-                  showScore={hasProfile}
-                  canReview={!review && !!history.length}
-                  onReview={() => setReview(history[history.length - 1] || null)}
-                  canLike={
-                    hasProfile &&
-                    (item.entity_type === "profile" ||
-                      !!query.data?.pages[0]?.supportsClubs)
-                  }
-                  onOpen={() =>
-                    router.push(
-                      `/${item.entity_type === "club" ? "club" : "profile"}/${item.id}`,
-                    )
-                  }
-                  onChoose={(direction) => {
-                    if (review || !candidate) return;
-                    swipe.reset();
-                    if (
-                      direction === "left" &&
-                      (!hasProfile ||
-                        (candidate.entity_type === "club" &&
-                          !query.data?.pages[0]?.supportsClubs))
-                    ) {
-                      setHistory((items) => [...items, candidate]);
-                      setHandled((items) => [
-                        ...items,
-                        `${candidate.entity_type}:${candidate.id}`,
-                      ]);
-                    } else {
-                      swipe.mutate({ item: candidate, direction });
+                        )}
+                        {!!swipe.error && (
+                          <Text
+                            accessibilityRole="alert"
+                            style={{
+                              color: "white",
+                              width: "100%",
+                              backgroundColor: "#6b1f2b",
+                              padding: 12,
+                              borderRadius: 12,
+                            }}
+                          >
+                            {swipe.error.message ||
+                              "Impossible d’enregistrer votre choix. Réessayez."}
+                          </Text>
+                        )}
+                      </View>
                     }
-                  }}
-                />
+                    showScore={hasProfile}
+                    canReview={!review && !!history.length}
+                    onReview={() =>
+                      setReview(history[history.length - 1] || null)
+                    }
+                    canLike={
+                      hasProfile &&
+                      (item.entity_type === "profile" ||
+                        !!query.data?.pages[0]?.supportsClubs)
+                    }
+                    onLikeUnavailable={() => {
+                      swipe.reset();
+                      if (!hasProfile) completeProfile();
+                      else
+                        setActionNotice(
+                          "La mise en relation avec ce club n’est pas encore disponible. Vous pouvez consulter sa fiche.",
+                        );
+                    }}
+                    onOpen={() =>
+                      router.push(
+                        `/${item.entity_type === "club" ? "club" : "profile"}/${item.id}`,
+                      )
+                    }
+                    onChoose={(direction) => {
+                      if (review || !candidate) return;
+                      swipe.reset();
+                      setActionNotice("");
+                      if (direction !== "left" && !hasProfile) {
+                        completeProfile();
+                        return;
+                      }
+                      if (
+                        direction === "left" &&
+                        (!hasProfile ||
+                          (candidate.entity_type === "club" &&
+                            !query.data?.pages[0]?.supportsClubs))
+                      ) {
+                        setHistory((items) => [...items, candidate]);
+                        setHandled((items) => [
+                          ...items,
+                          `${candidate.entity_type}:${candidate.id}`,
+                        ]);
+                      } else {
+                        swipe.mutate({ item: candidate, direction });
+                      }
+                    }}
+                  />
+                </SafeAreaProvider>
               </Modal>
               {!hasProfile && (
                 <Button
                   title="Enregistrer mon profil pour matcher"
-                  onPress={() => router.push("/profile-setup")}
+                  onPress={completeProfile}
                 />
               )}
               {item.entity_type === "club" &&
@@ -722,6 +848,11 @@ function Content() {
             </>
           ) : (
             <>
+              {!!actionNotice && (
+                <Text accessibilityLiveRegion="polite" style={s.small}>
+                  {actionNotice}
+                </Text>
+              )}
               <Empty
                 title="Aucune suggestion disponible"
                 description="Essayez d’autres filtres."
@@ -755,33 +886,37 @@ function Content() {
           ) : (
             <>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {["Tous", "Validés", "En attente", "Profils", "Clubs"].map((label) => (
-                  <Pressable
-                    key={label}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: matchFilter === label }}
-                    onPress={() => setMatchFilter(label)}
-                    style={{
-                      minHeight: 42,
-                      borderRadius: 999,
-                      paddingHorizontal: 14,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: matchFilter === label ? "#087BFF" : "#EAF0F7",
-                      borderWidth: 1,
-                      borderColor: matchFilter === label ? "#087BFF" : "#D8E1EC",
-                    }}
-                  >
-                    <Text
+                {["Tous", "Validés", "En attente", "Profils", "Clubs"].map(
+                  (label) => (
+                    <Pressable
+                      key={label}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: matchFilter === label }}
+                      onPress={() => setMatchFilter(label)}
                       style={{
-                        color: matchFilter === label ? "#FFFFFF" : "#142033",
-                        fontWeight: "900",
+                        minHeight: 42,
+                        borderRadius: 999,
+                        paddingHorizontal: 14,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor:
+                          matchFilter === label ? "#087BFF" : "#EAF0F7",
+                        borderWidth: 1,
+                        borderColor:
+                          matchFilter === label ? "#087BFF" : "#D8E1EC",
                       }}
                     >
-                      {label}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Text
+                        style={{
+                          color: matchFilter === label ? "#FFFFFF" : "#142033",
+                          fontWeight: "900",
+                        }}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  ),
+                )}
               </View>
               <View
                 style={{
@@ -793,8 +928,13 @@ function Content() {
                   borderColor: "#B9D8FF",
                 }}
               >
-                <Text style={{ color: "#0B63CE", fontSize: 15, fontWeight: "900" }}>
-                  {matchCountLabel(filteredMatches.length, matchFilter === "Tous" && matches.hasNextPage)}
+                <Text
+                  style={{ color: "#0B63CE", fontSize: 15, fontWeight: "900" }}
+                >
+                  {matchCountLabel(
+                    filteredMatches.length,
+                    matchFilter === "Tous" && matches.hasNextPage,
+                  )}
                 </Text>
                 <Text style={s.small}>
                   {matchFilter === "Tous"
@@ -807,155 +947,178 @@ function Content() {
                   title="Aucun match avec ce filtre"
                   description="Changez de filtre pour retrouver vos autres rencontres."
                 />
-              ) : filteredMatches.map((m) => (
-              <View
-                key={m.id}
-                style={{
-                  borderRadius: 30,
-                  padding: 18,
-                  gap: 16,
-                  backgroundColor: "#071A2F",
-                  borderWidth: 1,
-                  borderColor: "rgba(37,99,235,0.24)",
-                  shadowColor: "#0B63FF",
-                  shadowOpacity: 0.16,
-                  shadowRadius: 22,
-                  shadowOffset: { width: 0, height: 10 },
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 14,
-                  }}
-                >
+              ) : (
+                filteredMatches.map((m) => (
                   <View
+                    key={m.id}
                     style={{
-                      padding: 3,
-                      borderRadius: 999,
-                      backgroundColor: "#0B7CFF",
+                      borderRadius: 30,
+                      padding: 18,
+                      gap: 16,
+                      backgroundColor: "#071A2F",
+                      borderWidth: 1,
+                      borderColor: "rgba(37,99,235,0.24)",
+                      shadowColor: "#0B63FF",
+                      shadowOpacity: 0.16,
+                      shadowRadius: 22,
+                      shadowOffset: { width: 0, height: 10 },
                     }}
                   >
-                    <Avatar uri={m.avatar} name={m.name} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
                     <View
                       style={{
-                        alignSelf: "flex-start",
                         flexDirection: "row",
                         alignItems: "center",
-                        gap: 6,
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 999,
-                        backgroundColor:
-                          m.status === "active"
-                            ? "rgba(52,211,153,0.16)"
-                            : "rgba(251,191,36,0.16)",
+                        gap: 14,
                       }}
                     >
-                      <Sparkles
-                        size={13}
-                        color={m.status === "active" ? "#34D399" : "#FBBF24"}
-                      />
+                      <View
+                        style={{
+                          padding: 3,
+                          borderRadius: 999,
+                          backgroundColor: "#0B7CFF",
+                        }}
+                      >
+                        <Avatar uri={m.avatar} name={m.name} />
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+                        <View
+                          style={{
+                            alignSelf: "flex-start",
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 6,
+                            paddingHorizontal: 10,
+                            paddingVertical: 5,
+                            borderRadius: 999,
+                            backgroundColor:
+                              m.status === "active"
+                                ? "rgba(52,211,153,0.16)"
+                                : "rgba(251,191,36,0.16)",
+                          }}
+                        >
+                          <Sparkles
+                            size={13}
+                            color={
+                              m.status === "active" ? "#34D399" : "#FBBF24"
+                            }
+                          />
+                          <Text
+                            style={{
+                              color:
+                                m.status === "active" ? "#A7F3D0" : "#FDE68A",
+                              fontSize: 12,
+                              fontWeight: "900",
+                            }}
+                          >
+                            {m.status === "pending"
+                              ? "En attente"
+                              : "Match validé"}
+                          </Text>
+                        </View>
+                        <Text
+                          style={{
+                            color: "#FFFFFF",
+                            fontSize: 25,
+                            lineHeight: 31,
+                            fontWeight: "900",
+                          }}
+                          numberOfLines={1}
+                        >
+                          {m.name}
+                        </Text>
+                        <Text
+                          style={{
+                            color: "rgba(226,232,240,0.72)",
+                            fontSize: 14,
+                          }}
+                        >
+                          {formatMatchDate(m.created_at)}
+                        </Text>
+                        <Text
+                          style={{
+                            color: "rgba(226,232,240,0.62)",
+                            fontSize: 13,
+                          }}
+                        >
+                          Lance la discussion maintenant.
+                        </Text>
+                      </View>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        m.club ? "Contacter le club" : "Envoyer un message"
+                      }
+                      onPress={() =>
+                        m.club
+                          ? router.push(`/club/${m.otherId}`)
+                          : router.push(`/conversation/${m.otherId}`)
+                      }
+                      style={({ pressed }) => ({
+                        minHeight: 62,
+                        borderRadius: 22,
+                        paddingHorizontal: 18,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 10,
+                        backgroundColor: pressed ? "#005BD1" : "#087BFF",
+                        transform: [{ scale: pressed ? 0.99 : 1 }],
+                      })}
+                    >
+                      <MessageCircle size={24} color="#FFFFFF" />
                       <Text
                         style={{
-                          color: m.status === "active" ? "#A7F3D0" : "#FDE68A",
-                          fontSize: 12,
+                          color: "#FFFFFF",
+                          fontSize: 19,
                           fontWeight: "900",
                         }}
                       >
-                        {m.status === "pending" ? "En attente" : "Match validé"}
+                        {m.club ? "Contacter le club" : "Envoyer un message"}
                       </Text>
+                    </Pressable>
+                    <View style={{ flexDirection: "row", gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <MatchFollowButton
+                          id={m.otherId}
+                          name={m.name}
+                          club={m.club}
+                        />
+                      </View>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          m.club ? "Voir le club" : "Voir le profil"
+                        }
+                        onPress={() =>
+                          router.push(
+                            `/${m.club ? "club" : "profile"}/${m.otherId}`,
+                          )
+                        }
+                        style={({ pressed }) => ({
+                          flex: 1,
+                          minHeight: 52,
+                          borderRadius: 18,
+                          flexDirection: "row",
+                          gap: 8,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: pressed
+                            ? "rgba(255,255,255,0.18)"
+                            : "rgba(255,255,255,0.10)",
+                          borderWidth: 1,
+                          borderColor: "rgba(255,255,255,0.14)",
+                        })}
+                      >
+                        <Text style={{ color: "#E5F0FF", fontWeight: "900" }}>
+                          {m.club ? "Voir le club" : "Voir le profil"}
+                        </Text>
+                        <ArrowUpRight size={17} color="#E5F0FF" />
+                      </Pressable>
                     </View>
-                    <Text
-                      style={{
-                        color: "#FFFFFF",
-                        fontSize: 25,
-                        lineHeight: 31,
-                        fontWeight: "900",
-                      }}
-                      numberOfLines={1}
-                    >
-                      {m.name}
-                    </Text>
-                    <Text style={{ color: "rgba(226,232,240,0.72)", fontSize: 14 }}>
-                      {formatMatchDate(m.created_at)}
-                    </Text>
-                    <Text style={{ color: "rgba(226,232,240,0.62)", fontSize: 13 }}>
-                      Lance la discussion maintenant.
-                    </Text>
                   </View>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={m.club ? "Contacter le club" : "Envoyer un message"}
-                  onPress={() =>
-                    m.club
-                      ? router.push(`/club/${m.otherId}`)
-                      : router.push(`/conversation/${m.otherId}`)
-                  }
-                  style={({ pressed }) => ({
-                    minHeight: 62,
-                    borderRadius: 22,
-                    paddingHorizontal: 18,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 10,
-                    backgroundColor: pressed ? "#005BD1" : "#087BFF",
-                    transform: [{ scale: pressed ? 0.99 : 1 }],
-                  })}
-                >
-                  <MessageCircle size={24} color="#FFFFFF" />
-                  <Text
-                    style={{
-                      color: "#FFFFFF",
-                      fontSize: 19,
-                      fontWeight: "900",
-                    }}
-                  >
-                    {m.club ? "Contacter le club" : "Envoyer un message"}
-                  </Text>
-                </Pressable>
-                <View style={{ flexDirection: "row", gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <MatchFollowButton
-                      id={m.otherId}
-                      name={m.name}
-                      club={m.club}
-                    />
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={m.club ? "Voir le club" : "Voir le profil"}
-                    onPress={() =>
-                      router.push(`/${m.club ? "club" : "profile"}/${m.otherId}`)
-                    }
-                    style={({ pressed }) => ({
-                      flex: 1,
-                      minHeight: 52,
-                      borderRadius: 18,
-                      flexDirection: "row",
-                      gap: 8,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: pressed
-                        ? "rgba(255,255,255,0.18)"
-                        : "rgba(255,255,255,0.10)",
-                      borderWidth: 1,
-                      borderColor: "rgba(255,255,255,0.14)",
-                    })}
-                  >
-                    <Text style={{ color: "#E5F0FF", fontWeight: "900" }}>
-                      {m.club ? "Voir le club" : "Voir le profil"}
-                    </Text>
-                    <ArrowUpRight size={17} color="#E5F0FF" />
-                  </Pressable>
-                </View>
-              </View>
-            ))}
+                ))
+              )}
             </>
           )}
           {!!matches.hasNextPage && (

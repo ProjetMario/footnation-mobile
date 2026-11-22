@@ -2,8 +2,11 @@ import { MatchPrediction } from "./Predictions";
 import React, { useMemo, useState } from "react";
 import { FlatList, Pressable, ScrollView, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
-import { Image } from "expo-image";
+import {
+  useQuery,
+  useInfiniteQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { readNewsFeed } from "../lib/newsFeed";
 import { useDebounced } from "../lib/data";
 import type { MatchDTO } from "../types/matches";
@@ -15,10 +18,13 @@ import {
   useUpcomingFeaturedMatches,
 } from "../lib/useMatches";
 import { matchState, matchDataStale } from "../lib/featuredMatches";
+import type { FeaturedMatch } from "../lib/featuredMatches";
+import { matchPreviewKey, selectMatchDetail } from "../lib/matchPreview";
 import { validCalendarDate } from "../lib/calendarDate";
 import { CalendarDayField } from "../components/CalendarDayField";
 import { EspnMatchDetails } from "../components/EspnMatchDetails";
 import { ClubLiveSection } from "../components/ClubLiveSection";
+import { NewsVisual } from "../components/NewsVisual";
 import { useConnectivity } from "../components/ConnectivityProvider";
 import { espnLeagueFromId } from "../lib/espnMatches";
 import { isNationalMatch } from "../lib/nationalMatches";
@@ -390,7 +396,9 @@ function UpcomingFeaturedMatches({
       )}
       {upcoming.incomplete ? (
         <Text style={s.small}>
-          Certains championnats sont temporairement indisponibles.
+          {upcoming.refreshing
+            ? "Chargement des autres rencontres…"
+            : "Certains championnats sont temporairement indisponibles."}
         </Text>
       ) : null}
     </View>
@@ -562,7 +570,11 @@ export function Matches() {
   const [competitionFilter, setCompetitionFilter] =
     useState<CompetitionFilter>("all");
   const { isOffline } = useConnectivity();
-  const query = useMatches(date, source === "espn" ? "all" : undefined);
+  const query = useMatches(
+    date,
+    source === "espn" ? "all" : undefined,
+    competitionFilter !== "amateurs" && competitionFilter !== "nations",
+  );
   const nations = useNationalMatches(
     date,
     competitionFilter === "all" || competitionFilter === "nations",
@@ -592,8 +604,11 @@ export function Matches() {
             />
             {amateursOnly ? (
               <ClubLiveSection heading="Matchs amateurs en direct" />
-            ) : (
+            ) : competitionFilter !== "nations" ? (
               <LiveMatches competitionFilter={competitionFilter} />
+            ) : null}
+            {!amateursOnly && competitionFilter !== "nations" && (
+              <FeaturedMatchSections competitionFilter={competitionFilter} />
             )}
             {!amateursOnly &&
               competitionFilter === "all" &&
@@ -648,7 +663,9 @@ export function Matches() {
                   )}
                   {nations.data.incomplete && (
                     <Text style={s.small}>
-                      Certaines compétitions internationales sont indisponibles.
+                      {nations.isFetching
+                        ? "Chargement des autres rencontres…"
+                        : "Certaines compétitions internationales sont indisponibles."}
                     </Text>
                   )}
                   <Button
@@ -658,9 +675,6 @@ export function Matches() {
                   />
                 </View>
               )}
-            {!amateursOnly && competitionFilter !== "nations" && (
-              <FeaturedMatchSections competitionFilter={competitionFilter} />
-            )}
             {!amateursOnly && (
               <CalendarDayField
                 label="Calendrier"
@@ -668,12 +682,22 @@ export function Matches() {
                 onChange={setDate}
               />
             )}
-            {!amateursOnly && source === "espn" ? (
-              <Text style={s.small}>Grands championnats européens · ESPN</Text>
+            {!amateursOnly &&
+            competitionFilter !== "nations" &&
+            source === "espn" ? (
+              <Text style={s.small}>
+                {query.data?.alternative_source
+                  ? query.isFetching
+                    ? "Scores d’une autre source · actualisation en cours"
+                    : "Scores d’une autre source · ESPN indisponible"
+                  : "Grands championnats européens · ESPN"}
+              </Text>
             ) : null}
             {!amateursOnly && !!calendarQuery.data?.incomplete && (
               <Text style={s.small}>
-                Certaines compétitions sont temporairement indisponibles.
+                {calendarQuery.isFetching
+                  ? "Chargement des autres rencontres…"
+                  : "Certaines compétitions sont temporairement indisponibles."}
               </Text>
             )}
           </View>
@@ -740,26 +764,66 @@ export function MatchDetail() {
 
   const { id, date } = useLocalSearchParams<{ id: string; date?: string }>();
   const { isOffline } = useConnectivity();
+  const client = useQueryClient();
+  const matchDate = date || localDate();
   const espnLeague = espnLeagueFromId(id);
-  const query = useMatches(date || localDate(), espnLeague);
-  const match = query.data?.matches.find((m) => m.external_match_id === id);
+  const query = useMatches(matchDate, espnLeague);
+  const preview = client.getQueryData<FeaturedMatch>(
+    matchPreviewKey(matchDate, id),
+  );
+  const selection = selectMatchDetail({
+    date: matchDate,
+    id,
+    data: query.data,
+    preview,
+    offline: isOffline,
+    hasError: query.isError,
+    now: Date.now(),
+  });
+  const match = selection?.match;
   return (
     <Screen title="Match">
-      {query.isPending ? (
+      {!match && isOffline ? (
+        <Empty
+          title="Match indisponible hors connexion"
+          description="Reconnecte-toi pour charger les informations du match."
+        />
+      ) : !match && query.isPending ? (
         <Loading />
-      ) : query.isError ? (
-        <ErrorState error={query.error} />
+      ) : !match && query.isError ? (
+        <ErrorState error={query.error} retry={() => void query.refetch()} />
       ) : match ? (
         <>
-          <Score
-            match={match}
-            stale={
-              isOffline ||
-              (!!query.data && matchDataStale(query.data, Date.now()))
-            }
-          />
+          <Score match={match} stale={selection?.stale} />
+          {selection?.fromPreview || query.isError || isOffline ? (
+            <View style={{ gap: 8 }}>
+              <Text accessibilityLiveRegion="polite" style={s.small}>
+                {isOffline
+                  ? "Hors connexion · dernières informations connues."
+                  : query.isError
+                    ? "Actualisation indisponible · dernières informations connues."
+                    : query.isSuccess && selection?.fromPreview
+                      ? "Match introuvable lors de l’actualisation · dernières informations connues."
+                      : "Actualisation des informations du match…"}
+              </Text>
+              {query.isError && !isOffline ? (
+                <Button
+                  title="Réessayer"
+                  secondary
+                  busy={query.isFetching}
+                  onPress={() => void query.refetch()}
+                />
+              ) : null}
+            </View>
+          ) : null}
           {!!espnLeague && <EspnMatchDetails match={match} />}
-          <MatchPrediction match={match} />
+          {selection?.fromPreview && match.status === "SCHEDULED" ? (
+            <Text style={s.small}>
+              Les pronostics seront disponibles après actualisation du match.
+            </Text>
+          ) : (
+            <MatchPrediction match={match} />
+          )}
           {espnLeague ? (
             <Text style={s.small}>
               Source : ESPN · Scores selon les mises à jour du fournisseur.
@@ -834,13 +898,12 @@ export function News() {
             onPress={() => router.push(`/actu/${encodeURIComponent(item.id)}`)}
             style={s.card}
           >
-            {!!item.imageUrl && (
-              <Image
-                source={{ uri: item.imageUrl }}
-                style={{ width: "100%", aspectRatio: 1.7, borderRadius: 14 }}
-                contentFit="cover"
-              />
-            )}
+            <NewsVisual
+              imageUrl={item.imageUrl}
+              sourceName={item.sourceName}
+              topic={item.topic}
+              style={{ width: "100%", aspectRatio: 1.7, borderRadius: 14 }}
+            />
             <Text style={s.small}>{item.sourceName}</Text>
             <Text style={s.h2}>{item.title}</Text>
             <Text style={s.text}>{item.description}</Text>

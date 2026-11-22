@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("../src/lib/supabase", () => ({ supabase: {} }));
-import { createAdminApi } from "../src/lib/admin/api";
+import { AdminReauthenticationRequiredError, createAdminApi } from "../src/lib/admin/api";
 import {
   adminError,
   adminSections,
@@ -32,6 +32,7 @@ describe("admin navigation and data contracts", () => {
       "premium",
       "publications",
       "moderation",
+      "decisions",
       "posthog",
     ]));
   it("provides eight user sections", () =>
@@ -183,6 +184,20 @@ function client() {
   };
 }
 describe("session-bound admin service", () => {
+  it("identifies only the server's recent-authentication refusal for safe recovery", async () => {
+    const c = client();
+    c.setResult(true);
+    const invoke = vi.fn(async () => ({
+      error: { context: new Response(JSON.stringify({ error: "Reconnectez-vous pour confirmer cette action sensible." }), { status: 403 }) },
+    }));
+    Object.assign(c.fake, { functions: { invoke } });
+    await expect(createAdminApi("admin", c.fake as any).edge("admin-console-account", { action: "delete_account" }))
+      .rejects.toBeInstanceOf(AdminReauthenticationRequiredError);
+    expect(invoke).toHaveBeenCalledTimes(1);
+    invoke.mockResolvedValueOnce({ error: { context: new Response(JSON.stringify({ error: "Accès administrateur refusé ou révoqué." }), { status: 403 }) } });
+    await expect(createAdminApi("admin", c.fake as any).edge("admin-console-account", { action: "delete_account" }))
+      .rejects.not.toBeInstanceOf(AdminReauthenticationRequiredError);
+  });
   it("pins the token to a request", async () => {
     const c = client();
     await createAdminApi("admin", c.fake as any).page("users", {

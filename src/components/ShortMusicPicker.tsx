@@ -1,5 +1,6 @@
+import { SafeAreaModal as Modal } from "./SafeAreaModal";
 import React, { useEffect, useState } from "react";
-import { AppState, Modal, ScrollView, Text, View } from "react-native";
+import { AppState, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import {

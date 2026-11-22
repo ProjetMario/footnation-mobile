@@ -1,4 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   ActivityIndicator,
   Image,
@@ -10,9 +15,13 @@ import {
 import { router } from "expo-router";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useFonts } from "expo-font";
+import { useQuery } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react-native";
 import { useTheme } from "../theme";
 import { useAuth } from "../lib/auth";
-import { signInSocial } from "../lib/socialAuth";
+import { socialAuthFlow } from "../lib/socialAuth";
+import { getSocialAuthProviders } from "../lib/socialAuthProviders";
+import { backendConfigured } from "../lib/supabase";
 import { claimAuthNavigation } from "../lib/exchangeAuthCode";
 import { requireSocialSession } from "../lib/appleCredentialRegistration";
 import {
@@ -42,9 +51,29 @@ export function SocialAuthButtons({
   });
   const { requestNetworkInvite } = useAuth();
   const [appleAvailable, setAppleAvailable] = useState(false);
-  const [busy, setBusy] = useState<SocialProvider | null>(null);
-  const [error, setError] = useState("");
-  const pending = useRef(false);
+  const {
+    busy,
+    result,
+    error: flowError,
+  } = useSyncExternalStore(
+    socialAuthFlow.subscribe,
+    socialAuthFlow.getSnapshot,
+    socialAuthFlow.getSnapshot,
+  );
+  const [completionError, setCompletionError] = useState("");
+  const error = flowError || completionError;
+  const availability = useQuery({
+    queryKey: ["social-auth-providers"],
+    queryFn: getSocialAuthProviders,
+    enabled: backendConfigured,
+    staleTime: 60000,
+    retry: false,
+  });
+  const busyListener = useRef(onBusyChange);
+  busyListener.current = onBusyChange;
+  useEffect(() => {
+    busyListener.current?.(!!busy);
+  }, [busy]);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -58,58 +87,89 @@ export function SocialAuthButtons({
       mounted.current = false;
     };
   }, []);
-  const configuredProviders = enabledSocialProviders({
-    google: process.env.EXPO_PUBLIC_GOOGLE_AUTH_ENABLED,
-    apple: process.env.EXPO_PUBLIC_APPLE_AUTH_ENABLED,
+  const providers = enabledSocialProviders({
+    google:
+      process.env.EXPO_PUBLIC_GOOGLE_AUTH_ENABLED !== "false" &&
+      availability.data?.google
+        ? "true"
+        : "false",
+    apple:
+      process.env.EXPO_PUBLIC_APPLE_AUTH_ENABLED !== "false" &&
+      availability.data?.apple
+        ? "true"
+        : "false",
     platform: Platform.OS,
     appleAvailable,
   });
-  const providers =
-    intent === "signup"
-      ? {
-          google: true,
-          apple: Platform.OS === "ios" ? appleAvailable : true,
-        }
-      : configuredProviders;
   const locked = !!disabled || !!busy;
-  async function start(provider: SocialProvider) {
-    if (pending.current || locked || !providers[provider]) return;
-    pending.current = true;
-    setBusy(provider);
-    setError("");
-    onBusyChange?.(true);
-    try {
-      const result = await signInSocial(provider, { next, referral });
-      if (!result || !mounted.current) return;
-      const current = await requireSocialSession(result.session.user.id);
-      if (
-        !mounted.current ||
-        !claimAuthNavigation(
-          result.claim,
-          result.session.user.id,
-          current.user.id,
-        )
-      )
-        return;
-      if (
-        result.route !== "/suppression-compte" &&
-        !result.route.startsWith("/social-signup")
-      )
-        requestNetworkInvite(result.session);
-      router.replace(result.route);
-    } catch (reason) {
-      if (mounted.current) setError(socialAuthErrorMessage(reason));
-    } finally {
-      pending.current = false;
-      if (mounted.current) {
-        setBusy(null);
-        onBusyChange?.(false);
-      }
-    }
+  function start(provider: SocialProvider) {
+    if (locked || !providers[provider]) return;
+    setCompletionError("");
+    void socialAuthFlow.start(provider, { next, referral });
   }
   useEffect(() => {
-    if (autoStartProvider) void start(autoStartProvider);
-  }, [autoStartProvider]);
+    if (!result) return;
+    let active = true;
+    void requireSocialSession(result.session.user.id)
+      .then((current) => {
+        if (!active) return;
+        if (
+          claimAuthNavigation(
+            result.claim,
+            result.session.user.id,
+            current.user.id,
+          )
+        ) {
+          if (
+            result.route !== "/suppression-compte" &&
+            !result.route.startsWith("/admin/user/") &&
+            !result.route.startsWith("/social-signup") &&
+            !result.route.startsWith("/onboarding")
+          )
+            requestNetworkInvite(result.session);
+          router.replace(result.route);
+        }
+        socialAuthFlow.consume(result);
+      })
+      .catch((reason) => {
+        if (!active) return;
+        setCompletionError(socialAuthErrorMessage(reason));
+        socialAuthFlow.consume(result);
+      });
+    return () => {
+      active = false;
+    };
+  }, [result, requestNetworkInvite]);
+  useEffect(() => {
+    if (
+      autoStartProvider &&
+      providers[autoStartProvider] &&
+      !locked &&
+      !result
+    ) {
+      router.setParams({ retrySocial: undefined });
+      start(autoStartProvider);
+    }
+  }, [autoStartProvider, providers.google, providers.apple]);
+  if (availability.isError)
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Réessayer de charger Google et Apple"
+        onPress={() => void availability.refetch()}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          minHeight: 44,
+        }}
+      >
+        <RefreshCw size={20} color={colors.blue} />
+        <Text style={{ color: colors.muted, flex: 1 }}>
+          Google et Apple sont momentanément indisponibles. Réessayer
+        </Text>
+      </Pressable>
+    );
   if (!providers.google && !providers.apple) return null;
   const dark = mode === "dark";
   return (
@@ -219,7 +279,9 @@ export function SocialAuthButtons({
         </Text>
       )}
       {intent === "signup" && (
-        <Text style={{ color: colors.muted, textAlign: "center", fontSize: 13 }}>
+        <Text
+          style={{ color: colors.muted, textAlign: "center", fontSize: 13 }}
+        >
           Ou avec votre e-mail
         </Text>
       )}

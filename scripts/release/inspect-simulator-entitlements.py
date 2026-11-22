@@ -9,9 +9,11 @@ import sys
 
 app = pathlib.Path(sys.argv[1])
 team = sys.argv[2]
+expected_version = sys.argv[3]
+expected_build = sys.argv[4]
 info = plistlib.loads((app / 'Info.plist').read_bytes())
 assert info['CFBundleIdentifier'] == 'com.footnation.app'
-assert info['CFBundleShortVersionString'] == '1.0.4' and info['CFBundleVersion'] == '16'
+assert info['CFBundleShortVersionString'] == expected_version and info['CFBundleVersion'] == expected_build
 assert 'iPhoneSimulator' in info['CFBundleSupportedPlatforms']
 assert len(team) == 10 and team.isalnum()
 data = (app / info['CFBundleExecutable']).read_bytes()

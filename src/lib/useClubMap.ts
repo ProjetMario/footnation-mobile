@@ -28,6 +28,7 @@ export function useClubMap(enabled: boolean) {
             short_name: row.short_name,
             city: row.city,
             department_code: row.department_code,
+            metadata,
             latitude: Number(row.latitude),
             longitude: Number(row.longitude),
             logo_url:

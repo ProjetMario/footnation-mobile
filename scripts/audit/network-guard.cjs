@@ -5,6 +5,10 @@ function permitted(value, ports = ["8081", "7082"]) {
       typeof value === "string" ? value : value.url,
       `http://127.0.0.1:${ports[0]}`,
     );
+    // Selected fixture files are read locally by ImagePicker/readAsset. Neither
+    // data URLs nor blobs created by this isolated local origin access a host.
+    if (url.protocol === "data:") return /^data:(?:image\/(?:png|jpeg|webp)|video\/mp4);base64,/i.test(url.href);
+    if (url.protocol === "blob:") return permitted(url.pathname, ports);
     return (
       ["http:", "ws:"].includes(url.protocol) &&
       ["127.0.0.1", "localhost"].includes(url.hostname) &&

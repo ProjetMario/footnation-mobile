@@ -74,7 +74,10 @@ export async function postPublicationServices(
       }
       if (!bytes.byteLength)
         throw new Error("Cette pièce jointe est vide ou indisponible.");
-      const checksum = await digest(CryptoDigestAlgorithm.SHA256, bytes);
+      const checksum = await digest(
+        CryptoDigestAlgorithm.SHA256,
+        new Uint8Array(bytes),
+      );
       const sha256 = Array.from(new Uint8Array(checksum), (byte) =>
         byte.toString(16).padStart(2, "0"),
       ).join("");

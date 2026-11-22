@@ -2,6 +2,7 @@ import { expect, it, vi, beforeEach } from "vitest";
 const client = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock("../src/lib/supabase", () => ({ supabase: client }));
 import {
+  clubDirectoryColumns,
   loadRelatedClubs,
   matchesDirectoryClub,
   profileDepartment,
@@ -49,6 +50,13 @@ it("understands profile department labels including Corsica and overseas", () =>
   expect(profileDepartment("974 - La Réunion")).toBe("974");
   expect(profileDepartment("France")).toBe("");
 });
+it("finds international related clubs by country name or code with local filters unchanged", () => {
+  const imported = club("world", { name: "FC Example", city: "", department_code: "INT", metadata: { country: "États-Unis", country_code: "US" } });
+  expect(matchesDirectoryClub(imported, "etats-unis", "", "club")).toBe(true);
+  expect(matchesDirectoryClub(imported, "US", "", "all")).toBe(true);
+  expect(matchesDirectoryClub(imported, "etats-unis", "73", "club")).toBe(false);
+  expect(matchesDirectoryClub(imported, "France", "", "all")).toBe(false);
+});
 it("deduplicates linked and nearby clubs by id without dropping distinct clubs", () => {
   expect(
     uniqueDirectoryClubs([club("a"), club("b")], [club("b"), club("c")]).map(
@@ -76,6 +84,9 @@ it("loads followed and approved team clubs for the current member, with attachme
   expect(members.eq).toHaveBeenCalledWith("status", "approved");
   expect(members.eq).toHaveBeenCalledWith("is_active", true);
   expect(ids.in).toHaveBeenCalledWith("id", ["linked", "followed", "team"]);
+  expect(ids.select).toHaveBeenCalledWith(clubDirectoryColumns);
+  expect(names.select).toHaveBeenCalledWith(clubDirectoryColumns);
+  expect(clubDirectoryColumns.split(",")).toContain("metadata");
   expect(rows[0].id).toBe("linked");
   expect(new Set(rows.map((row) => row.id)).size).toBe(4);
 });

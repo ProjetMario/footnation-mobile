@@ -2,6 +2,8 @@ import type { KeyValueStore } from "./chunkedStorage";
 import {
   SocialAuthError,
   socialProvider,
+  socialCallbackParams,
+  type SocialAuthContext,
   type SocialProvider,
 } from "./socialAuthPolicy";
 
@@ -12,6 +14,7 @@ type Attempt = {
   provider: SocialProvider;
   userId: string | null;
   createdAt: number;
+  context?: SocialAuthContext;
 };
 
 /** One pending PKCE flow per local session, matching Supabase's single verifier. */
@@ -58,13 +61,57 @@ export function createSocialAuthAttempts(options: {
             "Cette tentative de connexion est incomplète. Recommencez avec le bouton de connexion de votre choix.",
           );
       }),
-    begin: (provider: SocialProvider) =>
+    resolve: (input: {
+      social?: string;
+      attempt?: string;
+      next?: string;
+      ref?: string;
+    }) =>
       locked(async () => {
+        const attempt = await read();
+        if (!attempt) {
+          if (
+            input.social ||
+            input.attempt ||
+            (await options.storage.getItem(key))
+          )
+            throw new SocialAuthError(
+              "Cette tentative de connexion a expiré. Recommencez la connexion.",
+            );
+          return null;
+        }
+        const explicit =
+          input.social !== undefined || input.attempt !== undefined;
+        if (
+          (explicit &&
+            (input.social !== attempt.provider ||
+              input.attempt !== attempt.id)) ||
+          (!explicit && !attempt.context)
+        )
+          throw new SocialAuthError(
+            "Cette tentative de connexion est incomplète. Recommencez la connexion.",
+          );
+        const context = socialCallbackParams(
+          attempt.provider,
+          attempt.context || { next: input.next, referral: input.ref },
+        );
+        return {
+          id: attempt.id,
+          provider: attempt.provider,
+          context: { next: context.next, referral: context.ref },
+        };
+      }),
+    begin: (provider: SocialProvider, context?: SocialAuthContext) =>
+      locked(async () => {
+        const safe = socialCallbackParams(provider, context || {});
         const attempt: Attempt = {
           id: options.randomId(),
           provider,
           userId: await options.currentUser(),
           createdAt: now(),
+          ...(context !== undefined
+            ? { context: { next: safe.next, referral: safe.ref } }
+            : {}),
         };
         await options.storage.setItem(key, JSON.stringify(attempt));
         return attempt;

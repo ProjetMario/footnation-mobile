@@ -1,4 +1,5 @@
 import bundledInformation from "../data/clubPublicInformation.json";
+import { hasUnresolvedClubIdentity } from "./clubIdentitySafety";
 
 type EnrichmentRecord = {
   numero: string;
@@ -84,6 +85,7 @@ export function buildAddress(
 }
 
 export function findClubEnrichment(club: Record<string, any>) {
+  if (hasUnresolvedClubIdentity(club.id)) return null;
   // Expo/native cannot fetch the web project's relative /data URL.
   // This bundle is generated from the same public report, without staff/contact data.
   const rows = (bundledInformation as EnrichmentReport).results || [];

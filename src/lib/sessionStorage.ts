@@ -1,6 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createAccountSessionStorage } from "./accountSessionStorage";
+export const sessionStorageKey = "footnation-auth";
 export default createAccountSessionStorage(AsyncStorage, {
+  // Share the existing site session and Supabase BroadcastChannel on this origin.
+  // No copy into a second key: logout must never resurrect a stale account.
+  authStorageKey: sessionStorageKey,
   // Every tab uses this namespace for SDK reads/writes and the atomic removal.
   // Supabase's current SDK is lockless by default; a per-instance queue alone
   // would not protect the displayed account against a sign-in in another tab.

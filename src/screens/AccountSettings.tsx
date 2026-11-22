@@ -1,4 +1,4 @@
-import * as AuthSession from "expo-auth-session";
+import { authRedirectUri } from "../lib/authRedirectUri";
 import { accountChangePayload } from "../lib/accountChange";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -126,10 +126,7 @@ function Settings() {
         payload,
         kind === "email"
           ? {
-              emailRedirectTo: AuthSession.makeRedirectUri({
-                scheme: "com.footnation.app",
-                path: "auth/callback",
-              }),
+              emailRedirectTo: authRedirectUri(),
             }
           : undefined,
       );
@@ -204,6 +201,11 @@ function Settings() {
         title="Mes signalements"
         secondary
         onPress={() => router.push("/my-reports")}
+      />
+      <Button
+        title="Désactiver temporairement"
+        secondary
+        onPress={() => router.push("/desactivation-compte")}
       />
       <Button
         title="Supprimer mon compte"
