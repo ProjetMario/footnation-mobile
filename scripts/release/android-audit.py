@@ -250,6 +250,7 @@ try:
  checks.append('video-autoplay-pause-resume-scroll-and-return')
  stage='profile-short-grid'
  route('my-profile')
+ stage='profile-short-tab'
  profile_shorts=None
  for _ in range(16):
   candidates=[]
@@ -263,9 +264,12 @@ try:
   adb('shell','input','swipe','540','1450','540','650','450');time.sleep(1)
  if profile_shorts is None:raise RuntimeError('Profile Shorts tab unavailable')
  tap(profile_shorts)
+ stage='profile-short-tile'
  tile=wait_for(lambda n:n.get('content-desc','').startswith('Ouvrir le Short') and visible(n),45)
  tap(tile)
+ stage='profile-short-viewer'
  wait_for(lambda n:n.get('content-desc')=='Retour' and visible(n),20)
+ stage='profile-short-playback'
  video_progress()
  tap(control('Retour'))
  checks.append('profile-short-thumbnail-opens-and-plays')
