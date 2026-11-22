@@ -60,6 +60,10 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: python3 scripts/release/android-audit.py > "$RUNNER_TEMP/footnation-android-audit/ui.log" 2>&1
+      - name: Report the safe failed audit stage
+        if: failure()
+        run: |
+          node -e 'const fs=require("fs");const p=process.env.RUNNER_TEMP+"/footnation-android-audit/report.json";if(!fs.existsSync(p)){console.log("audit-stage=report-unavailable");process.exit(0)}const r=JSON.parse(fs.readFileSync(p));const clean=v=>typeof v==="string"&&/^[a-z0-9-]{1,80}$/.test(v)?v:"redacted";console.log("audit-stage="+clean(r.stage));console.log("completed-checks="+(Array.isArray(r.checks)?r.checks.length:0));'
       - name: Encrypt audit evidence and remove temporary app data
         if: always()
         run: node scripts/release/android-audit.mjs finalize
