@@ -88,7 +88,7 @@ try {
   stage('inspect installed application container');
   const appPath=run('xcrun',['simctl','get_app_container',options.udid,metadata.appBundle,'app']).trim();
   stage('verify installed application identity');
-  run('python3',['-c',"import plistlib,sys;p=plistlib.load(open(sys.argv[1],'rb'));assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='17'",path.join(appPath,'Info.plist')]);
+  run('python3',['-c',"import plistlib,sys;p=plistlib.load(open(sys.argv[1],'rb'));assert p['CFBundleIdentifier']=='com.footnation.app' and p['CFBundleShortVersionString']=='1.0.5' and p['CFBundleVersion']=='23'",path.join(appPath,'Info.plist')]);
   const stamp=options.mode+'-'+options.locale+'-'+options.device;
   // Keep patched file beside the original so __TESTROOT__ resolves identically.
   const patched=path.join(path.dirname(metadata.xctestrun),'footnation-'+stamp+'.xctestrun');
@@ -119,7 +119,7 @@ try {
       preserved.push({filename:target,originalFilename:filename,sha256:createHash('sha256').update(data).digest('hex'),width:data.readUInt32BE(16),height:data.readUInt32BE(20),captureMethod:'XCUIScreen.main.screenshot',visuallyReviewed:false});
      }
      if(preserved.length) {
-      writeFileSync(path.join(options.output,'partial-'+stamp+'.json'),JSON.stringify({phaseFailed:true,appBundle:metadata.appBundle,version:'1.0.5',buildNumber:'17',locale:options.locale,device:options.device,mode:options.mode,screens:preserved},null,2),{mode:0o600});
+      writeFileSync(path.join(options.output,'partial-'+stamp+'.json'),JSON.stringify({phaseFailed:true,appBundle:metadata.appBundle,version:'1.0.5',buildNumber:'23',locale:options.locale,device:options.device,mode:options.mode,screens:preserved},null,2),{mode:0o600});
       console.log('Partial native frames preserved privately; this capture phase remains failed.');
      }
     }
@@ -141,7 +141,7 @@ try {
    const target=options.mode==='login'?options.device+'-00-authenticated-profile.png':filename;
    cpSync(path.join(captures,filename),path.join(options.output,target));chmodSync(path.join(options.output,target),0o600);
    const data=readFileSync(path.join(options.output,target));if(!data.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))throw Error('Expected native PNG');
-   receipt.push({filename:target,locale:options.locale,device:options.device,width:data.readUInt32BE(16),height:data.readUInt32BE(20),sha256:createHash('sha256').update(data).digest('hex'),captureMethod:'XCUIScreen.main.screenshot, installed Release app 1.0.5(17), genuine UI authentication',visuallyReviewed:false});
+   receipt.push({filename:target,locale:options.locale,device:options.device,width:data.readUInt32BE(16),height:data.readUInt32BE(20),sha256:createHash('sha256').update(data).digest('hex'),captureMethod:'XCUIScreen.main.screenshot, installed Release app 1.0.5(23), genuine UI authentication',visuallyReviewed:false});
   }
   writeFileSync(path.join(options.output,'xctest-'+stamp+'.json'),JSON.stringify({schema:1,authProof:'Démo FootNation visible in native my-profile',screens:receipt},null,2),{mode:0o600});
   rmSync(captures,{recursive:true,force:true});
