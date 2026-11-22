@@ -248,8 +248,10 @@ try:
  adb('shell','input','swipe','432','1500','432','450','400');video_progress()
  route('search');route('shorts');video_progress()
  checks.append('video-autoplay-pause-resume-scroll-and-return')
- stage='profile-short-grid'
- route('my-profile')
+ stage='profile-short-author'
+ route('shorts')
+ author_link=wait_for(lambda n:n.get('content-desc','').startswith('Voir le profil de ') and visible(n),30)
+ tap(author_link)
  stage='profile-short-tab'
  profile_shorts=None
  for _ in range(16):
